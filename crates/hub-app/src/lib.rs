@@ -17,4 +17,4 @@ pub use app::{Actor, App, Event, Tx};
 pub use auth::AuthUser;
 pub use config::Config;
 pub use error::{ApiError, ApiResult};
-pub use module::{FieldSql, Module, ModuleMeta, QueryScope};
+pub use module::{FieldSql, Module, ModuleMeta, QueryScope, ToolSpec};

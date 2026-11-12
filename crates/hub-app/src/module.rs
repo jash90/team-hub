@@ -29,6 +29,17 @@ pub struct FieldSql {
     pub params: Vec<Value>,
 }
 
+/// A tool a module offers to AI agents (served over MCP by the `agents` module).
+#[derive(Debug, Clone)]
+pub struct ToolSpec {
+    pub name: &'static str,
+    pub description: &'static str,
+    /// JSON Schema of the arguments object.
+    pub input_schema: serde_json::Value,
+    /// True when calling the tool changes nothing.
+    pub read_only: bool,
+}
+
 pub struct QueryScope<'a> {
     pub user: &'a AuthUser,
     pub now: DateTime<Utc>,
@@ -82,6 +93,16 @@ pub trait Module: Send + Sync + 'static {
     /// The module's section of "my work".
     fn dashboard(&self, _connection: &Connection, _viewer: &AuthUser) -> ApiResult<Option<serde_json::Value>> {
         Ok(None)
+    }
+
+    /// Tools this module offers to AI agents.
+    fn tools(&self) -> Vec<ToolSpec> {
+        Vec::new()
+    }
+
+    /// Runs one of this module's tools as `user`; none when the tool is not the module's.
+    fn call_tool(&self, _app: &App, _user: &AuthUser, _name: &str, _arguments: &serde_json::Value) -> Option<ApiResult<serde_json::Value>> {
+        None
     }
 
     /// Background work; called once the application is up.
