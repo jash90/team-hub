@@ -1,0 +1,40 @@
+use hub_app::{App, Config};
+use hub_server::{build_router, modules};
+
+fn main() {
+    tracing_subscriber::fmt().with_target(false).init();
+
+    if let Err(error) = start() {
+        eprintln!("team-hub: {error}");
+        std::process::exit(1);
+    }
+}
+
+fn start() -> Result<(), Box<dyn std::error::Error>> {
+    let config = Config::from_env()?;
+
+    // Request work and batch computations share one pool; blocking calls to other systems
+    // never run on it.
+    rayon::ThreadPoolBuilder::new()
+        .thread_name(|index| format!("hub-worker-{index}"))
+        .num_threads(std::thread::available_parallelism().map(|count| count.get().max(4)).unwrap_or(4))
+        .build_global()?;
+
+    let app = App::new(config.clone(), modules())?;
+    app.start_modules();
+
+    let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
+
+    runtime.block_on(async move {
+        let listener = tokio::net::TcpListener::bind((config.bind.as_str(), config.port)).await?;
+        tracing::info!("team-hub listening on http://{}", listener.local_addr()?);
+
+        axum::serve(listener, build_router(app))
+            .with_graceful_shutdown(async {
+                let _ = tokio::signal::ctrl_c().await;
+            })
+            .await?;
+
+        Ok::<(), Box<dyn std::error::Error>>(())
+    })
+}
