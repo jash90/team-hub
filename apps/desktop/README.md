@@ -16,9 +16,10 @@ core/        hub-desktop-core: everything that is not a window. No Tauri; shares
              Also the `hub` command line, the fake agent and the development server.
 src-tauri/   The window: one command that forwards to the core, the tray, notifications, window state.
 ui/          The interface: React, TypeScript, Vite. Polish and English, light and dark.
-sidecar/     Node helper that runs one agent turn through the Claude Agent SDK, JSON lines on stdin/stdout.
+sidecar/     Node helper that runs one agent turn through the Claude Agent SDK, JSON lines on stdin/stdout;
+             launch.mjs starts it from the agent runtime an installed app fetched.
 scripts/     The end-to-end check against a real server; the icon generator; the release's version check
-             and the helper's dependencies as an installer carries them.
+             and its check of what was packaged.
 ```
 
 ## Download
@@ -28,7 +29,8 @@ repository's [Releases page](https://github.com/jash90/team-hub/releases) (the r
 "team-hub desktop"). What you need besides the installer, how to open an unsigned build, and
 what is known not to work: [RELEASE_NOTES.md](RELEASE_NOTES.md), which is also the text of the
 release. The installers are built by GitHub Actions and were not tried by a person; see
-[Releasing](#releasing).
+[Releasing](#releasing). An installed app needs Node.js 22.18 or newer **and npm**: it
+downloads its [agent runtime](#the-agent-runtime-of-an-installed-app) when it first starts.
 
 ## Building and running
 
@@ -48,13 +50,15 @@ For installers on your own machine (`.dmg`; a Windows `-setup.exe`; `.deb`, `.rp
 ```bash
 cd apps/desktop
 npm ci && npm ci --prefix ui
-npm run sidecar        # the helper's production dependencies, as the installer carries them
 npm run build          # → src-tauri/target/release/bundle/
 ```
 
-`npm run sidecar` replaces `sidecar/node_modules`; run `npm install` in `sidecar` again before
-its `npm run check` and `npm test`. Released installers are not built this way but by GitHub
-Actions: see [Releasing](#releasing).
+Nothing has to be installed in `sidecar` for that: an installer carries the helper's source
+and no `node_modules`. Released installers are built by GitHub Actions: see
+[Releasing](#releasing).
+
+A run from the source tree (`npm run dev`, or the binary built above) uses
+`sidecar/node_modules` when it is there and downloads nothing.
 
 | System | Besides Rust and Node |
 |---|---|
@@ -84,6 +88,55 @@ target/debug/hub runner            # claim and carry out delegated runs until Ct
 Environment: `TEAM_HUB_DESKTOP_DIR` moves the app's data; `TEAM_HUB_TOKEN` gives the token for
 one process on a machine without a keychain (it is then stored nowhere); `TEAM_HUB_SIDECAR`
 replaces the helper process (e.g. with `target/debug/hub-fake-agent`).
+
+## The agent runtime of an installed app
+
+The Claude Agent SDK and its `claude` program are Anthropic's, and an installer does not pass
+them on. An installed app fetches them on the person's computer, once:
+
+- **When.** At start, when they are not there yet, and when a thread is started and they
+  are missing; again only after an update of the app whose `sidecar/package-lock.json`
+  changed. The tray menu has "Download the agent runtime"
+  for a try by hand, and so has a terminal: `team-hub-desktop --fetch-agent-runtime`.
+- **How and from where.** With the person's own npm (the one beside the Node of Settings →
+  Node command, else `npm` on the `PATH`):
+  `npm ci --omit=dev --no-audit --no-fund --ignore-scripts --no-bin-links --loglevel=http`,
+  in a folder that holds copies of the installer's `package.json` and `package-lock.json`.
+  So exactly the versions of the lock file, checked against its hashes by npm, from the
+  registry npm is set up with (registry.npmjs.org unless the person changed it); no install
+  script runs (no package of the helper has one). 106 packages; nearly all of the weight is
+  `@anthropic-ai/claude-agent-sdk-<system>`.
+- **How big.** Measured: a download of about 165 MB on macOS and Windows and about 330 MB
+  on Linux (npm fetches the program for glibc and the one for musl, and the app removes the
+  one it cannot use); 370 to 410 MB on disk afterwards.
+- **Where.** `agent-runtime/` in the app's data folder:
+  `~/.local/share/team-hub-desktop/` on Linux, `~/Library/Application Support/team-hub-desktop/`
+  on macOS, `%APPDATA%\team-hub-desktop\` on Windows, or `TEAM_HUB_DESKTOP_DIR`. Inside, one
+  folder named after a hash of `package.json` and `package-lock.json`, with `node_modules`
+  and, beside it, a copy of this app's helper source (`helper-<hash>/`): Node finds what the
+  source imports only in the folders above the source, so the helper runs from there and not
+  from the app's own, read-only folder.
+- **Whole or not at all.** npm works in `<hash>.partial-<pid>`, which gets the real name when
+  npm ended well and the SDK and its program are there. An install that was cut off leaves
+  nothing that looks finished and is removed at the next try, and so are the runtimes of
+  earlier versions after a successful one.
+- **What the person sees.** A dialog when the download starts; npm's last line in the
+  window's title and the tray's tooltip while it runs; a notification when the runtime is
+  ready. When it fails, a dialog with the reason (no npm, the registry not reached or
+  refusing, the disk full), npm's last lines, the command, where the full log is
+  (`agent-runtime/install.log`), and a **Retry** button. Starting a thread meanwhile is
+  answered with that state, not with a helper error, and the runner does not claim delegated
+  runs before the runtime is settled. With the runtime there, nothing needs the network.
+- **Removing it.** Quit the app and delete `agent-runtime/`; the next start fetches it again.
+  npm keeps its own copy of what it downloaded in its cache (`npm cache clean --force`).
+- **Not involved.** `TEAM_HUB_SIDECAR` replaces the helper as before, and a run from a source
+  tree with `sidecar/node_modules` uses that. The `hub` command line does not fetch anything;
+  it can use what the app fetched: `TEAM_HUB_SIDECAR="node <the app's resources>/sidecar/launch.mjs"`.
+
+The code is `src-tauri/src/runtime.rs` (no Tauri in it; `rustc --edition 2021 --test
+src-tauri/src/runtime.rs` runs its tests), the dialogs are in `src-tauri/src/main.rs`, and
+`sidecar/launch.mjs` is what the core is given as the helper: it runs the helper from the
+runtime, or answers the thread with the reason why it cannot.
 
 ## Connecting to a server
 
@@ -172,7 +225,8 @@ that token. The app acts as you, with your permissions.
   server it starts itself, with a throwaway repository and the fake agent: delegate, claim,
   working tree, question and answer, proposals, push, pull request, cancel.
 - `(cd sidecar && npm run check && npm test)`: the real helper type-checked against the
-  installed Claude Agent SDK, its options, and its side of the protocol.
+  installed Claude Agent SDK, its options, and its side of the protocol; and the launcher of
+  an installed app against made-up agent runtimes.
 - The interface in a browser, with the real core behind it:
 
   ```bash
@@ -221,11 +275,15 @@ here); a long real implementation run; how the SDK reports cost for a resumed se
 app takes the larger of "replace" and "add", see `Store::record_result`).
 
 What the first release added to the window's start was not run in a window either: taking
-the `PATH` of the person's shell, the dialog about a missing or old Node, and running the
-helper from the installed resources (`src-tauri/src/environment.rs`, `main.rs`). It compiles
-with the app, and its parts are tested alone (`rustc --edition 2021 --test
-src-tauri/src/environment.rs`, then run the program it makes); the helper was started from a
-copy laid out like the installed one, with production dependencies only, and answered `ready`.
+the `PATH` of the person's shell, the dialog about a missing or old Node, and fetching the
+agent runtime with its dialogs, the progress in the title and the tray's menu item
+(`src-tauri/src/environment.rs`, `runtime.rs`, `main.rs`). It compiles with the app, and the
+parts without Tauri are tested alone (`rustc --edition 2021 --test` on the first two files,
+then run the program it makes). Beyond those tests, the fetching code of `runtime.rs` was run
+here as it is, with the real npm and registry, from a copy laid out like an installed app:
+it left one whole runtime, the launcher started the helper from it (`ready`), the agent's
+program answered, a second run needed neither npm nor the network, and nothing was written
+into the copy of the installed folder.
 
 ## Releasing
 
@@ -270,26 +328,26 @@ What the workflow builds, each on the system it is for:
 | hub · the same four | the same | `hub-…tar.gz`, `hub-…zip` |
 | Draft the release | `ubuntu-latest`, the only job that may write | `SHA256SUMS`, the draft |
 
-**What an installer carries.** The window, the interface, and under its resources the helper:
-`sidecar/src`, `sidecar/package.json` and `sidecar/node_modules` with production dependencies
-only (`scripts/prepare-sidecar.mjs`). That folder holds the Claude Agent SDK and its native
-`claude` program for exactly one system, about 350 MB unpacked, which is why there are two
-macOS builds instead of a universal one and why an installer should come to around 200 MB
-(none was built yet; a `.deb` of the helper alone, made by hand, is 190 MB). **Node.js is
-not carried**: the app runs `node` (Settings → Node command) from the `PATH` of the person's
-shell, and says so in a dialog at start when there is none or it is older than 22.18. There
-is no `.msi`: add `"msi"` to `bundle.targets` in `tauri.conf.json` to get one. There is no
-updater.
+**What an installer carries.** The window, the interface, and under its resources the helper
+without its dependencies: `sidecar/launch.mjs`, `sidecar/src`, `sidecar/package.json` and
+`sidecar/package-lock.json`, 96 KB together. Not the Claude Agent SDK and not Node.js: the app
+[fetches the first](#the-agent-runtime-of-an-installed-app) and runs the second (`node`, or
+Settings → Node command) from the `PATH` of the person's shell, and says so in a dialog at
+start when there is none or it is older than 22.18. The helper's share of an installer was
+385 MB (190 MB packed) while the SDK was inside; no installer was built yet to weigh as a
+whole. There is no `.msi`: add `"msi"` to `bundle.targets` in `tauri.conf.json` to get one.
+There is no updater.
 
 **The workflow tries what it built, as far as a build machine can.** After packaging,
-`scripts/check-packaged.mjs` looks into the `.deb`, the AppImage and the macOS `.app`: the
-helper's files are where the app looks for them, the agent's program still answers as
-itself, and Node starts the helper from there. That matters because packaging tools rewrite
-programs they find: `strip` turns the agent's program into a bare JavaScript runtime that
-still starts (tried here; the AppImage tool is told not to strip, and it also rewrites the
-program's library path, which did it no harm here). On Windows the installer is run silently
-and the same check made on what it installed; that step reports and does not stop the
-release. None of this starts the window or an agent.
+`scripts/check-packaged.mjs` does what a first start does, on the unpacked `.deb`, the
+extracted AppImage and the macOS `.app`: the package carries the helper and no
+`node_modules`; before anything is fetched the launcher answers with a sentence; the
+packaged program itself fetches the runtime (`--fetch-agent-runtime`, into a data folder of
+its own); the agent's program answers as itself; the launcher starts the helper from there
+and Node gets `ready`. For the Intel Mac build, which the Apple silicon build machine cannot
+start, the same npm command is run instead of the program. On Windows the installer is run
+silently and the same check made on what it installed; that step reports and does not stop
+the release. None of this opens the window or runs an agent.
 
 **Signing is optional and off.** Without secrets the macOS app gets an ad-hoc signature and
 the Windows installer none; people have to allow the app by hand, as the notes describe.
@@ -299,10 +357,7 @@ Once a system is signed, take its "not signed" paragraph out of the notes.
   certificate as base64 of the `.p12`), `APPLE_CERTIFICATE_PASSWORD` and
   `APPLE_SIGNING_IDENTITY` to sign; add `APPLE_ID`, `APPLE_PASSWORD` (an app-specific
   password) and `APPLE_TEAM_ID` as well to notarize. The workflow passes them to Tauri only
-  when they are set. This path was never run. One thing to watch on the first try: Apple
-  notarizes an app only when every program inside it is signed. The `claude` program under
-  `Contents/Resources/sidecar/node_modules` is one; Tauri leaves it as it came, signed by
-  Anthropic's Developer ID, and whether Apple accepts the app with it has not been tried.
+  when they are set. This path was never run.
 - *Windows.* Nothing is wired. It needs a code-signing certificate and, in `tauri.conf.json`,
   either `bundle.windows.certificateThumbprint` with `digestAlgorithm` and `timestampUrl` (the
   certificate imported into the runner's store from secrets in a step before the build), or
@@ -316,14 +371,8 @@ secret. The workflow asks for its own permissions, read everywhere and
 `contents: write` for the one job that drafts the release, so the repository's default
 workflow permissions can stay read-only.
 
-**Before publishing, two things only the owner can settle.** The repository has no licence
-file, so a release says nothing about what people may do with the app. And the installers
-pass on software that is not ours: the Claude Agent SDK and its `claude` program are
-"© Anthropic PBC. All rights reserved", used under Anthropic's
-[legal agreements](https://code.claude.com/docs/en/legal-and-compliance); check that they
-allow handing the program on inside an installer. If they do not, the way out is an installer
-without `sidecar/node_modules` that fetches it on the person's computer (`npm ci` at first
-start), which is not built.
+**Licence.** team-hub is under the MIT licence; the bundle's metadata says so
+(`bundle.license`). Nothing of Anthropic's is in an installer.
 
 **Never run.** The workflow was written and checked (actionlint, shellcheck, the inputs of
 each action, the Tauri configuration against the schema) on a machine that cannot run GitHub
@@ -332,11 +381,13 @@ Actions. Its first run is its first test.
 ## What is not done
 
 - No installer was installed and tried by a person, on any system, and none is signed with a
-  developer certificate. The release workflow has not run yet. Node has to be installed on
-  the user's machine.
-- The `hub` command line, downloaded alone, finds no helper: it looks where the source tree
-  was when it was built. Agent threads from it need `TEAM_HUB_SIDECAR` (see the release
-  notes).
+  developer certificate. The release workflow has not run yet. Node and npm have to be
+  installed on the user's machine.
+- The download of the agent runtime shows its progress in the window's title and in native
+  dialogs, not in the interface, and its texts are English only.
+- The `hub` command line, downloaded alone, finds no helper and fetches none: it looks where
+  the source tree was when it was built. Agent threads from it need `TEAM_HUB_SIDECAR`
+  pointing at the app's launcher, after the app fetched the runtime (see the release notes).
 - On Windows the core starts git and the helper without hiding their console, so windows may
   flash; nobody has looked.
 - A pull request is opened with the `gh` command when it is installed (it is then yours). Without
