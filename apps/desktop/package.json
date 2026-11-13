@@ -7,7 +7,6 @@
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
-    "sidecar": "node scripts/prepare-sidecar.mjs",
     "check-version": "node scripts/check-version.mjs",
     "icons": "python3 scripts/make-icons.py src-tauri/icons"
   },

@@ -13,6 +13,9 @@
 # The build jobs only read the repository. One job, at the end and only for a tag, may write
 # releases. Nothing here needs a secret: without the Apple secrets the macOS app is signed
 # ad hoc, and the Windows installer is not signed.
+#
+# An installer does not carry the Claude Agent SDK: the app fetches it with npm on the
+# person's computer when it first starts. The build legs try exactly that on what they built.
 name: Desktop release
 
 on:
@@ -77,29 +80,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Two macOS builds, not one universal: the agent's native program in the bundle is
-          # for one architecture and weighs about 350 MB (see scripts/prepare-sidecar.mjs).
+          # One macOS build per architecture, as Tauri's own example does: two plain builds
+          # and two small downloads rather than one universal build of both.
           - label: macos-arm64
             os: macos-latest
             target: aarch64-apple-darwin
-            npm_os: darwin
-            npm_cpu: arm64
           - label: macos-x64
             os: macos-latest
             target: x86_64-apple-darwin
-            npm_os: darwin
-            npm_cpu: x64
           - label: windows-x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            npm_os: win32
-            npm_cpu: x64
           # The oldest Ubuntu GitHub offers: the packages then run on that glibc and newer.
           - label: linux-x64
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            npm_os: linux
-            npm_cpu: x64
     env:
       VERSION: ${{ needs.version.outputs.version }}
       LABEL: ${{ matrix.label }}
@@ -116,7 +111,6 @@ jobs:
           cache-dependency-path: |
             apps/desktop/package-lock.json
             apps/desktop/ui/package-lock.json
-            apps/desktop/sidecar/package-lock.json
 
       - name: Rust (stable) for ${{ matrix.target }}
         run: |
@@ -143,13 +137,8 @@ jobs:
           npm ci --prefix apps/desktop
           npm ci --prefix apps/desktop/ui
 
-      # What the installer carries of the helper: production dependencies only, and the
-      # agent's native program for the system the installer is for.
-      - name: The helper's dependencies, as bundled
-        env:
-          NPM_OS: ${{ matrix.npm_os }}
-          NPM_CPU: ${{ matrix.npm_cpu }}
-        run: node apps/desktop/scripts/prepare-sidecar.mjs --os "$NPM_OS" --cpu "$NPM_CPU"
+      # Nothing is installed for the helper (apps/desktop/sidecar): the installer carries its
+      # source, package.json, lock file and launcher, and no node_modules.
 
       # Optional. With the secrets of a Developer ID certificate the app is signed with it,
       # and notarized when the Apple ID ones are there too. A variable that is set but empty
@@ -195,10 +184,6 @@ jobs:
       # runs `npm run tauri build -- <args>` there, and what follows the second `--` is for cargo.
       - name: Build the app and its installers
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
-        env:
-          # For the AppImage tool: `strip` would turn the agent's program in the bundle into a
-          # bare JavaScript runtime.
-          NO_STRIP: 'true'
         with:
           projectPath: apps/desktop
           tauriScript: npm run tauri
@@ -238,40 +223,49 @@ jobs:
 
           ls -l dist
 
-      # Not whether the app works, only whether the helper it carries can start: the files
-      # are where the app looks, the agent's program is still that program after packaging,
-      # and Node runs the helper from there. Without an account or the network.
-      - name: The packaged helper starts (Linux, from the .deb and the AppImage)
+      # What a person's first start does, tried on what was just packaged (see
+      # scripts/check-packaged.mjs): the package carries the helper and no SDK; the installed
+      # program fetches the agent runtime with npm into a data folder (--fetch-agent-runtime);
+      # the agent's program answers; the launcher starts the helper from there. It uses the
+      # network and no account. It does not open the window or run an agent.
+      - name: The packaged app fetches its runtime and starts the helper (Linux, the .deb and the AppImage)
         if: runner.os == 'Linux'
         run: |
           work="$RUNNER_TEMP/packaged"
           mkdir -p "$work"
 
           dpkg-deb -x "dist/team-hub-desktop-$VERSION-$LABEL.deb" "$work/deb"
-          node apps/desktop/scripts/check-packaged.mjs "$work/deb/usr/lib/team-hub"
+          node apps/desktop/scripts/check-packaged.mjs "$work/deb/usr/lib/team-hub" --app "$work/deb/usr/bin/team-hub-desktop"
 
           cp "dist/team-hub-desktop-$VERSION-$LABEL.AppImage" "$work/app.AppImage"
           chmod +x "$work/app.AppImage"
           (cd "$work" && ./app.AppImage --appimage-extract > /dev/null)
-          node apps/desktop/scripts/check-packaged.mjs "$work/squashfs-root/usr/lib/team-hub"
+          # AppRun, so that npm runs in the environment an AppImage gives what it starts.
+          node apps/desktop/scripts/check-packaged.mjs "$work/squashfs-root/usr/lib/team-hub" --app "$work/squashfs-root/AppRun"
 
-      - name: The packaged helper starts (macOS, from the .app)
+      - name: The packaged app fetches its runtime and starts the helper (macOS, the .app)
         if: runner.os == 'macOS'
-        env:
-          NPM_OS: ${{ matrix.npm_os }}
-          NPM_CPU: ${{ matrix.npm_cpu }}
         run: |
-          node apps/desktop/scripts/check-packaged.mjs \
-            "apps/desktop/src-tauri/target/$TARGET/release/bundle/macos/team-hub.app/Contents/Resources" \
-            --os "$NPM_OS" --cpu "$NPM_CPU"
+          bundle="apps/desktop/src-tauri/target/$TARGET/release/bundle/macos/team-hub.app/Contents"
+          set -- "$bundle/Resources"
+
+          # The app itself does the fetching where this machine can run it. The build for the
+          # other architecture is checked with the same npm command instead.
+          case "$(uname -m)-$TARGET" in
+            arm64-aarch64-apple-darwin | x86_64-x86_64-apple-darwin)
+              set -- "$@" --app "$bundle/MacOS/team-hub-desktop"
+              ;;
+          esac
+
+          node apps/desktop/scripts/check-packaged.mjs "$@"
 
       # The only place the Windows installer is ever run before a person does. It reports and
       # does not stop the release: an installer that will not install silently on a build
       # machine may still be fine on a desk.
-      - name: The installer installs and the helper starts (Windows; reported, not required)
+      - name: The installer installs, the app fetches its runtime and starts the helper (Windows; reported, not required)
         if: runner.os == 'Windows'
         continue-on-error: true
-        timeout-minutes: 10
+        timeout-minutes: 20
         shell: pwsh
         run: |
           $installer = (Resolve-Path "dist/team-hub-desktop-${env:VERSION}-${env:LABEL}-setup.exe").Path
@@ -284,7 +278,7 @@ jobs:
             exit 1
           }
 
-          node apps/desktop/scripts/check-packaged.mjs $folder
+          node apps/desktop/scripts/check-packaged.mjs $folder --app (Join-Path $folder 'team-hub-desktop.exe')
           exit $LASTEXITCODE
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
