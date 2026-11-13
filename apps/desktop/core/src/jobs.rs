@@ -810,6 +810,8 @@ impl JobRunner {
                 command.uid(*uid).gid(*gid);
                 // SAFETY: runs in the child between fork and exec and only makes one system
                 // call: from here on no program it starts can gain rights (a setuid binary).
+                // Linux has that call; elsewhere the job runs as the other user without it.
+                #[cfg(target_os = "linux")]
                 unsafe {
                     command.pre_exec(|| match libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) {
                         0 => Ok(()),
