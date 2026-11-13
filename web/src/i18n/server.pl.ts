@@ -155,6 +155,14 @@ export const exact: Record<string, string> = {
 
   // ---- AI agents: errors ----
   Proposal: 'propozycja',
+  Changes: 'zmiany',
+  'A commit is named by its hexadecimal id': 'Commit podaje się jego szesnastkowym identyfikatorem',
+  'Nobody is at this runner; its pushes and pull requests are decided on the web':
+    'Przy tym runnerze nikogo nie ma; o jego wypchnięciach i pull requestach decyduje się na stronie',
+  'Only a push or a pull request approved on the web is reported this way': 'W ten sposób zgłasza się tylko wypchnięcie albo pull request zatwierdzone na stronie',
+  'This proposal is not waiting to be carried out': 'Ta propozycja nie czeka na wykonanie',
+  'Say what came of it, or why it could not be done': 'Podaj wynik albo powód, dla którego się nie udało',
+  'The changes are too large to show; send a shorter diff and say it was cut': 'Zmiany są za duże, żeby je pokazać; wyślij krótszy diff i zaznacz, że został skrócony',
   // Both an agent's run („zlecenie”) and a test run („przebieg”) are a "Run" to the server.
   Run: 'zlecenie albo przebieg testów',
   person: 'osoba',
@@ -401,6 +409,9 @@ export const patterns: Record<string, string> = {
   'Proposed {what}': 'Propozycja: {t:what}',
   'Approved: {what}': 'Zatwierdzono: {t:what}',
   'Rejected: {what}': 'Odrzucono: {t:what}',
+  'Approved: {what}; the runner carries it out': 'Zatwierdzono: {t:what}; wykona to runner',
+  'Carried out: {what}': 'Wykonano: {t:what}',
+  'Could not carry out {what}: {error}': 'Nie udało się wykonać ({t:what}): {t:error}',
   "Done in the runner's app: {what}": 'Wykonano w aplikacji desktopowej: {t:what}',
   "Declined in the runner's app: {what}": 'Odrzucono w aplikacji desktopowej: {t:what}',
   'Could not apply {what}: {why}': 'Nie udało się zastosować ({t:what}): {t:why}',

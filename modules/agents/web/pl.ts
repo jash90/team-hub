@@ -230,4 +230,21 @@ export const polish: Record<string, string> = {
   'Pushed at': 'Wypchnięto commit',
   'Decided in the desktop app, on the computer that has the code, where the changes can be looked at first.':
     'Decyzja zapada w aplikacji desktopowej, na komputerze z kodem, gdzie można najpierw obejrzeć zmiany.',
+  'being carried out': 'w realizacji',
+  'Approve the push': 'Zatwierdź wypchnięcie',
+  'Approve and open': 'Zatwierdź i otwórz',
+  'Approved. The runner does it on its next round and reports back here.': 'Zatwierdzono. Runner wykona to przy najbliższym obiegu i zamelduje tutaj wynik.',
+  'Look at the changes above first: approving sends exactly the commit shown there, and nothing later.':
+    'Najpierw obejrzyj zmiany powyżej: zatwierdzenie wysyła dokładnie pokazany tam commit i nic późniejszego.',
+  'Approved: {what}; the runner carries it out': 'Zatwierdzono: {what}; wykona to runner',
+  'Carried out: {what}': 'Wykonano: {what}',
+  'Could not carry out ({what}): {why}': 'Nie udało się wykonać ({what}): {why}',
+  Changes: 'Zmiany',
+  '{commits} commits, {files} files': 'commity: {commits}, pliki: {files}',
+  modified: 'zmieniony',
+  deleted: 'usunięty',
+  renamed: 'przeniesiony',
+  'The diff was cut short by the runner; the rest is on the branch once it is pushed.': 'Runner skrócił diff; reszta będzie na gałęzi po wypchnięciu.',
+  'uploaded {when}': 'przesłano {when}',
+  added: 'dodany',
 };

@@ -13,4 +13,8 @@ projects: Array<string> | null, version: string, lastSeenAt: string,
 /**
  * Seen in the last two minutes.
  */
-online: boolean, };
+online: boolean, 
+/**
+ * False for a runner with nobody at it (a container): see `AgentRun::runner_interactive`.
+ */
+interactive: boolean, };

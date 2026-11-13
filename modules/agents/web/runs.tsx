@@ -4,6 +4,7 @@ import { api } from '@/api.ts';
 import type { AgentProposal } from '@/bindings/AgentProposal.ts';
 import type { AgentProposalKind } from '@/bindings/AgentProposalKind.ts';
 import type { AgentRun } from '@/bindings/AgentRun.ts';
+import type { AgentRunChanges } from '@/bindings/AgentRunChanges.ts';
 import type { AgentRunDetail } from '@/bindings/AgentRunDetail.ts';
 import type { AgentRunEvent } from '@/bindings/AgentRunEvent.ts';
 import type { AgentRunKind } from '@/bindings/AgentRunKind.ts';
@@ -134,6 +135,9 @@ function statusText(text: string): string {
     [/^Rejected: (.+)$/, (found) => t('Rejected: {what}', { what: what(found[1]) })],
     [/^Done in the runner's app: (.+)$/, (found) => t('Done in the desktop app: {what}', { what: what(found[1]) })],
     [/^Declined in the runner's app: (.+)$/, (found) => t('Declined in the desktop app: {what}', { what: what(found[1]) })],
+    [/^Approved: (.+); the runner carries it out$/, (found) => t('Approved: {what}; the runner carries it out', { what: what(found[1]) })],
+    [/^Carried out: (.+)$/, (found) => t('Carried out: {what}', { what: what(found[1]) })],
+    [/^Could not carry out (.+?): (.+)$/, (found) => t('Could not carry out ({what}): {why}', { what: what(found[1]), why: translateServer(found[2]) })],
     [/^Could not apply (.+?): (.+)$/, (found) => t('Could not apply ({what}): {why}', { what: what(found[1]), why: translateServer(found[2]) })],
     [/^A proposal was refused: (.+)$/, (found) => t('A proposal was refused: {why}', { why: translateServer(found[1]) })],
     [/^Cancelled$/, () => t('Cancelled')],
@@ -300,6 +304,12 @@ function ProposalPreview({ proposal, drafts, onDrafts }: { proposal: AgentPropos
     return (
       <p>
         <code>{asText(payload.branch)}</code>
+        {asText(payload.commit) && (
+          <span className="muted">
+            {' @ '}
+            <code>{asText(payload.commit).slice(0, 12)}</code>
+          </span>
+        )}
         {asText(payload.note) && <span className="muted"> · {asText(payload.note)}</span>}
       </p>
     );
@@ -436,8 +446,19 @@ function ProposalResult({ proposal }: { proposal: AgentProposal }) {
   );
 }
 
-function ProposalCard({ proposal, canDecide, onDecided }: { proposal: AgentProposal; canDecide: boolean; onDecided: (detail: AgentRunDetail) => void }) {
-  const elsewhere = decidedByRunner(proposal.kind);
+type ProposalCardProps = {
+  proposal: AgentProposal;
+  canDecide: boolean;
+  /** False when nobody is at the run's runner: its pushes and pull requests are then decided here. */
+  runnerInteractive: boolean;
+  onDecided: (detail: AgentRunDetail) => void;
+};
+
+function ProposalCard({ proposal, canDecide, runnerInteractive, onDecided }: ProposalCardProps) {
+  const ofRunner = decidedByRunner(proposal.kind);
+  const elsewhere = ofRunner && runnerInteractive;
+  // Approved here, and the runner has not said yet how it went.
+  const underway = ofRunner && !runnerInteractive && proposal.state === 'approved' && proposal.result === null;
   const editable = proposal.state === 'pending' && canDecide && !elsewhere;
   const [drafts, setDrafts] = useState(() => subtasksOf(proposal.payload));
   const [note, setNote] = useState('');
@@ -456,14 +477,14 @@ function ProposalCard({ proposal, canDecide, onDecided }: { proposal: AgentPropo
     <article className={`agents-proposal agents-proposal-${proposal.state}`}>
       <header>
         <strong>{proposalLabel(proposal.kind)}</strong>
-        <Tag tone={tone}>{stateText}</Tag>
+        <Tag tone={underway ? 'blue' : tone}>{underway ? t('being carried out') : stateText}</Tag>
       </header>
       <ProposalPreview proposal={proposal} drafts={editable && proposal.kind === 'create_subtasks' ? drafts : null} onDrafts={editable ? setDrafts : null} />
       {editable ? (
         <div className="agents-decide">
           <input className="input" placeholder={t('A note on your decision (optional)')} value={note} onChange={(event) => setNote(event.target.value)} />
           <Button variant="primary" icon="check" disabled={busy || (proposal.kind === 'create_subtasks' && usable.length === 0)} onClick={() => decide(true)}>
-            {t('Approve')}
+            {proposal.kind === 'push' ? t('Approve the push') : proposal.kind === 'pull_request' ? t('Approve and open') : t('Approve')}
           </Button>
           <Button disabled={busy} onClick={() => decide(false)}>
             {t('Reject')}
@@ -474,9 +495,102 @@ function ProposalCard({ proposal, canDecide, onDecided }: { proposal: AgentPropo
       ) : proposal.state === 'pending' ? (
         <p className="muted">{t('Waiting for someone who may edit this project to decide.')}</p>
       ) : (
-        <ProposalResult proposal={proposal} />
+        <>
+          <ProposalResult proposal={proposal} />
+          {underway && (
+            <p className="muted agents-underway">
+              <Spinner /> {t('Approved. The runner does it on its next round and reports back here.')}
+            </p>
+          )}
+        </>
       )}
+      {editable && proposal.kind === 'push' && <p className="muted">{t('Look at the changes above first: approving sends exactly the commit shown there, and nothing later.')}</p>}
     </article>
+  );
+}
+
+/** A unified diff, line by line: what was added and removed is said by the sign as well as by colour. */
+function Patch({ text }: { text: string }) {
+  return (
+    <pre className="agents-patch">
+      {text.split('\n').map((line, index) => {
+        const kind = line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff ') || line.startsWith('index ')
+          ? 'file'
+          : line.startsWith('@@')
+            ? 'hunk'
+            : line.startsWith('+')
+              ? 'added'
+              : line.startsWith('-')
+                ? 'removed'
+                : 'same';
+
+        return (
+          <span key={index} className={`agents-patch-${kind}`}>
+            {line}
+            {'\n'}
+          </span>
+        );
+      })}
+    </pre>
+  );
+}
+
+/**
+ * What the run's thread has committed, as its runner uploaded it: the commits, the files, and
+ * the diff. This is what a person reads before approving a push from a runner nobody sits at.
+ */
+function RunChanges({ runId }: { runId: number }) {
+  const changes = useRemote(() => api.get<AgentRunChanges>(`${BASE}/runs/${runId}/changes`), [runId], (event) => event.kind === 'agent.run' && event.payload.runId === runId);
+  const data = changes.data;
+
+  if (!data) {
+    return changes.error ? <ErrorNote message={changes.error} /> : null;
+  }
+
+  const added = data.files.reduce((sum, file) => sum + file.additions, 0);
+  const removed = data.files.reduce((sum, file) => sum + file.deletions, 0);
+  const statusLabel: Record<string, string> = { added: t('added'), modified: t('modified'), deleted: t('deleted'), renamed: t('renamed') };
+
+  return (
+    <details className="agents-changes-block">
+      <summary>
+        <strong>{t('Changes')}</strong>
+        <span className="muted">
+          {' · '}
+          {t('{commits} commits, {files} files', { commits: data.commits.length, files: data.files.length })}
+          {' · '}
+          <span className="agents-added">+{added}</span> <span className="agents-removed">−{removed}</span>
+          {' · '}
+          <code>{data.head.slice(0, 12)}</code>
+        </span>
+      </summary>
+      <ol className="agents-list">
+        {data.commits.map((commit) => (
+          <li key={commit.sha}>
+            <code>{commit.sha.slice(0, 9)}</code> {commit.subject}
+            {commit.author && <span className="muted"> · {commit.author}</span>}
+          </li>
+        ))}
+      </ol>
+      <table className="table table-plain agents-files">
+        <tbody>
+          {data.files.map((file) => (
+            <tr key={file.path}>
+              <td>
+                <code>{file.path}</code>
+              </td>
+              <td className="muted">{statusLabel[file.status] ?? file.status}</td>
+              <td className="agents-file-counts">
+                <span className="agents-added">+{file.additions}</span> <span className="agents-removed">−{file.deletions}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {data.patch && <Patch text={data.patch} />}
+      {data.truncated && <p className="muted">{t('The diff was cut short by the runner; the rest is on the branch once it is pushed.')}</p>}
+      <p className="muted">{t('uploaded {when}', { when: timeAgo(data.updatedAt) })}</p>
+    </details>
   );
 }
 
@@ -663,6 +777,7 @@ export function RunCard({ run: listed, canDecide, settings, open = false, showIs
             <>
               <Stream events={detail.data.events} skip={isFinished(run.state) || run.state === 'waiting' ? run.summary : null} />
               {run.pendingQuestion && canDecide && <AnswerBox run={run} onAnswered={changed} />}
+              {run.hasChanges && <RunChanges runId={run.id} />}
               {detail.data.proposals.length > 0 && (
                 <div className="agents-proposals">
                   <div className="agents-proposals-head">
@@ -674,7 +789,13 @@ export function RunCard({ run: listed, canDecide, settings, open = false, showIs
                     )}
                   </div>
                   {detail.data.proposals.map((proposal) => (
-                    <ProposalCard key={`${proposal.id}-${proposal.state}`} proposal={proposal} canDecide={canDecide} onDecided={changed} />
+                    <ProposalCard
+                      key={`${proposal.id}-${proposal.state}-${proposal.result === null ? 'open' : 'done'}`}
+                      proposal={proposal}
+                      canDecide={canDecide}
+                      runnerInteractive={run.runnerInteractive}
+                      onDecided={changed}
+                    />
                   ))}
                 </div>
               )}

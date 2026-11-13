@@ -10,10 +10,10 @@ use hub_core::Id;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::proposals::{self, Decision, Settlement};
+use crate::proposals::{self, Decision, Report, Settlement};
 use crate::runs::{self, Claim, Heartbeat, NewEvent, NewRun, RunFilter, RunPatch, AI_LABEL};
 use crate::settings::{self, SettingsInput};
-use crate::types::{AgentProposal, AgentProposalKind, AgentRun, AgentRunDetail, AgentRunner, AgentSettings, AgentTrust};
+use crate::types::{AgentProposal, AgentProposalKind, AgentRun, AgentRunChanges, AgentRunDetail, AgentRunner, AgentSettings, AgentTrust};
 
 type Reply<T> = ApiResult<Json<T>>;
 
@@ -29,6 +29,8 @@ pub fn router() -> Router<App> {
         .route("/runs/{id}/proposals", post(add_proposal))
         .route("/proposals/{id}/decide", post(decide))
         .route("/proposals/{id}/settle", post(settle))
+        .route("/proposals/{id}/result", post(report))
+        .route("/runs/{id}/changes", get(get_changes).put(put_changes))
         .route("/runners", get(runners))
         .route("/runners/heartbeat", post(heartbeat))
         .route("/settings", get(get_settings).put(put_settings))
@@ -166,6 +168,18 @@ async fn add_proposal(State(app): State<App>, user: AuthUser, Path(id): Path<Id>
 
 async fn settle(State(app): State<App>, user: AuthUser, Path(id): Path<Id>, Json(settlement): Json<Settlement>) -> Reply<AgentRunDetail> {
     app.run(move |app| app.write(Actor::user_via(user.id, AI_LABEL), |tx| proposals::settle(tx, &user, id, &settlement))).await.map(Json)
+}
+
+async fn report(State(app): State<App>, user: AuthUser, Path(id): Path<Id>, Json(report): Json<Report>) -> Reply<AgentRunDetail> {
+    app.run(move |app| app.write(agent(), |tx| proposals::report(tx, &user, id, &report))).await.map(Json)
+}
+
+async fn get_changes(State(app): State<App>, user: AuthUser, Path(id): Path<Id>) -> Reply<AgentRunChanges> {
+    app.run(move |app| app.read(|connection| runs::changes(connection, &user, id))).await.map(Json)
+}
+
+async fn put_changes(State(app): State<App>, user: AuthUser, Path(id): Path<Id>, Json(changes): Json<AgentRunChanges>) -> Reply<AgentRun> {
+    app.run(move |app| app.write(agent(), |tx| runs::put_changes(tx, &user, id, &changes))).await.map(Json)
 }
 
 async fn patch_run(State(app): State<App>, user: AuthUser, Path(id): Path<Id>, Json(patch): Json<RunPatch>) -> Reply<AgentRun> {

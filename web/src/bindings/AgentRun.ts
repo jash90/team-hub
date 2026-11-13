@@ -22,4 +22,13 @@ repo: string | null, branch: string | null, pullRequestUrl: string | null,
 /**
  * The result in a few sentences (Markdown).
  */
-summary: string | null, inputTokens: number | null, outputTokens: number | null, costUsd: number | null, cancelRequested: boolean, pendingProposals: number, pendingQuestion: boolean, createdAt: string, startedAt: string | null, finishedAt: string | null, };
+summary: string | null, inputTokens: number | null, outputTokens: number | null, costUsd: number | null, cancelRequested: boolean, pendingProposals: number, pendingQuestion: boolean, 
+/**
+ * False when the run's runner has nobody at it: its pushes and pull requests are then
+ * decided here rather than in the runner's app. True for the server and for no runner.
+ */
+runnerInteractive: boolean, 
+/**
+ * Whether the runner has uploaded what the thread committed (`GET /runs/{id}/changes`).
+ */
+hasChanges: boolean, createdAt: string, startedAt: string | null, finishedAt: string | null, };

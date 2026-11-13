@@ -71,4 +71,15 @@ CREATE TABLE agent_runner (
     version TEXT NOT NULL DEFAULT '',
     last_seen_at TEXT NOT NULL
 );
+"#, r#"
+-- A runner with nobody at it (a container) is not interactive: what its threads want to
+-- push is then decided on the web, from the changes it uploads.
+ALTER TABLE agent_runner ADD COLUMN interactive INTEGER NOT NULL DEFAULT 1;
+
+-- What a run's thread has committed, as its runner last described it: one JSON document.
+CREATE TABLE agent_run_changes (
+    run_id INTEGER PRIMARY KEY REFERENCES agent_run (id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 "#];

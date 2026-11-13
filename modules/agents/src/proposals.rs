@@ -90,6 +90,9 @@ struct PushPayload {
     branch: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     note: Option<String>,
+    /// The commit that would be pushed: what the person approves, and no later one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    commit: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -267,7 +270,13 @@ fn check(connection: &Connection, row: &RunRow, kind: AgentProposalKind, payload
                 return Err(ApiError::bad_request("The note is too long"));
             }
 
-            json!(PushPayload { branch: branch_name(&push.branch)?, note: note.map(String::from) })
+            let commit = push.commit.as_deref().map(str::trim).filter(|commit| !commit.is_empty());
+
+            if commit.is_some_and(|commit| !(7..=64).contains(&commit.len()) || !commit.chars().all(|character| character.is_ascii_hexdigit())) {
+                return Err(ApiError::bad_request("A commit is named by its hexadecimal id"));
+            }
+
+            json!(PushPayload { branch: branch_name(&push.branch)?, note: note.map(String::from), commit: commit.map(String::from) })
         }
         AgentProposalKind::PullRequest => {
             let pull: PullRequestPayload = parse(payload)?;
@@ -668,7 +677,17 @@ pub fn decide(app: &App, user: &AuthUser, id: Id, decision: &Decision) -> ApiRes
         }
 
         if proposal.kind.decided_by_runner() {
-            return Err(ApiError::conflict("This is decided in the runner's app, where the changes can be looked at first"));
+            if row.run.runner_interactive {
+                return Err(ApiError::conflict("This is decided in the runner's app, where the changes can be looked at first"));
+            }
+
+            // Nobody is at this runner: the decision is made here, and the runner carries it
+            // out and says how it went (`report`). Nothing is applied on the server.
+            if decision.approve {
+                let words = format!("Approved: {}; the runner carries it out", kind_words(proposal.kind));
+
+                return decided(tx, &row, &proposal, AgentProposalState::Approved, note, None, &words);
+            }
         }
 
         if !decision.approve {
@@ -732,6 +751,10 @@ pub fn settle(tx: &Tx, user: &AuthUser, id: Id, settlement: &Settlement) -> ApiR
     // Like the run's branch, how it went may be said after the run has ended.
     let row = runs::holder(tx, user, proposal.run_id)?;
 
+    if !row.run.runner_interactive {
+        return Err(ApiError::conflict("Nobody is at this runner; its pushes and pull requests are decided on the web"));
+    }
+
     if !proposal.kind.decided_by_runner() {
         return Err(ApiError::bad_request("A person decides this proposal here; a runner cannot settle it"));
     }
@@ -752,6 +775,73 @@ pub fn settle(tx: &Tx, user: &AuthUser, id: Id, settlement: &Settlement) -> ApiR
     };
 
     decided(tx, &row, &proposal, state, note, settlement.approve.then_some(&settlement.result), &words)?;
+
+    runs::detail(tx, row.run.id)
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Report {
+    /// What came of it: `{ commit }` for a push, `{ url }` for a pull request.
+    #[serde(default)]
+    pub result: Value,
+    /// Why it could not be done.
+    pub error: Option<String>,
+}
+
+/// A runner with nobody at it says how a push or a pull request that was approved on the
+/// web went. With an error the proposal is marked failed, so the person sees it was not done.
+pub fn report(tx: &Tx, user: &AuthUser, id: Id, report: &Report) -> ApiResult<AgentRunDetail> {
+    let proposal = stored(tx, "id = ?1", id)?.pop().ok_or_else(|| ApiError::not_found("Proposal"))?.proposal;
+    let row = runs::holder(tx, user, proposal.run_id)?;
+
+    if !proposal.kind.decided_by_runner() || row.run.runner_interactive {
+        return Err(ApiError::bad_request("Only a push or a pull request approved on the web is reported this way"));
+    }
+
+    if proposal.state != AgentProposalState::Approved || !proposal.result.is_null() {
+        return Err(ApiError::conflict("This proposal is not waiting to be carried out"));
+    }
+
+    let error = report.error.as_deref().map(str::trim).filter(|error| !error.is_empty());
+
+    if report.result.to_string().len() > MAX_NOTE || error.is_some_and(|error| error.len() > MAX_NOTE) {
+        return Err(ApiError::bad_request("The result is too long"));
+    }
+
+    match error {
+        Some(error) => {
+            tx.execute("UPDATE agent_proposal SET state = 'failed', note = ?1 WHERE id = ?2", (error, id))?;
+            runs::add_event(
+                tx,
+                row.run.id,
+                AgentEventKind::Error,
+                &format!("Could not carry out {}: {error}", kind_words(proposal.kind)),
+                Some(&json!({ "proposalId": id, "state": "failed" })),
+                None,
+            )?;
+        }
+        None if report.result.is_null() => return Err(ApiError::bad_request("Say what came of it, or why it could not be done")),
+        None => {
+            tx.execute("UPDATE agent_proposal SET result = ?1 WHERE id = ?2", (report.result.to_string(), id))?;
+
+            if let (AgentProposalKind::PullRequest, Some(url)) = (proposal.kind, report.result["url"].as_str()) {
+                if url.starts_with("https://") || url.starts_with("http://") {
+                    tx.execute("UPDATE agent_run SET pull_request_url = ?1 WHERE id = ?2", (url, row.run.id))?;
+                }
+            }
+
+            runs::add_event(
+                tx,
+                row.run.id,
+                AgentEventKind::Status,
+                &format!("Carried out: {}", kind_words(proposal.kind)),
+                Some(&json!({ "proposalId": id, "state": "approved" })),
+                None,
+            )?;
+        }
+    }
+
+    runs::announce(tx, row.run.id)?;
 
     runs::detail(tx, row.run.id)
 }

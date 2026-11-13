@@ -15,7 +15,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::proposals;
-use crate::types::{AgentEventKind, AgentRun, AgentRunDetail, AgentRunEvent, AgentRunKind, AgentRunState, AgentRunner};
+use crate::types::{AgentEventKind, AgentRun, AgentRunChanges, AgentRunDetail, AgentRunEvent, AgentRunKind, AgentRunState, AgentRunner};
 
 /// The runner id of the server itself.
 pub const SERVER_RUNNER: &str = "server";
@@ -25,11 +25,16 @@ const STALE_AFTER_MINUTES: i64 = 10;
 const ONLINE_FOR_SECONDS: i64 = 120;
 const MAX_INSTRUCTIONS: usize = 8000;
 const MAX_EVENT_TEXT: usize = 100_000;
+/// The diff a runner uploads is for a person to read, not an archive of the branch.
+const MAX_PATCH_BYTES: usize = 2 * 1024 * 1024;
+const MAX_CHANGED_ITEMS: usize = 2000;
 
 const SELECT: &str = "SELECT r.id, i.key, i.summary, p.key, r.kind, r.instructions, r.state, r.requested_by, r.shared, r.runner_id, r.runner_name,
         r.model, r.repo, r.branch, r.pull_request_url, r.summary, r.input_tokens, r.output_tokens, r.cost_usd, r.cancel_requested,
         (SELECT count(*) FROM agent_proposal a WHERE a.run_id = r.id AND a.state = 'pending'),
-        r.question_pending, r.created_at, r.started_at, r.finished_at, r.issue_id, r.project_id, r.runner_user_id
+        r.question_pending, r.created_at, r.started_at, r.finished_at, r.issue_id, r.project_id, r.runner_user_id,
+        coalesce((SELECT n.interactive FROM agent_runner n WHERE n.id = r.runner_id), 1),
+        EXISTS (SELECT 1 FROM agent_run_changes c WHERE c.run_id = r.id)
     FROM agent_run r JOIN issue i ON i.id = r.issue_id JOIN project p ON p.id = r.project_id";
 
 /// A run with what the contract's shape leaves out.
@@ -79,6 +84,8 @@ fn map_row(row: &rusqlite::Row) -> rusqlite::Result<RunRow> {
             cancel_requested: row.get(19)?,
             pending_proposals: row.get(20)?,
             pending_question: row.get(21)?,
+            runner_interactive: row.get(28)?,
+            has_changes: row.get(29)?,
             created_at: row.get(22)?,
             started_at: row.get(23)?,
             finished_at: row.get(24)?,
@@ -521,6 +528,42 @@ pub fn update(tx: &Tx, row: &RunRow, patch: &RunPatch) -> ApiResult<AgentRun> {
     Ok(load(tx, id)?.run)
 }
 
+/// Replaces what the run's thread is known to have committed. The runner sends the whole
+/// picture each time; a run that has ended still takes it, like its branch.
+pub fn put_changes(tx: &Tx, user: &AuthUser, id: Id, changes: &AgentRunChanges) -> ApiResult<AgentRun> {
+    holder(tx, user, id)?;
+
+    let is_commit = |sha: &str| (7..=64).contains(&sha.len()) && sha.chars().all(|character| character.is_ascii_hexdigit());
+
+    if !is_commit(&changes.base) || !is_commit(&changes.head) || changes.commits.iter().any(|commit| !is_commit(&commit.sha)) {
+        return Err(ApiError::bad_request("A commit is named by its hexadecimal id"));
+    }
+
+    if changes.patch.len() > MAX_PATCH_BYTES || changes.commits.len() > MAX_CHANGED_ITEMS || changes.files.len() > MAX_CHANGED_ITEMS {
+        return Err(ApiError::bad_request("The changes are too large to show; send a shorter diff and say it was cut"));
+    }
+
+    let stored = AgentRunChanges { updated_at: tx.now.clone(), ..changes.clone() };
+
+    tx.execute(
+        "INSERT INTO agent_run_changes (run_id, body, updated_at) VALUES (?1, ?2, ?3)
+         ON CONFLICT (run_id) DO UPDATE SET body = ?2, updated_at = ?3",
+        (id, serde_json::to_string(&stored)?, &tx.now),
+    )?;
+    announce(tx, id)?;
+
+    Ok(load(tx, id)?.run)
+}
+
+/// What the run's thread has committed, for anyone who can see the run.
+pub fn changes(connection: &Connection, user: &AuthUser, id: Id) -> ApiResult<AgentRunChanges> {
+    run_access(connection, user, id)?;
+
+    let body: Option<String> = query_one(connection, "SELECT body FROM agent_run_changes WHERE run_id = ?1", [id], |row| row.get(0))?;
+
+    body.and_then(|body| serde_json::from_str(&body).ok()).ok_or_else(|| ApiError::not_found("Changes"))
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Heartbeat {
@@ -531,6 +574,13 @@ pub struct Heartbeat {
     pub projects: Option<Vec<String>>,
     #[serde(default)]
     pub version: String,
+    /// False for a runner with nobody at it; absent means there is someone (the desktop app).
+    #[serde(default = "yes")]
+    pub interactive: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 fn runner_id(text: &str) -> ApiResult<&str> {
@@ -556,8 +606,8 @@ pub fn heartbeat(tx: &Tx, user: &AuthUser, beat: &Heartbeat) -> ApiResult<()> {
     let kinds: Vec<&str> = beat.kinds.iter().map(|kind| kind.as_str()).collect();
 
     tx.execute(
-        "INSERT INTO agent_runner (id, name, user_id, kinds, projects, version, last_seen_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-         ON CONFLICT (id) DO UPDATE SET name = ?2, kinds = ?4, projects = ?5, version = ?6, last_seen_at = ?7",
+        "INSERT INTO agent_runner (id, name, user_id, kinds, projects, version, last_seen_at, interactive) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT (id) DO UPDATE SET name = ?2, kinds = ?4, projects = ?5, version = ?6, last_seen_at = ?7, interactive = ?8",
         (
             id,
             name,
@@ -566,6 +616,7 @@ pub fn heartbeat(tx: &Tx, user: &AuthUser, beat: &Heartbeat) -> ApiResult<()> {
             beat.projects.as_ref().map(|projects| json!(projects).to_string()),
             beat.version.trim(),
             &tx.now,
+            beat.interactive,
         ),
     )?;
 
@@ -698,7 +749,7 @@ pub fn runners(connection: &Connection, user: &AuthUser, now: DateTime<Utc>) -> 
     let online_since = iso(now - Duration::seconds(ONLINE_FOR_SECONDS));
     let all = query_all(
         connection,
-        "SELECT id, name, user_id, kinds, projects, version, last_seen_at FROM agent_runner ORDER BY last_seen_at DESC",
+        "SELECT id, name, user_id, kinds, projects, version, last_seen_at, interactive FROM agent_runner ORDER BY last_seen_at DESC",
         [],
         |row| {
             let kinds: String = row.get(3)?;
@@ -714,6 +765,7 @@ pub fn runners(connection: &Connection, user: &AuthUser, now: DateTime<Utc>) -> 
                 version: row.get(5)?,
                 online: last_seen_at >= online_since,
                 last_seen_at,
+                interactive: row.get(7)?,
             })
         },
     )?;

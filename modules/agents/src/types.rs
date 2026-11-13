@@ -120,9 +120,64 @@ pub struct AgentRun {
     pub cancel_requested: bool,
     pub pending_proposals: i64,
     pub pending_question: bool,
+    /// False when the run's runner has nobody at it: its pushes and pull requests are then
+    /// decided here rather than in the runner's app. True for the server and for no runner.
+    pub runner_interactive: bool,
+    /// Whether the runner has uploaded what the thread committed (`GET /runs/{id}/changes`).
+    pub has_changes: bool,
     pub created_at: String,
     pub started_at: Option<String>,
     pub finished_at: Option<String>,
+}
+
+/// One commit of a run's thread.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AgentCommit {
+    pub sha: String,
+    pub subject: String,
+    #[serde(default)]
+    pub author: Option<String>,
+}
+
+/// One file a run's thread changed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AgentChangedFile {
+    pub path: String,
+    /// "added", "modified", "deleted" or "renamed".
+    pub status: String,
+    #[serde(default)]
+    pub additions: i64,
+    #[serde(default)]
+    pub deletions: i64,
+}
+
+/// What a run's thread has committed, uploaded by its runner so that a person can look
+/// before anything is pushed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AgentRunChanges {
+    /// The commit the thread started from.
+    pub base: String,
+    /// The thread's last commit.
+    pub head: String,
+    #[serde(default)]
+    pub commits: Vec<AgentCommit>,
+    #[serde(default)]
+    pub files: Vec<AgentChangedFile>,
+    /// A unified diff from `base` to `head`.
+    #[serde(default)]
+    pub patch: String,
+    /// True when the runner cut the diff short.
+    #[serde(default)]
+    pub truncated: bool,
+    /// When it was uploaded; set by the server.
+    #[serde(default)]
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
@@ -226,6 +281,8 @@ pub struct AgentRunner {
     pub last_seen_at: String,
     /// Seen in the last two minutes.
     pub online: bool,
+    /// False for a runner with nobody at it (a container): see `AgentRun::runner_interactive`.
+    pub interactive: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
