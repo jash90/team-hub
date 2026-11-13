@@ -1149,6 +1149,7 @@ name = "hub-mod-agents"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "http-body-util",
  "hub-app",
  "hub-core",
@@ -1157,7 +1158,9 @@ dependencies = [
  "serde_json",
  "tokio",
  "tower",
+ "tracing",
  "ts-rs",
+ "ureq",
 ]
 
 [[package]]
@@ -1225,6 +1228,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "hub-mod-jira"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64",
+ "chrono",
+ "hex",
+ "http-body-util",
+ "hub-app",
+ "hub-core",
+ "rayon",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tower",
+ "tracing",
+ "ts-rs",
+ "ureq",
+]
+
+[[package]]
 name = "hub-mod-reports"
 version = "0.1.0"
 dependencies = [
@@ -1274,6 +1300,7 @@ dependencies = [
  "hub-core",
  "hub-mod-agents",
  "hub-mod-confluence",
+ "hub-mod-e2e",
  "hub-mod-github",
  "hub-mod-reports",
  "hub-mod-wiki",

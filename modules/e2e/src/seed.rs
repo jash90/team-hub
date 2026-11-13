@@ -54,12 +54,21 @@ struct Case {
     seconds: f64,
 }
 
-const BASE: Case = Case { file: "", group: "", title: "", line: 1, tags: &[], outcomes: "pppppppp", failure: None, skip: None, agent_steps: 0, seconds: 3.0 };
+const BASE: Case =
+    Case { file: "", group: "", title: "", line: 1, tags: &[], outcomes: "pppppppp", failure: None, skip: None, agent_steps: 0, seconds: 3.0 };
 
 const CASES: &[Case] = &[
     Case { file: "tests/koszyk.e2e.ts", group: "Koszyk", title: "WEB-4 klient dodaje produkt do koszyka", line: 8, seconds: 4.2, ..BASE },
     Case { file: "tests/koszyk.e2e.ts", group: "Koszyk", title: "WEB-4 klient usuwa produkt z koszyka", line: 21, seconds: 3.6, ..BASE },
-    Case { file: "tests/koszyk.e2e.ts", group: "Koszyk", title: "WEB-6 suma koszyka uwzględnia rabat pozycji", line: 34, tags: &["regresja"], seconds: 3.1, ..BASE },
+    Case {
+        file: "tests/koszyk.e2e.ts",
+        group: "Koszyk",
+        title: "WEB-6 suma koszyka uwzględnia rabat pozycji",
+        line: 34,
+        tags: &["regresja"],
+        seconds: 3.1,
+        ..BASE
+    },
     Case {
         file: "tests/koszyk.e2e.ts",
         group: "Koszyk",
@@ -79,7 +88,15 @@ const CASES: &[Case] = &[
         ..BASE
     },
     Case { file: "tests/konto.e2e.ts", group: "Konto klienta", title: "WEB-8 rejestracja nowego klienta e-mailem", line: 9, seconds: 5.8, ..BASE },
-    Case { file: "tests/konto.e2e.ts", group: "Konto klienta", title: "WEB-8 logowanie poprawnym hasłem", line: 24, tags: &["smoke"], seconds: 2.9, ..BASE },
+    Case {
+        file: "tests/konto.e2e.ts",
+        group: "Konto klienta",
+        title: "WEB-8 logowanie poprawnym hasłem",
+        line: 24,
+        tags: &["smoke"],
+        seconds: 2.9,
+        ..BASE
+    },
     Case {
         file: "tests/konto.e2e.ts",
         group: "Konto klienta",
@@ -97,7 +114,16 @@ const CASES: &[Case] = &[
         seconds: 7.5,
         ..BASE
     },
-    Case { file: "tests/platnosci.e2e.ts", group: "Płatności", title: "WEB-9 płatność kartą testową przechodzi", line: 11, tags: &["płatności"], outcomes: "----p-p-", seconds: 9.4, ..BASE },
+    Case {
+        file: "tests/platnosci.e2e.ts",
+        group: "Płatności",
+        title: "WEB-9 płatność kartą testową przechodzi",
+        line: 11,
+        tags: &["płatności"],
+        outcomes: "----p-p-",
+        seconds: 9.4,
+        ..BASE
+    },
     Case {
         file: "tests/platnosci.e2e.ts",
         group: "Płatności",
@@ -127,8 +153,23 @@ const CASES: &[Case] = &[
         seconds: 0.0,
         ..BASE
     },
-    Case { file: "tests/adres.e2e.ts", group: "Adres dostawy", title: "formularz wymaga ulicy, miasta i kodu pocztowego", line: 7, tags: &["@WEB-5"], seconds: 3.3, ..BASE },
-    Case { file: "tests/adres.e2e.ts", group: "Adres dostawy", title: "WEB-5 zapisany adres podpowiada się przy kolejnym zamówieniu", line: 22, seconds: 4.0, ..BASE },
+    Case {
+        file: "tests/adres.e2e.ts",
+        group: "Adres dostawy",
+        title: "formularz wymaga ulicy, miasta i kodu pocztowego",
+        line: 7,
+        tags: &["@WEB-5"],
+        seconds: 3.3,
+        ..BASE
+    },
+    Case {
+        file: "tests/adres.e2e.ts",
+        group: "Adres dostawy",
+        title: "WEB-5 zapisany adres podpowiada się przy kolejnym zamówieniu",
+        line: 22,
+        seconds: 4.0,
+        ..BASE
+    },
     Case {
         file: "tests/zakup.e2e.ts",
         group: "Ścieżka zakupowa",
@@ -140,7 +181,15 @@ const CASES: &[Case] = &[
         seconds: 38.0,
         ..BASE
     },
-    Case { file: "tests/smoke.e2e.ts", group: "", title: "strona główna pokazuje katalog produktów", line: 4, tags: &["smoke"], seconds: 1.8, ..BASE },
+    Case {
+        file: "tests/smoke.e2e.ts",
+        group: "",
+        title: "strona główna pokazuje katalog produktów",
+        line: 4,
+        tags: &["smoke"],
+        seconds: 1.8,
+        ..BASE
+    },
 ];
 
 /// A run of today happened `hour` hours ago; an earlier one at `hour` o'clock of its day.
@@ -240,8 +289,9 @@ fn report(run: &Run, position: usize) -> Value {
     }
 
     let failed = results.iter().any(|result| result["status"] == "failed");
-    let finished = (chrono::DateTime::parse_from_rfc3339(&started).map(|at| at.with_timezone(&Utc)).unwrap_or_else(|_| Utc::now()) + Duration::milliseconds(total_ms + 21_000))
-        .to_rfc3339_opts(SecondsFormat::Millis, true);
+    let finished = (chrono::DateTime::parse_from_rfc3339(&started).map(|at| at.with_timezone(&Utc)).unwrap_or_else(|_| Utc::now())
+        + Duration::milliseconds(total_ms + 21_000))
+    .to_rfc3339_opts(SecondsFormat::Millis, true);
 
     json!({
         "schemaVersion": "report-1",

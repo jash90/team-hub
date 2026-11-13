@@ -448,7 +448,8 @@ fn read_result(result: &DocResult, groups: &HashMap<&str, &DocGroup>, variants: 
         .map(|line| whole(Some(line)))
         .filter(|line| *line > 0);
     let steps = || views.iter().flat_map(|view| view.steps.iter());
-    let costs: Vec<f64> = steps().filter_map(|step| step.model.as_ref()?.estimated_cost_usd).filter(|cost| cost.is_finite() && *cost >= 0.0).collect();
+    let costs: Vec<f64> =
+        steps().filter_map(|step| step.model.as_ref()?.estimated_cost_usd).filter(|cost| cost.is_finite() && *cost >= 0.0).collect();
     let mut notes = Vec::new();
 
     if let Some(annotations) = &result.annotations {
@@ -481,7 +482,8 @@ fn read_result(result: &DocResult, groups: &HashMap<&str, &DocGroup>, variants: 
 /// The framework's JSON report. Fields this module does not use are ignored, so a newer
 /// report still reads; one without a `run` is refused.
 pub fn parse_json(bytes: &[u8]) -> ApiResult<ParsedRun> {
-    let document: Document = serde_json::from_slice(bytes).map_err(|error| ApiError::bad_request(format!("The report is not valid JSON: {error}")))?;
+    let document: Document =
+        serde_json::from_slice(bytes).map_err(|error| ApiError::bad_request(format!("The report is not valid JSON: {error}")))?;
     let run = document.run.ok_or_else(|| {
         ApiError::bad_request("This is not an e2e report: it has no \"run\". Post the document the json reporter prints, or .e2e/report.json.")
     })?;
@@ -491,7 +493,8 @@ pub fn parse_json(bytes: &[u8]) -> ApiResult<ParsedRun> {
     }
 
     let groups: HashMap<&str, &DocGroup> = run.serial_groups.iter().filter_map(|group| Some((group.id.as_deref()?, group))).collect();
-    let targets: HashSet<&str> = run.results.iter().filter(|result| result.selected != Some(false)).filter_map(|result| result.target_id.as_deref()).collect();
+    let targets: HashSet<&str> =
+        run.results.iter().filter(|result| result.selected != Some(false)).filter_map(|result| result.target_id.as_deref()).collect();
     let variants = Variants { many_targets: targets.len() > 1 };
     let mut results: Vec<ParsedResult> = run.results.par_iter().filter_map(|result| read_result(result, &groups, &variants)).collect();
     tell_apart(&mut results);
@@ -503,14 +506,15 @@ pub fn parse_json(bytes: &[u8]) -> ApiResult<ParsedRun> {
             E2eRunStatus::Passed
         }
     });
-    let duration_ms = millis_between(run.started_at.as_deref(), run.finished_at.as_deref()).unwrap_or_else(|| results.iter().map(|result| result.duration_ms).sum());
-    let runner = run.runner.as_ref().and_then(|runner| {
+    let duration_ms = millis_between(run.started_at.as_deref(), run.finished_at.as_deref())
+        .unwrap_or_else(|| results.iter().map(|result| result.duration_ms).sum());
+    let runner = run.runner.as_ref().map(|runner| {
         let name = runner.name.as_deref().unwrap_or("e2e");
 
-        Some(match runner.version.as_deref() {
+        match runner.version.as_deref() {
             Some(version) => format!("{name} {version}"),
             None => name.to_string(),
-        })
+        }
     });
 
     Ok(ParsedRun {
@@ -569,7 +573,10 @@ fn split_junit_name(name: &str) -> JunitName {
 }
 
 fn seconds_to_millis(text: Option<&str>) -> i64 {
-    text.and_then(|text| text.trim().parse::<f64>().ok()).filter(|seconds| seconds.is_finite() && *seconds >= 0.0).map(|seconds| (seconds * 1000.0).round() as i64).unwrap_or(0)
+    text.and_then(|text| text.trim().parse::<f64>().ok())
+        .filter(|seconds| seconds.is_finite() && *seconds >= 0.0)
+        .map(|seconds| (seconds * 1000.0).round() as i64)
+        .unwrap_or(0)
 }
 
 fn element_text(node: roxmltree::Node) -> String {
@@ -595,8 +602,14 @@ fn read_case(case: roxmltree::Node, suite_name: &str, framework: bool) -> Option
         return None;
     }
 
-    let name = if framework { split_junit_name(raw_name) } else { JunitName { title: raw_name.to_string(), target: None, agent: None, repeat: None } };
-    let file = [case.attribute("file"), case.attribute("classname"), Some(suite_name)].into_iter().flatten().map(str::trim).find(|text| !text.is_empty()).unwrap_or("unknown");
+    let name =
+        if framework { split_junit_name(raw_name) } else { JunitName { title: raw_name.to_string(), target: None, agent: None, repeat: None } };
+    let file = [case.attribute("file"), case.attribute("classname"), Some(suite_name)]
+        .into_iter()
+        .flatten()
+        .map(str::trim)
+        .find(|text| !text.is_empty())
+        .unwrap_or("unknown");
     let child = |tag: &str| case.children().find(|node| node.has_tag_name(tag));
     let output = child("system-out").map(element_text).unwrap_or_default();
     let mut attempts = 1;
@@ -639,7 +652,8 @@ fn read_case(case: roxmltree::Node, suite_name: &str, framework: bool) -> Option
 /// JUnit XML: the file the framework's `junit` reporter writes, or any other JUnit file.
 pub fn parse_junit(bytes: &[u8]) -> ApiResult<ParsedRun> {
     let text = std::str::from_utf8(bytes).map_err(|_| ApiError::bad_request("The JUnit file is not UTF-8 text"))?;
-    let document = roxmltree::Document::parse(text.trim_start_matches('\u{feff}')).map_err(|error| ApiError::bad_request(format!("The JUnit file is not valid XML: {error}")))?;
+    let document = roxmltree::Document::parse(text.trim_start_matches('\u{feff}'))
+        .map_err(|error| ApiError::bad_request(format!("The JUnit file is not valid XML: {error}")))?;
     let root = document.root_element();
 
     if !root.has_tag_name("testsuites") && !root.has_tag_name("testsuite") {
@@ -720,7 +734,11 @@ pub fn parse_junit(bytes: &[u8]) -> ApiResult<ParsedRun> {
             (None, false) => E2eRunStatus::Passed,
         },
         started_at: timestamp.and_then(normalize_time),
-        duration_ms: if root.attribute("time").is_some() { seconds_to_millis(root.attribute("time")) } else { results.iter().map(|result| result.duration_ms).sum() },
+        duration_ms: if root.attribute("time").is_some() {
+            seconds_to_millis(root.attribute("time"))
+        } else {
+            results.iter().map(|result| result.duration_ms).sum()
+        },
         runner: None,
         branch: None,
         commit: None,
@@ -846,7 +864,10 @@ mod tests {
         assert_eq!(result.title, "Cart > WEB-11 empty cart shows a message");
         assert_eq!(result.variant, "");
         assert_eq!((result.status, result.attempts, result.duration_ms), (E2eStatus::Failed, 2, 2100));
-        assert_eq!(result.message.as_deref(), Some("expect.toHaveText failed\nlocator: getByRole(\"status\")\nexpected: text \"Koszyk jest pusty\"\nobserved: text \"500\""));
+        assert_eq!(
+            result.message.as_deref(),
+            Some("expect.toHaveText failed\nlocator: getByRole(\"status\")\nexpected: text \"Koszyk jest pusty\"\nobserved: text \"500\"")
+        );
         assert_eq!(result.error_code.as_deref(), Some("ASSERTION_FAILED"));
         assert_eq!((result.declared_line, result.line), (Some(12), Some(19)));
         assert_eq!((result.agent_steps, result.model_calls, result.model_tokens), (2, 4, 1200));
@@ -926,7 +947,10 @@ mod tests {
         assert_eq!(passed.issue_keys, vec!["WEB-4"]);
 
         let failed = find(&run, "Koszyk > WEB-11 pusty koszyk pokazuje komunikat");
-        assert_eq!((failed.status, failed.message.as_deref(), failed.error_code.as_deref()), (E2eStatus::Failed, Some("expect.toHaveText failed"), Some("ASSERTION_FAILED")));
+        assert_eq!(
+            (failed.status, failed.message.as_deref(), failed.error_code.as_deref()),
+            (E2eStatus::Failed, Some("expect.toHaveText failed"), Some("ASSERTION_FAILED"))
+        );
 
         let flaky = find(&run, "Konto > WEB-14 reset hasła");
         assert_eq!((flaky.status, flaky.attempts, flaky.variant.as_str()), (E2eStatus::Flaky, 3, "fast · repeat #1"));
@@ -945,7 +969,10 @@ mod tests {
         let run = parse(xml.as_bytes(), None).unwrap();
 
         assert_eq!((run.status, run.started_at.as_deref(), run.duration_ms), (E2eRunStatus::Failed, Some("2026-11-12T08:00:00.000Z"), 1500));
-        assert_eq!((run.results[0].title.as_str(), run.results[0].file.as_str(), run.results[0].line), ("test_total [eur]", "tests/test_cart.py", Some(14)));
+        assert_eq!(
+            (run.results[0].title.as_str(), run.results[0].file.as_str(), run.results[0].line),
+            ("test_total [eur]", "tests/test_cart.py", Some(14))
+        );
         assert_eq!((run.results[1].file.as_str(), run.results[1].message.as_deref()), ("tests.test_cart", Some("boom\n  at line 3")));
     }
 

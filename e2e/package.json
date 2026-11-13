@@ -1,0 +1,23 @@
+{
+  "name": "team-hub-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "description": "End-to-end tests of team-hub itself, run with the e2e framework against a demo instance",
+  "type": "module",
+  "scripts": {
+    "test": "e2e run",
+    "test:ci": "e2e run --reporter list,junit",
+    "report:json": "e2e run --reporter json > .e2e/stdout-report.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@e2e-dev/web": "^0.15.5",
+    "@types/node": "^22.0.0",
+    "e2e": "^0.23.0",
+    "team-hub-e2e-reporter": "file:../integrations/e2e-reporter",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": "^22.22.3 || >=24.8.0"
+  }
+}

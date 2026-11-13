@@ -102,11 +102,14 @@ fn linked_issues(connection: &Connection, test_id: Id) -> ApiResult<Vec<(Id, boo
     )
 }
 
+/// A result as `refresh_tests` reads it: run, when, status, duration, attempts, message, error code.
+type LastResult = (Id, String, String, i64, i64, Option<String>, Option<String>);
+
 /// The newest run that has a result for the test decides what the test's `last_*` columns say.
 /// A test on several targets takes its worst result there.
 pub fn refresh_tests(connection: &Connection, test_ids: &[Id]) -> ApiResult<()> {
     for test_id in test_ids {
-        let results: Vec<(Id, String, String, i64, i64, Option<String>, Option<String>)> = query_all(
+        let results: Vec<LastResult> = query_all(
             connection,
             "SELECT e.run_id, r.started_at, e.status, e.duration_ms, e.attempts, e.message, e.error_code
              FROM e2e_result e JOIN e2e_run r ON r.id = e.run_id
@@ -154,7 +157,8 @@ pub fn store_run(tx: &Tx, poster: Option<&AuthUser>, project_id: Id, run: &Parse
     let external_id = meta.run_id.clone().or_else(|| run.external_id.clone());
 
     if let Some(external_id) = &external_id {
-        let known: Option<Id> = query_one(tx, "SELECT id FROM e2e_run WHERE project_id = ?1 AND external_id = ?2", (project_id, external_id), |row| row.get(0))?;
+        let known: Option<Id> =
+            query_one(tx, "SELECT id FROM e2e_run WHERE project_id = ?1 AND external_id = ?2", (project_id, external_id), |row| row.get(0))?;
 
         if let Some(run_id) = known {
             return Ok(Stored { run_id, created: false, issues: Vec::new() });
@@ -207,8 +211,11 @@ pub fn store_run(tx: &Tx, poster: Option<&AuthUser>, project_id: Id, run: &Parse
              ON CONFLICT (project_id, file, title) DO UPDATE SET tags = excluded.tags, line = coalesce(excluded.line, e2e_test.line)",
             (project_id, &result.file, &result.title, serde_json::to_string(&result.tags)?, result.declared_line, &tx.now),
         )?;
-        let test_id: Id =
-            tx.query_row("SELECT id FROM e2e_test WHERE project_id = ?1 AND file = ?2 AND title = ?3", (project_id, &result.file, &result.title), |row| row.get(0))?;
+        let test_id: Id = tx.query_row(
+            "SELECT id FROM e2e_test WHERE project_id = ?1 AND file = ?2 AND title = ?3",
+            (project_id, &result.file, &result.title),
+            |row| row.get(0),
+        )?;
 
         tx.execute(
             "INSERT INTO e2e_result (run_id, test_id, variant, status, duration_ms, attempts, line, message, error_code, agent_steps, model_calls,

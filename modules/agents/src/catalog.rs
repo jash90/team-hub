@@ -5,7 +5,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use ts_rs::TS;
 
-use crate::builtin;
+use crate::{builtin, runner_tools};
 
 pub const OWN_MODULE: &str = "agents";
 
@@ -27,7 +27,7 @@ pub struct AgentToolInfo {
 /// The tools with the module each comes from. A module's tool that has the name of one
 /// already listed is left out: the tracker's own tools win, then the module loaded first.
 fn tools(app: &App) -> Vec<(ToolSpec, &'static str)> {
-    let mut tools: Vec<(ToolSpec, &'static str)> = builtin::specs().into_iter().map(|spec| (spec, OWN_MODULE)).collect();
+    let mut tools: Vec<(ToolSpec, &'static str)> = builtin::specs().into_iter().chain(runner_tools::specs()).map(|spec| (spec, OWN_MODULE)).collect();
 
     for module in app.enabled_modules() {
         for spec in module.tools() {
@@ -70,5 +70,7 @@ pub fn listing(app: &App) -> Vec<Value> {
 
 /// Runs a tool as `user`; none when nothing has a tool of that name.
 pub fn call(app: &App, user: &AuthUser, name: &str, arguments: &Value) -> Option<ApiResult<Value>> {
-    builtin::call(app, user, name, arguments).or_else(|| app.enabled_modules().find_map(|module| module.call_tool(app, user, name, arguments)))
+    builtin::call(app, user, name, arguments)
+        .or_else(|| runner_tools::call(app, user, name, arguments))
+        .or_else(|| app.enabled_modules().find_map(|module| module.call_tool(app, user, name, arguments)))
 }

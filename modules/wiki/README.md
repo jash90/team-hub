@@ -116,3 +116,22 @@ unchanged or had been detached.
 `wiki_space`, `wiki_page`, `wiki_revision`, `wiki_detached` (source ids of detached pages),
 and the FTS5 table `wiki_fts(title, body)` with rowid = page id, holding text folded with
 `hub_core::text::fold`.
+
+## Web (`web/`)
+
+`index.tsx` exports `wikiModule`; texts are English in place with Polish in `pl.ts`, styles in
+`styles.css` (classes prefixed `wiki-`).
+
+| Address | Screen |
+|---|---|
+| `/wiki` | The spaces as cards, "New space", and search over all pages (`?q=`, `&space=KEY` limits it). `?project=KEY` opens the space bound to that project, or offers to create one |
+| `/wiki/:space` | The space: page tree on the left (folding remembered per space, "+" adds a child), its first page on the right |
+| `/wiki/:space/:page` | A page: breadcrumbs, text, table of contents (three headings or more), children, linked issues with their live status, backlinks, the lock banner of a Confluence mirror with "Detach to edit" |
+| `/wiki/:space/:page/edit` | The editor, with a live preview beside it on wide screens. When somebody else saves meanwhile, the draft stays and the person compares, then saves theirs as the next version or takes the other one |
+| `/wiki/:space/:page/history` | The versions; `?v=N` shows one, `?from=A&to=B` the changes between two; restore |
+| `/wiki-go?title=&space=` | Where `[[Title]]` links land: opens the page of that title, or offers to create it |
+
+Also: the entry "Knowledge base" in the main navigation and "Knowledge" in a project's; the
+panel on an issue (linked pages, "Link a page", "Create a page"); dialogs for a new page
+(with templates, in the language of the interface), moving a page, turning task lines into
+issues, linking an issue, space settings.

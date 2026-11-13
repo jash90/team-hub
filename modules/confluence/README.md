@@ -70,3 +70,11 @@ issue key, so it links to an issue of the same key here), `ac:link` to a page (`
 `[[SPACE:Title]]`, `[[Title|shown text]]`), `ac:task-list` (`- [ ]` / `- [x]`), entities.
 Macro parameters are dropped; unknown tags are dropped and their text is kept. Text that
 would read as Markdown (`*`, `_`, `[`, `<`, a leading `#` …) is escaped.
+
+## Web (`web/`)
+
+`index.tsx` exports `confluenceModule`: the tab "Confluence" in the instance settings
+(`/settings/confluence`, administrators only) with the connection (and "Test connection"),
+the import form, and the imported spaces with their last report and "Sync now". An import or
+sync runs inside one request; the screen says so and keeps its buttons disabled meanwhile.
+Polish is in `pl.ts`, styles in `styles.css` (classes prefixed `confluence-`).

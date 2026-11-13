@@ -107,11 +107,20 @@ export function revisionAuthor(name: (authorId: number | null, authorLabel?: str
   return name(revision.authorId, revision.authorLabel);
 }
 
+/** An excerpt is read, not rendered: the Markdown signs in it are noise. */
+function plain(text: string): string {
+  return text
+    .replace(/\|[-:| ]*-[-:| ]*\|/g, ' ')
+    .replace(/\*\*|__|`+|\[\[|\]\]|(^|\s)#{1,6}(?=\s)|(^|\s)- \[[ xX]\]/g, '$1$2')
+    .replace(/\s*\|\s*/g, ' · ')
+    .replace(/\s{2,}/g, ' ');
+}
+
 /** A search excerpt with the matched words marked; the text is never treated as HTML. */
 export function Snippet({ text }: { text: string }) {
   return (
     <span className="wiki-snippet">
-      {splitMarks(text).map((piece, index) => (piece.marked ? <mark key={index}>{piece.text}</mark> : <span key={index}>{piece.text}</span>))}
+      {splitMarks(text).map((piece, index) => (piece.marked ? <mark key={index}>{piece.text}</mark> : <span key={index}>{plain(piece.text)}</span>))}
     </span>
   );
 }

@@ -10,7 +10,9 @@ use rayon::prelude::*;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Row};
 
-use crate::types::{E2eBadge, E2eCounts, E2eHistoryPoint, E2eIssueRef, E2eIssueState, E2eIssueTest, E2eRun, E2eRunResult, E2eRunStatus, E2eStatus, E2eTest};
+use crate::types::{
+    E2eBadge, E2eCounts, E2eHistoryPoint, E2eIssueRef, E2eIssueState, E2eIssueTest, E2eRun, E2eRunResult, E2eRunStatus, E2eStatus, E2eTest,
+};
 
 /// Kind of a test in the shared `link` table.
 pub const TEST_KIND: &str = "e2e_test";
@@ -76,9 +78,12 @@ fn map_run(row: &Row) -> rusqlite::Result<E2eRun> {
 
 /// A run and the id of its project.
 pub fn run_by_id(connection: &Connection, id: Id) -> ApiResult<Option<(E2eRun, Id)>> {
-    query_one(connection, &format!("SELECT {RUN_COLUMNS}, r.project_id FROM e2e_run r JOIN project p ON p.id = r.project_id WHERE r.id = ?1"), [id], |row| {
-        Ok((map_run(row)?, row.get(24)?))
-    })
+    query_one(
+        connection,
+        &format!("SELECT {RUN_COLUMNS}, r.project_id FROM e2e_run r JOIN project p ON p.id = r.project_id WHERE r.id = ?1"),
+        [id],
+        |row| Ok((map_run(row)?, row.get(24)?)),
+    )
 }
 
 /// A project's runs, newest first.
@@ -124,7 +129,12 @@ fn recent_results(connection: &Connection, tests: &str, params: Vec<Value>) -> A
              WHERE position <= {HISTORY} ORDER BY test_id, position"
         ),
         rusqlite::params_from_iter(params.iter().chain(params.iter())),
-        |row| Ok((row.get::<_, Id>(0)?, E2eHistoryPoint { run_id: row.get(1)?, status: status_from_severity(row.get(2)?), at: row.get(3)?, branch: row.get(4)? })),
+        |row| {
+            Ok((
+                row.get::<_, Id>(0)?,
+                E2eHistoryPoint { run_id: row.get(1)?, status: status_from_severity(row.get(2)?), at: row.get(3)?, branch: row.get(4)? },
+            ))
+        },
     )?;
     let mut history: HashMap<Id, Vec<E2eHistoryPoint>> = HashMap::new();
 
@@ -190,7 +200,12 @@ fn test_issues(connection: &Connection, viewer: &AuthUser, tests: &str, mut para
              GROUP BY l.from_id, i.id ORDER BY i.project_id, i.number"
         ),
         rusqlite::params_from_iter(params),
-        |row| Ok((row.get::<_, Id>(0)?, E2eIssueRef { key: row.get(1)?, summary: row.get(2)?, status: row.get(3)?, done: row.get(4)?, manual: row.get(5)? })),
+        |row| {
+            Ok((
+                row.get::<_, Id>(0)?,
+                E2eIssueRef { key: row.get(1)?, summary: row.get(2)?, status: row.get(3)?, done: row.get(4)?, manual: row.get(5)? },
+            ))
+        },
     )?;
     let mut issues: HashMap<Id, Vec<E2eIssueRef>> = HashMap::new();
 

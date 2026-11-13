@@ -268,9 +268,10 @@ span.wiki-node-fold:hover {
   max-width: 86ch;
 }
 
-.wiki-body .markdown table {
-  width: max-content;
-  max-width: 100%;
+/* Cells keep their words whole; a table wider than the page scrolls sideways. */
+.wiki-body .markdown th,
+.wiki-body .markdown td {
+  overflow-wrap: break-word;
 }
 
 .wiki-toc {
@@ -390,7 +391,9 @@ span.wiki-node-fold:hover {
 
 .wiki-conflict {
   flex-direction: column;
+  flex-wrap: nowrap;
   align-items: stretch;
+  min-width: 0;
   background: var(--amber-soft);
   color: var(--ink);
 }
@@ -472,12 +475,11 @@ span.wiki-node-fold:hover {
   font-family: var(--mono);
   font-size: 12.5px;
   line-height: 1.55;
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .wiki-diff-row {
   display: flex;
-  min-width: max-content;
 }
 
 .wiki-diff-mark {
@@ -492,8 +494,10 @@ span.wiki-node-fold:hover {
 
 .wiki-diff-text {
   flex: 1;
+  min-width: 0;
   padding: 0 10px;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .wiki-diff-added {

@@ -1,0 +1,705 @@
+/* Tests (e2e). Colours come from the application's variables, so both themes follow. */
+
+.e2e-is-passed {
+  --e2e-tone: var(--green);
+  --e2e-soft: var(--green-soft);
+}
+
+.e2e-is-failed {
+  --e2e-tone: var(--red);
+  --e2e-soft: var(--red-soft);
+}
+
+.e2e-is-flaky {
+  --e2e-tone: var(--amber);
+  --e2e-soft: var(--amber-soft);
+}
+
+.e2e-is-skipped,
+.e2e-is-none {
+  --e2e-tone: var(--muted);
+  --e2e-soft: var(--sunk);
+}
+
+/* ---------- a result: mark, word, history ---------- */
+
+.e2e-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--e2e-tone);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.e2e-status-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--e2e-soft);
+}
+
+.e2e-dash {
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.e2e-history {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.e2e-tick {
+  display: block;
+  width: 7px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--e2e-tone);
+}
+
+.e2e-tick.e2e-is-skipped {
+  background: var(--line-strong);
+}
+
+.e2e-tick.e2e-is-flaky {
+  background: repeating-linear-gradient(to bottom, var(--amber) 0 4px, var(--amber-soft) 4px 7px);
+}
+
+.e2e-tick:hover {
+  filter: brightness(0.85);
+  transform: scaleY(1.15);
+}
+
+.e2e-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+
+.e2e-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px 9px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.e2e-sub .mono {
+  overflow-wrap: anywhere;
+}
+
+.e2e-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.e2e-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.e2e-branch > span {
+  max-width: 220px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.e2e-tag {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--sunk);
+  font-size: 11.5px;
+}
+
+.e2e-oneline {
+  display: block;
+  overflow: hidden;
+  color: var(--e2e-tone);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.e2e-message {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--e2e-tone);
+  border-radius: var(--radius-sm);
+  background: var(--sunk);
+  color: var(--ink);
+  font: 12.5px/1.5 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.e2e-more {
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* ---------- issues a test verifies ---------- */
+
+.e2e-issues {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.e2e-issue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.e2e-unlink {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.e2e-issue:hover .e2e-unlink,
+.e2e-unlink:focus-visible {
+  opacity: 1;
+}
+
+.e2e-unlink:hover {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+/* ---------- the mark on a card or row ---------- */
+
+.e2e-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--sunk);
+  color: var(--muted);
+}
+
+.e2e-chip-passing {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.e2e-chip-failing {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.e2e-chip-flaky {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+/* ---------- the panel on an issue, the dashboard ---------- */
+
+.e2e-issue-tests {
+  display: flex;
+  flex-direction: column;
+}
+
+.e2e-issue-test {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.e2e-issue-test:last-child {
+  border-bottom: 0;
+}
+
+.e2e-issue-test-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.e2e-issue-test-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+  gap: 4px;
+  max-width: 55%;
+}
+
+.e2e-issue-test-side .e2e-sub {
+  justify-content: flex-end;
+}
+
+.e2e-dash-row {
+  border-bottom: 1px solid var(--line);
+}
+
+.e2e-dash-row:last-child {
+  border-bottom: 0;
+}
+
+.e2e-dash-row .issue-line {
+  border-bottom: 0;
+}
+
+.e2e-dash-tests {
+  padding: 0 14px 6px 34px;
+}
+
+.e2e-dash-tests .e2e-issue-test {
+  padding: 5px 0;
+  border-bottom: 0;
+}
+
+/* ---------- a run's summary ---------- */
+
+.e2e-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.e2e-summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.e2e-summary-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.e2e-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.e2e-summary-title h2 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 18px;
+}
+
+.e2e-summary-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 6px;
+}
+
+.e2e-run-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.e2e-run-line a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.e2e-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.e2e-bar > span {
+  flex-basis: 0;
+  min-width: 4px;
+  background: var(--e2e-tone);
+}
+
+.e2e-bar > .e2e-is-skipped {
+  background: var(--line-strong);
+}
+
+.e2e-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.e2e-stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 96px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.e2e-stat strong {
+  color: var(--e2e-tone, var(--ink));
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.e2e-stat span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------- the list of tests ---------- */
+
+.e2e-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap-reverse;
+  gap: 8px 16px;
+  padding: 4px 12px 0 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.e2e-toolbar .tabs {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}
+
+.e2e-search {
+  width: 220px;
+  max-width: 100%;
+  margin-bottom: 4px;
+}
+
+.e2e-test {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) minmax(90px, 190px) 112px 150px 34px;
+  align-items: start;
+  gap: 4px 14px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.e2e-test:last-child {
+  border-bottom: 0;
+}
+
+.e2e-test-head {
+  padding-top: 7px;
+  padding-bottom: 7px;
+  background: var(--sunk);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.e2e-test-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.e2e-test-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.e2e-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin-left: -17px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.e2e-toggle .icon {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.e2e-toggle:hover span {
+  text-decoration: underline;
+}
+
+.e2e-test-last {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.e2e-test-last > * {
+  max-width: 100%;
+}
+
+.e2e-test-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -5px;
+}
+
+.e2e-textarea {
+  min-height: 220px;
+  resize: vertical;
+}
+
+/* ---------- runs ---------- */
+
+.e2e-runs {
+  display: flex;
+  flex-direction: column;
+}
+
+.e2e-run {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 14px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+}
+
+.e2e-run:last-child {
+  border-bottom: 0;
+}
+
+.e2e-run:hover {
+  background: var(--sunk);
+  text-decoration: none;
+}
+
+.e2e-run-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.e2e-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.e2e-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--e2e-tone);
+  font-weight: 600;
+}
+
+.e2e-results {
+  display: flex;
+  flex-direction: column;
+}
+
+.e2e-result {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.e2e-result:last-child {
+  border-bottom: 0;
+}
+
+.e2e-result-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.e2e-result-head .e2e-title {
+  font-weight: 600;
+}
+
+.e2e-quiet {
+  display: flex;
+  flex-direction: column;
+}
+
+.e2e-quiet-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  padding: 5px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.e2e-quiet-row:last-child {
+  border-bottom: 0;
+}
+
+.e2e-quiet-row .e2e-title {
+  flex: 1;
+  font-weight: 400;
+}
+
+.e2e-quiet-time {
+  flex: none;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* ---------- settings ---------- */
+
+.e2e-snippet {
+  margin-top: 12px;
+}
+
+.e2e-snippet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.e2e-code {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--sunk);
+  font: 12.5px/1.55 var(--mono);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 1240px) {
+  .e2e-test {
+    grid-template-columns: 104px minmax(0, 1fr) auto 34px;
+  }
+
+  .e2e-test-head {
+    display: none;
+  }
+
+  .e2e-test-main {
+    grid-column: 2 / 4;
+  }
+
+  .e2e-test-actions {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  .e2e-test-issues {
+    grid-column: 2 / 5;
+  }
+
+  .e2e-test-history {
+    grid-column: 2 / 3;
+  }
+
+  .e2e-test-last {
+    grid-column: 3 / 5;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 3px 9px;
+  }
+
+  .e2e-run {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .e2e-run .e2e-run-line {
+    grid-column: 1 / 3;
+  }
+}
+
+@media (max-width: 760px) {
+  .e2e-test {
+    grid-template-columns: minmax(0, 1fr) 34px;
+  }
+
+  .e2e-test-status {
+    flex-direction: row;
+    align-items: center;
+    grid-column: 1;
+  }
+
+  .e2e-test-main,
+  .e2e-test-issues,
+  .e2e-test-history,
+  .e2e-test-last {
+    grid-column: 1 / 3;
+    justify-content: flex-start;
+  }
+
+  .e2e-test-actions {
+    grid-column: 2;
+  }
+
+  .e2e-toggle {
+    margin-left: 0;
+  }
+
+  .e2e-issue-test {
+    flex-wrap: wrap;
+  }
+
+  .e2e-issue-test-side {
+    align-items: flex-start;
+    max-width: none;
+    padding-left: 27px;
+  }
+
+  .e2e-summary-head {
+    flex-direction: column;
+  }
+}

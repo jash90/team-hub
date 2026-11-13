@@ -82,7 +82,8 @@ impl Module for E2eModule {
         ModuleMeta {
             id: "e2e",
             name: "Tests (e2e)",
-            description: "Runs of the e2e testing framework, each test linked to the issues it verifies: results on issues, cards and a project page.",
+            description:
+                "Runs of the e2e testing framework, each test linked to the issues it verifies: results on issues, cards and a project page.",
             version: env!("CARGO_PKG_VERSION"),
             depends_on: &[],
             default_enabled: true,

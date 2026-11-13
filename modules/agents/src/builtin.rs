@@ -241,10 +241,7 @@ fn search_issues(app: &App, user: &AuthUser, input: SearchInput) -> ApiResult<Va
     let result = search::search(app, user, &input.query, limit, 0)?;
 
     if let Some(error) = result.error {
-        return Err(ApiError::bad_request(format!(
-            "The query could not be understood at character {}: {}",
-            error.position, error.message
-        )));
+        return Err(ApiError::bad_request(format!("The query could not be understood at character {}: {}", error.position, error.message)));
     }
 
     let names = app.read(Names::load)?;
@@ -308,7 +305,7 @@ fn issue_json(app: &App, names: &Names, issue: &Issue) -> Value {
         "subtasks": subtasks,
         "links": links,
         "comments": comments,
-        "panels": issue.panels,
+        "panels": issue.panels.iter().filter(|(module, _)| module.as_str() != crate::catalog::OWN_MODULE).collect::<std::collections::BTreeMap<_, _>>(),
     })
 }
 
@@ -349,24 +346,13 @@ fn create_issue(app: &App, user: &AuthUser, input: CreateInput) -> ApiResult<Val
             description: input.description.clone(),
             type_id: input.issue_type.as_deref().map(|name| names::type_id(tx, access.id, name)).transpose()?,
             priority: input.priority.as_ref().map(names::priority).transpose()?,
-            assignee_id: input
-                .assignee
-                .as_deref()
-                .map(|name| names::user_id(tx, user, name))
-                .transpose()?
-                .map(Some),
+            assignee_id: input.assignee.as_deref().map(|name| names::user_id(tx, user, name)).transpose()?.map(Some),
             labels: input.labels.clone(),
             parent_key: input.parent_key.clone().map(Some),
             points: input.points.map(Some),
             ..Default::default()
         };
-        let id = issues::create_issue(
-            tx,
-            &NewIssue {
-                project_key: access.key.clone(),
-                fields,
-            },
-        )?;
+        let id = issues::create_issue(tx, &NewIssue { project_key: access.key.clone(), fields })?;
 
         changed_row(app, tx, id)
     })
@@ -439,14 +425,7 @@ fn transition_issue(app: &App, user: &AuthUser, input: TransitionInput) -> ApiRe
         access.require_edit()?;
 
         let status_id = names::status_id(tx, access.id, &input.status)?;
-        issues::update_issue(
-            tx,
-            id,
-            &IssuePatch {
-                status_id: Some(status_id),
-                ..Default::default()
-            },
-        )?;
+        issues::update_issue(tx, id, &IssuePatch { status_id: Some(status_id), ..Default::default() })?;
 
         changed_row(app, tx, id)
     })
@@ -505,10 +484,7 @@ fn my_work(app: &App, user: &AuthUser) -> ApiResult<Value> {
         let rows = issues::load_rows(app, connection, &tail, params)?;
         let names = Names::load(connection)?;
         let in_category = |category: StatusCategory| {
-            rows.iter()
-                .filter(|row| names.category(row.status_id) == category)
-                .map(|row| names.row(row))
-                .collect::<Vec<_>>()
+            rows.iter().filter(|row| names.category(row.status_id) == category).map(|row| names.row(row)).collect::<Vec<_>>()
         };
 
         Ok(json!({ "inProgress": in_category(StatusCategory::InProgress), "todo": in_category(StatusCategory::Todo) }))

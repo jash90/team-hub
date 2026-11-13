@@ -114,7 +114,8 @@ async fn posting_needs_a_token_and_the_right_to_edit() {
 
     // A private project does not exist for outsiders, nor do its runs.
     project(&app, &admin, "SEC", true);
-    let secret = admin.post("/projects/SEC/runs", report("s-1", "2026-11-12T10:00:00Z", "main", vec![result("s.e2e.ts", &["secret"], "passed", &[])])).await;
+    let secret =
+        admin.post("/projects/SEC/runs", report("s-1", "2026-11-12T10:00:00Z", "main", vec![result("s.e2e.ts", &["secret"], "passed", &[])])).await;
     assert_eq!(ci.refused(Method::GET, "/projects/SEC", None).await.0, StatusCode::NOT_FOUND);
     assert_eq!(ci.refused(Method::POST, "/projects/SEC/runs", Some(json!({}))).await.0, StatusCode::NOT_FOUND);
     assert_eq!(ci.refused(Method::GET, &format!("/runs/{}", secret["run"]["id"]), None).await.0, StatusCode::NOT_FOUND);
@@ -131,7 +132,10 @@ async fn takes_the_frameworks_report_as_it_is_and_only_once() {
     assert_eq!(posted["created"], true);
     assert_eq!((run["format"].as_str(), run["status"].as_str(), run["projectKey"].as_str()), (Some("json"), Some("failed"), Some("WEB")));
     // Three of the four results count: the one a test filter left out says nothing about its test.
-    assert_eq!((run["total"].clone(), run["passed"].clone(), run["failed"].clone(), run["skipped"].clone()), (json!(3), json!(1), json!(1), json!(1)));
+    assert_eq!(
+        (run["total"].clone(), run["passed"].clone(), run["failed"].clone(), run["skipped"].clone()),
+        (json!(3), json!(1), json!(1), json!(1))
+    );
     assert_eq!((run["agentSteps"].clone(), run["modelCalls"].clone()), (json!(3), json!(2)));
     assert_eq!(posted["url"], format!("http://localhost/p/WEB/tests?run={}", run["id"]));
 
@@ -152,7 +156,10 @@ async fn takes_the_frameworks_report_as_it_is_and_only_once() {
     let results = detail["results"].as_array().unwrap();
     assert_eq!(results.iter().map(|result| result["status"].as_str().unwrap()).collect::<Vec<_>>(), vec!["failed", "passed", "skipped"]);
     assert_eq!(results[2]["message"], "the demo tenant has a single organization");
-    assert_eq!((results[1]["file"].as_str(), results[1]["line"].clone(), results[1]["durationMs"].clone()), (Some("tests/example.e2e.ts"), json!(3), json!(1000)));
+    assert_eq!(
+        (results[1]["file"].as_str(), results[1]["line"].clone(), results[1]["durationMs"].clone()),
+        (Some("tests/example.e2e.ts"), json!(3), json!(1000))
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -269,7 +276,10 @@ async fn takes_junit_xml_with_what_ci_knows_in_the_query() {
     assert_eq!((run["format"].as_str(), run["status"].as_str(), run["name"].as_str()), (Some("junit"), Some("failed"), Some("CI #77")));
     assert_eq!((run["branch"].as_str(), run["commit"].as_str(), run["prNumber"].clone()), (Some("feature/WEB-2-cart"), Some("abc1234"), json!(12)));
     assert_eq!((run["ciUrl"].as_str(), run["durationMs"].clone()), (Some("https://ci.example/runs/77"), json!(9500)));
-    assert_eq!((run["total"].clone(), run["passed"].clone(), run["failed"].clone(), run["flaky"].clone(), run["skipped"].clone()), (json!(4), json!(1), json!(1), json!(1), json!(1)));
+    assert_eq!(
+        (run["total"].clone(), run["passed"].clone(), run["failed"].clone(), run["flaky"].clone(), run["skipped"].clone()),
+        (json!(4), json!(1), json!(1), json!(1), json!(1))
+    );
     assert_eq!(posted["linkedIssues"], json!(["WEB-1", "WEB-2", "WEB-3", "WEB-4"]));
 
     // The run id from the query makes a JUnit post idempotent too.
@@ -280,7 +290,10 @@ async fn takes_junit_xml_with_what_ci_knows_in_the_query() {
 
     let page = ci.get("/projects/WEB").await;
     let failed = test(&page, "Cart > WEB-2 an empty cart shows a message");
-    assert_eq!((failed["status"].as_str(), failed["message"].as_str(), failed["errorCode"].as_str()), (Some("failed"), Some("expect.toHaveText failed"), Some("ASSERTION_FAILED")));
+    assert_eq!(
+        (failed["status"].as_str(), failed["message"].as_str(), failed["errorCode"].as_str()),
+        (Some("failed"), Some("expect.toHaveText failed"), Some("ASSERTION_FAILED"))
+    );
     assert_eq!(test(&page, "WEB-4 reset sends a link")["attempts"], 2);
 }
 
@@ -308,8 +321,14 @@ async fn the_newest_run_that_ran_a_test_decides_and_history_shows_the_rest() {
 
     let steady = test(&page, "WEB-1 steady");
     assert_eq!((steady["status"].as_str(), steady["lastRunId"].clone(), steady["unstable"].clone()), (Some("failed"), json!(third), json!(false)));
-    assert_eq!(steady["history"].as_array().unwrap().iter().map(|point| point["status"].as_str().unwrap()).collect::<Vec<_>>(), vec!["passed", "passed", "failed"]);
-    assert_eq!((steady["message"].as_str().map(|message| message.lines().next().unwrap()), steady["branch"].as_str()), (Some("expect.toHaveText failed"), Some("main")));
+    assert_eq!(
+        steady["history"].as_array().unwrap().iter().map(|point| point["status"].as_str().unwrap()).collect::<Vec<_>>(),
+        vec!["passed", "passed", "failed"]
+    );
+    assert_eq!(
+        (steady["message"].as_str().map(|message| message.lines().next().unwrap()), steady["branch"].as_str()),
+        (Some("expect.toHaveText failed"), Some("main"))
+    );
 
     // Passing, failing, passing on one branch: unstable, though its newest result is a pass.
     let wobbly = test(&page, "WEB-2 wobbly");
@@ -321,10 +340,7 @@ async fn the_newest_run_that_ran_a_test_decides_and_history_shows_the_rest() {
     ci.post("/projects/WEB/runs", partial).await;
     let page = ci.get("/projects/WEB").await;
     assert_eq!((test(&page, "WEB-1 steady")["status"].as_str(), test(&page, "WEB-2 wobbly")["status"].as_str()), (Some("failed"), Some("flaky")));
-
-    // Removing the newest run of a test falls back to the one before.
-    let admin_page = ci.get("/projects/WEB").await;
-    assert_eq!(admin_page["canAdmin"], false);
+    assert_eq!(page["canAdmin"], false);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -366,9 +382,15 @@ async fn issues_show_their_tests_on_the_panel_the_card_and_in_queries() {
     assert_eq!(panel["state"], "failing");
     assert_eq!(panel["tests"].as_array().unwrap().len(), 2);
     let failing = &panel["tests"][0];
-    assert_eq!((failing["title"].as_str(), failing["status"].as_str(), failing["projectKey"].as_str()), (Some("WEB-2 signs in"), Some("failed"), Some("WEB")));
+    assert_eq!(
+        (failing["title"].as_str(), failing["status"].as_str(), failing["projectKey"].as_str()),
+        (Some("WEB-2 signs in"), Some("failed"), Some("WEB"))
+    );
     assert_eq!((failing["runId"].clone(), failing["runName"].as_str(), failing["branch"].as_str()), (json!(run_id), Some("CI #5"), Some("main")));
-    assert_eq!((failing["commit"].as_str(), failing["at"].as_str(), failing["ciUrl"].as_str()), (Some("0123456789abcdef0123456789abcdef01234567"), Some("2026-11-12T10:00:00.000Z"), Some("https://ci.example/5")));
+    assert_eq!(
+        (failing["commit"].as_str(), failing["at"].as_str(), failing["ciUrl"].as_str()),
+        (Some("0123456789abcdef0123456789abcdef01234567"), Some("2026-11-12T10:00:00.000Z"), Some("https://ci.example/5"))
+    );
     assert_eq!(failing["history"][0]["status"], "failed");
     // The badge on its card.
     assert_eq!(row.ext["e2e"], json!({ "state": "failing", "total": 2, "passing": 0, "failing": 1, "flaky": 1 }));
@@ -400,14 +422,21 @@ async fn issues_show_their_tests_on_the_panel_the_card_and_in_queries() {
     // "My issues with failing tests": the administrator is assigned every issue, the CI user none.
     let mine = app.read(|connection| module.dashboard(connection, &admin.user)).unwrap().expect("a section");
     assert_eq!(mine["issues"].as_array().unwrap().len(), 1);
-    assert_eq!((mine["issues"][0]["key"].as_str(), mine["issues"][0]["done"].clone(), mine["issues"][0]["tests"][0]["title"].as_str()), (Some("WEB-2"), json!(true), Some("WEB-2 signs in")));
+    assert_eq!(
+        (mine["issues"][0]["key"].as_str(), mine["issues"][0]["done"].clone(), mine["issues"][0]["tests"][0]["title"].as_str()),
+        (Some("WEB-2"), json!(true), Some("WEB-2 signs in"))
+    );
     assert_eq!(app.read(|connection| module.dashboard(connection, &ci.user)).unwrap(), None);
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agents_can_ask_about_tests() {
     let Hub { app, ci, .. } = hub();
-    let results = vec![result("login.e2e.ts", &["WEB-2 signs in"], "failed", &[]), result("pay.e2e.ts", &["WEB-3 pays by card"], "flaky", &[]), result("cart.e2e.ts", &["WEB-1 adds"], "passed", &[])];
+    let results = vec![
+        result("login.e2e.ts", &["WEB-2 signs in"], "failed", &[]),
+        result("pay.e2e.ts", &["WEB-3 pays by card"], "flaky", &[]),
+        result("cart.e2e.ts", &["WEB-1 adds"], "passed", &[]),
+    ];
     ci.post("/projects/WEB/runs", report("run-1", "2026-11-12T10:00:00Z", "main", results)).await;
 
     let module = E2eModule;
@@ -416,29 +445,49 @@ async fn agents_can_ask_about_tests() {
     assert!(module.tools().iter().all(|tool| tool.read_only));
 
     let tests = module.call_tool(&app, &ci.user, "get_issue_tests", &json!({ "key": "WEB-2" })).unwrap().unwrap();
-    assert_eq!((tests["state"].as_str(), tests["tests"][0]["status"].as_str(), tests["tests"][0]["file"].as_str()), (Some("failing"), Some("failed"), Some("login.e2e.ts")));
+    assert_eq!(
+        (tests["state"].as_str(), tests["tests"][0]["status"].as_str(), tests["tests"][0]["file"].as_str()),
+        (Some("failing"), Some("failed"), Some("login.e2e.ts"))
+    );
     let none = module.call_tool(&app, &ci.user, "get_issue_tests", &json!({ "key": "WEB-4" })).unwrap().unwrap();
     assert_eq!((none["state"].clone(), none["tests"].clone()), (Value::Null, json!([])));
 
     let failing = module.call_tool(&app, &ci.user, "list_failing_tests", &json!({ "projectKey": "web" })).unwrap().unwrap();
     assert_eq!((failing["tests"].clone(), failing["latestRun"]["status"].as_str()), (json!(3), Some("failed")));
-    assert_eq!((failing["failing"][0]["title"].as_str(), failing["failing"][0]["line"].clone(), failing["failing"][0]["issues"][0]["key"].as_str()), (Some("WEB-2 signs in"), json!(5), Some("WEB-2")));
+    assert_eq!(
+        (failing["failing"][0]["title"].as_str(), failing["failing"][0]["line"].clone(), failing["failing"][0]["issues"][0]["key"].as_str()),
+        (Some("WEB-2 signs in"), json!(5), Some("WEB-2"))
+    );
     assert_eq!(failing["flaky"][0]["title"], "WEB-3 pays by card");
 
     assert_eq!(module.call_tool(&app, &ci.user, "get_issue_tests", &json!({})).unwrap().unwrap_err().status, StatusCode::BAD_REQUEST);
     assert_eq!(module.call_tool(&app, &ci.user, "get_issue_tests", &json!({ "key": "NOPE-1" })).unwrap().unwrap_err().status, StatusCode::NOT_FOUND);
-    assert_eq!(module.call_tool(&app, &ci.user, "list_failing_tests", &json!({ "projectKey": "NOPE" })).unwrap().unwrap_err().status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        module.call_tool(&app, &ci.user, "list_failing_tests", &json!({ "projectKey": "NOPE" })).unwrap().unwrap_err().status,
+        StatusCode::NOT_FOUND
+    );
     assert!(module.call_tool(&app, &ci.user, "something_else", &json!({})).is_none());
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_run_announces_itself_and_the_issues_it_touches() {
     let Hub { app, ci, .. } = hub();
-    let results = vec![result("cart.e2e.ts", &["WEB-1 adds"], "passed", &[]), result("login.e2e.ts", &["WEB-2 signs in"], "failed", &[]), result("x.e2e.ts", &["no issue"], "passed", &[])];
+    let results = vec![
+        result("cart.e2e.ts", &["WEB-1 adds"], "passed", &[]),
+        result("login.e2e.ts", &["WEB-2 signs in"], "failed", &[]),
+        result("x.e2e.ts", &["no issue"], "passed", &[]),
+    ];
     let mut stream = app.subscribe();
 
     ci.post("/projects/WEB/runs", report("run-1", "2026-11-12T10:00:00Z", "main", results.clone())).await;
-    assert_eq!(events(&app), vec![("e2e.run".to_string(), None), ("e2e.updated".to_string(), Some("WEB-1".to_string())), ("e2e.updated".to_string(), Some("WEB-2".to_string()))]);
+    assert_eq!(
+        events(&app),
+        vec![
+            ("e2e.run".to_string(), None),
+            ("e2e.updated".to_string(), Some("WEB-1".to_string())),
+            ("e2e.updated".to_string(), Some("WEB-2".to_string()))
+        ]
+    );
 
     // The same events reach open pages.
     let live = stream.recv().await.unwrap();
@@ -456,9 +505,18 @@ async fn a_run_announces_itself_and_the_issues_it_touches() {
 #[tokio::test(flavor = "multi_thread")]
 async fn runs_tests_and_issues_can_be_removed() {
     let Hub { app, admin, ci } = hub();
-    let first = ci.post("/projects/WEB/runs", report("r1", "2026-11-11T10:00:00Z", "main", vec![result("a.e2e.ts", &["WEB-1 old"], "passed", &[])])).await;
+    let first =
+        ci.post("/projects/WEB/runs", report("r1", "2026-11-11T10:00:00Z", "main", vec![result("a.e2e.ts", &["WEB-1 old"], "passed", &[])])).await;
     let second = ci
-        .post("/projects/WEB/runs", report("r2", "2026-11-12T10:00:00Z", "main", vec![result("a.e2e.ts", &["WEB-1 old"], "failed", &[]), result("a.e2e.ts", &["WEB-2 new"], "passed", &[])]))
+        .post(
+            "/projects/WEB/runs",
+            report(
+                "r2",
+                "2026-11-12T10:00:00Z",
+                "main",
+                vec![result("a.e2e.ts", &["WEB-1 old"], "failed", &[]), result("a.e2e.ts", &["WEB-2 new"], "passed", &[])],
+            ),
+        )
         .await;
     assert_eq!(found(&app, &ci, "tests = failing"), vec!["WEB-1"]);
 
@@ -479,7 +537,10 @@ async fn runs_tests_and_issues_can_be_removed() {
 
     // A deleted issue leaves no link behind for a later issue to inherit.
     ci.post("/projects/WEB/runs", report("r3", "2026-11-13T10:00:00Z", "main", vec![result("a.e2e.ts", &["WEB-3 pays"], "passed", &[])])).await;
-    let links = |app: &App| app.read(|connection| Ok(connection.query_row("SELECT count(*) FROM link WHERE from_kind = 'e2e_test'", [], |row| row.get::<_, i64>(0))?)).unwrap();
+    let links = |app: &App| {
+        app.read(|connection| Ok(connection.query_row("SELECT count(*) FROM link WHERE from_kind = 'e2e_test'", [], |row| row.get::<_, i64>(0))?))
+            .unwrap()
+    };
     assert_eq!(links(&app), 1);
     app.write(admin.user.actor(), |tx| {
         let (issue_id, _) = issue_id_by_key(tx, "WEB-3")?.expect("the issue");
@@ -501,20 +562,32 @@ async fn the_demo_has_a_done_issue_with_a_failing_test() {
     let tests = page["tests"].as_array().unwrap();
     assert_eq!(page["runs"].as_array().unwrap().len(), 8);
     assert_eq!(page["counts"], json!({ "total": 14, "passing": 11, "failing": 1, "flaky": 1, "skipped": 1, "unlinked": 1 }));
-    assert_eq!((page["latestRun"]["name"].as_str(), page["latestRun"]["status"].as_str(), page["latestRun"]["branch"].as_str()), (Some("CI #236"), Some("failed"), Some("main")));
+    assert_eq!(
+        (page["latestRun"]["name"].as_str(), page["latestRun"]["status"].as_str(), page["latestRun"]["branch"].as_str()),
+        (Some("CI #236"), Some("failed"), Some("main"))
+    );
     assert!(page["latestRun"]["agentSteps"].as_i64().unwrap() > 0 && page["latestRun"]["costUsd"].as_f64().unwrap() > 0.0);
     assert!(page["bugTypeId"].is_i64());
 
     // The one failing test verifies an issue that is done.
     let failing = &tests[0];
     assert_eq!(failing["title"], "Koszyk > WEB-11 pusty koszyk pokazuje komunikat zamiast błędu 500");
-    assert_eq!((failing["status"].as_str(), failing["issues"][0]["key"].as_str(), failing["issues"][0]["done"].clone()), (Some("failed"), Some("WEB-11"), json!(true)));
+    assert_eq!(
+        (failing["status"].as_str(), failing["issues"][0]["key"].as_str(), failing["issues"][0]["done"].clone()),
+        (Some("failed"), Some("WEB-11"), json!(true))
+    );
     assert_eq!(found(&app, &owner, "category = done AND tests = failing"), vec!["WEB-11"]);
     assert_eq!(found(&app, &owner, "tests = flaky"), vec!["WEB-14"]);
 
     let flaky = &tests[1];
-    assert_eq!((flaky["status"].as_str(), flaky["unstable"].clone(), flaky["issues"][0]["key"].as_str()), (Some("flaky"), json!(true), Some("WEB-14")));
-    assert_eq!(tests.iter().filter(|test| test["issues"].as_array().unwrap().is_empty()).map(|test| test["title"].as_str().unwrap()).collect::<Vec<_>>(), vec!["strona główna pokazuje katalog produktów"]);
+    assert_eq!(
+        (flaky["status"].as_str(), flaky["unstable"].clone(), flaky["issues"][0]["key"].as_str()),
+        (Some("flaky"), json!(true), Some("WEB-14"))
+    );
+    assert_eq!(
+        tests.iter().filter(|test| test["issues"].as_array().unwrap().is_empty()).map(|test| test["title"].as_str().unwrap()).collect::<Vec<_>>(),
+        vec!["strona główna pokazuje katalog produktów"]
+    );
     // A tag links too, and a test that last ran on a branch says so.
     assert_eq!(issue_keys(test(&page, "Adres dostawy > formularz wymaga ulicy, miasta i kodu pocztowego")), vec!["WEB-5"]);
     assert_eq!(test(&page, "Płatności > WEB-9 odrzucona karta pokazuje czytelny komunikat")["branch"], "feature/WEB-9-platnosc-karta");

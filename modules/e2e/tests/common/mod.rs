@@ -48,13 +48,15 @@ pub fn person(app: &App, name: &str, role: Role) -> Client {
 }
 
 pub fn project(app: &App, owner: &Client, key: &str, is_private: bool) -> Id {
-    let new = NewProject { key: key.to_string(), name: format!("Project {key}"), description: String::new(), board_mode: None, is_private, lead_id: None };
+    let new =
+        NewProject { key: key.to_string(), name: format!("Project {key}"), description: String::new(), board_mode: None, is_private, lead_id: None };
 
     app.write(owner.user.actor(), |tx| create_project(tx, &owner.user, &new)).expect("a project").summary.id
 }
 
 pub fn member(app: &App, owner: &Client, key: &str, who: &Client, role: ProjectRole) {
-    app.write(owner.user.actor(), |tx| set_member(tx, &access::project_access(tx, &owner.user, key)?, who.user.id, Some(role))).expect("a membership");
+    app.write(owner.user.actor(), |tx| set_member(tx, &access::project_access(tx, &owner.user, key)?, who.user.id, Some(role)))
+        .expect("a membership");
 }
 
 /// Creates an issue assigned to `who` and returns its key.

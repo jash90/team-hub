@@ -21,6 +21,7 @@ pub fn modules() -> Vec<Arc<dyn Module>> {
         Arc::new(hub_mod_wiki::WikiModule),
         Arc::new(hub_mod_confluence::ConfluenceModule),
         Arc::new(hub_mod_reports::ReportsModule),
+        Arc::new(hub_mod_e2e::E2eModule),
         Arc::new(hub_mod_agents::AgentsModule),
     ]
 }

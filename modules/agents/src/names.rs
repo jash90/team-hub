@@ -14,11 +14,7 @@ use rusqlite::Connection;
 use serde_json::{json, Value};
 
 fn id_names(connection: &Connection, sql: &str) -> ApiResult<HashMap<Id, String>> {
-    Ok(
-        query_all(connection, sql, [], |row| Ok((row.get::<_, Id>(0)?, row.get::<_, String>(1)?)))?
-            .into_iter()
-            .collect(),
-    )
+    Ok(query_all(connection, sql, [], |row| Ok((row.get::<_, Id>(0)?, row.get::<_, String>(1)?)))?.into_iter().collect())
 }
 
 /// The names behind the ids on an issue.
@@ -94,11 +90,7 @@ impl Names {
 }
 
 fn unknown(what: &str, given: &str, valid: &[String]) -> ApiError {
-    let valid = if valid.is_empty() {
-        "there are none".to_string()
-    } else {
-        format!("valid: {}", valid.join(", "))
-    };
+    let valid = if valid.is_empty() { "there are none".to_string() } else { format!("valid: {}", valid.join(", ")) };
 
     ApiError::bad_request(format!("Unknown {what} \"{given}\" ({valid})"))
 }
@@ -110,36 +102,24 @@ fn names_where(connection: &Connection, sql: &str, project_id: Id) -> ApiResult<
 pub fn status_id(connection: &Connection, project_id: Id, name: &str) -> ApiResult<Id> {
     match status_by_name(connection, project_id, name)? {
         Some(id) => Ok(id),
-        None => Err(unknown(
-            "status",
-            name,
-            &names_where(
-                connection,
-                "SELECT name FROM status WHERE project_id = ?1 ORDER BY position, id",
-                project_id,
-            )?,
-        )),
+        None => {
+            Err(unknown("status", name, &names_where(connection, "SELECT name FROM status WHERE project_id = ?1 ORDER BY position, id", project_id)?))
+        }
     }
 }
 
 pub fn type_id(connection: &Connection, project_id: Id, name: &str) -> ApiResult<Id> {
-    let found = query_one(
-        connection,
-        "SELECT id FROM issue_type WHERE project_id = ?1 AND name = ?2 COLLATE NOCASE",
-        (project_id, name.trim()),
-        |row| row.get(0),
-    )?;
+    let found =
+        query_one(connection, "SELECT id FROM issue_type WHERE project_id = ?1 AND name = ?2 COLLATE NOCASE", (project_id, name.trim()), |row| {
+            row.get(0)
+        })?;
 
     match found {
         Some(id) => Ok(id),
         None => Err(unknown(
             "issue type",
             name,
-            &names_where(
-                connection,
-                "SELECT name FROM issue_type WHERE project_id = ?1 ORDER BY position, id",
-                project_id,
-            )?,
+            &names_where(connection, "SELECT name FROM issue_type WHERE project_id = ?1 ORDER BY position, id", project_id)?,
         )),
     }
 }
@@ -163,33 +143,23 @@ pub fn sprint_id(connection: &Connection, project_id: Id, name: &str) -> ApiResu
         None => Err(unknown(
             "sprint",
             name,
-            &names_where(
-                connection,
-                "SELECT name FROM sprint WHERE project_id = ?1 AND state != 'closed' ORDER BY position, id",
-                project_id,
-            )?,
+            &names_where(connection, "SELECT name FROM sprint WHERE project_id = ?1 AND state != 'closed' ORDER BY position, id", project_id)?,
         )),
     }
 }
 
 pub fn version_id(connection: &Connection, project_id: Id, name: &str) -> ApiResult<Id> {
-    let found = query_one(
-        connection,
-        "SELECT id FROM version WHERE project_id = ?1 AND name = ?2 COLLATE NOCASE",
-        (project_id, name.trim()),
-        |row| row.get(0),
-    )?;
+    let found =
+        query_one(connection, "SELECT id FROM version WHERE project_id = ?1 AND name = ?2 COLLATE NOCASE", (project_id, name.trim()), |row| {
+            row.get(0)
+        })?;
 
     match found {
         Some(id) => Ok(id),
         None => Err(unknown(
             "version",
             name,
-            &names_where(
-                connection,
-                "SELECT name FROM version WHERE project_id = ?1 AND archived = 0 ORDER BY id",
-                project_id,
-            )?,
+            &names_where(connection, "SELECT name FROM version WHERE project_id = ?1 AND archived = 0 ORDER BY id", project_id)?,
         )),
     }
 }
@@ -207,12 +177,7 @@ pub fn user_id(connection: &Connection, caller: &AuthUser, name: &str) -> ApiRes
 }
 
 pub fn active_people(connection: &Connection) -> ApiResult<Vec<String>> {
-    query_all(
-        connection,
-        "SELECT name FROM user WHERE active = 1 ORDER BY name COLLATE NOCASE",
-        [],
-        |row| row.get(0),
-    )
+    query_all(connection, "SELECT name FROM user WHERE active = 1 ORDER BY name COLLATE NOCASE", [], |row| row.get(0))
 }
 
 /// A priority given as its name ("High") or its number (1 is the highest, 5 the lowest).

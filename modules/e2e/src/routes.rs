@@ -49,11 +49,16 @@ fn run_url(app: &App, project_key: &str, run_id: Id) -> String {
 fn load_project(app: &App, user: &AuthUser, key: &str) -> ApiResult<E2eProjectTests> {
     let access = app.read(|connection| project_access(connection, user, key))?;
     // Two independent reads, each on its own connection.
-    let (runs, tests) =
-        rayon::join(|| app.read(|connection| project_runs(connection, access.id, RUNS_SHOWN)), || app.read(|connection| project_tests(connection, user, access.id)));
+    let (runs, tests) = rayon::join(
+        || app.read(|connection| project_runs(connection, access.id, RUNS_SHOWN)),
+        || app.read(|connection| project_tests(connection, user, access.id)),
+    );
     let (runs, tests) = (runs?, tests?);
-    let bug_type_id =
-        app.read(|connection| query_one(connection, "SELECT id FROM issue_type WHERE project_id = ?1 AND name = 'Bug' AND level = 'standard'", [access.id], |row| row.get(0)))?;
+    let bug_type_id = app.read(|connection| {
+        query_one(connection, "SELECT id FROM issue_type WHERE project_id = ?1 AND name = 'Bug' AND level = 'standard'", [access.id], |row| {
+            row.get(0)
+        })
+    })?;
 
     Ok(E2eProjectTests {
         latest_run: runs.first().cloned(),
@@ -82,7 +87,14 @@ struct WithMeta {
 /// Takes a run report: the framework's JSON document as it is (optionally with a `meta`
 /// object beside `run`), or JUnit XML. Branch, commit, pull request, CI address, run name
 /// and, for a report without one, a run id can also come as query parameters.
-async fn post_run(State(app): State<App>, user: AuthUser, Path(key): Path<String>, Query(query): Query<RunMeta>, headers: HeaderMap, body: Bytes) -> Reply<E2eIngestResult> {
+async fn post_run(
+    State(app): State<App>,
+    user: AuthUser,
+    Path(key): Path<String>,
+    Query(query): Query<RunMeta>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Reply<E2eIngestResult> {
     let content_type = headers.get(CONTENT_TYPE).and_then(|value| value.to_str().ok()).map(String::from);
 
     app.run(move |app| {
@@ -156,8 +168,8 @@ async fn remove_run(State(app): State<App>, user: AuthUser, Path(id): Path<Id>) 
 
 /// The project a test belongs to, for a caller who may edit it.
 fn editable_test(connection: &Connection, user: &AuthUser, test_id: Id) -> ApiResult<Id> {
-    let project_id: Id =
-        query_one(connection, "SELECT project_id FROM e2e_test WHERE id = ?1", [test_id], |row| row.get(0))?.ok_or_else(|| ApiError::not_found("Test"))?;
+    let project_id: Id = query_one(connection, "SELECT project_id FROM e2e_test WHERE id = ?1", [test_id], |row| row.get(0))?
+        .ok_or_else(|| ApiError::not_found("Test"))?;
     project_access_by_id(connection, user, project_id).map_err(|_| ApiError::not_found("Test"))?.require_edit()?;
 
     Ok(project_id)
@@ -204,7 +216,8 @@ async fn unlink_issue(State(app): State<App>, user: AuthUser, Path((id, issue_ke
 /// The issue's tests. None when it has none and its project has never received a run, so the
 /// panel only shows up where tests are in use.
 pub fn issue_panel(connection: &Connection, issue: &IssueRow, viewer: &AuthUser) -> ApiResult<Option<E2eIssuePanel>> {
-    let tests: Vec<_> = tests_of_issues(connection, viewer, "i.id = ?", vec![SqlValue::Integer(issue.id)])?.into_iter().map(|(_, test)| test).collect();
+    let tests: Vec<_> =
+        tests_of_issues(connection, viewer, "i.id = ?", vec![SqlValue::Integer(issue.id)])?.into_iter().map(|(_, test)| test).collect();
 
     if tests.is_empty() {
         let in_use: Option<Id> = query_one(connection, "SELECT id FROM e2e_run WHERE project_id = ?1 LIMIT 1", [issue.project_id], |row| row.get(0))?;
@@ -237,7 +250,12 @@ pub fn dashboard(connection: &Connection, viewer: &AuthUser) -> ApiResult<Option
              WHERE i.id IN ({ids}) ORDER BY s.category = 'done' DESC, i.updated_at DESC LIMIT 20"
         ),
         [],
-        |row| Ok((row.get::<_, Id>(0)?, E2eDashboardIssue { key: row.get(1)?, summary: row.get(2)?, status: row.get(3)?, done: row.get(4)?, tests: Vec::new() })),
+        |row| {
+            Ok((
+                row.get::<_, Id>(0)?,
+                E2eDashboardIssue { key: row.get(1)?, summary: row.get(2)?, status: row.get(3)?, done: row.get(4)?, tests: Vec::new() },
+            ))
+        },
     )?;
 
     for (issue_id, test) in failing {

@@ -16,10 +16,7 @@ pub struct RpcError {
 
 impl RpcError {
     pub fn new(code: i64, message: impl Into<String>) -> Self {
-        Self {
-            code,
-            message: message.into(),
-        }
+        Self { code, message: message.into() }
     }
 }
 
@@ -34,19 +31,12 @@ pub enum Incoming {
 }
 
 fn invalid(id: Value, message: &str) -> Incoming {
-    Incoming::Invalid {
-        id,
-        error: RpcError::new(INVALID_REQUEST, format!("Invalid request: {message}")),
-    }
+    Incoming::Invalid { id, error: RpcError::new(INVALID_REQUEST, format!("Invalid request: {message}")) }
 }
 
 pub fn classify(message: Value) -> Incoming {
     let Value::Object(mut message) = message else {
-        let reason = if message.is_array() {
-            "batches are not supported, send one message per request"
-        } else {
-            "a message is a JSON object"
-        };
+        let reason = if message.is_array() { "batches are not supported, send one message per request" } else { "a message is a JSON object" };
 
         return invalid(Value::Null, reason);
     };
@@ -66,11 +56,7 @@ pub fn classify(message: Value) -> Incoming {
 
     match id {
         None => Incoming::Notification,
-        Some(id) if id.is_string() || id.is_number() => Incoming::Call {
-            id,
-            method,
-            params: message.remove("params").unwrap_or(Value::Null),
-        },
+        Some(id) if id.is_string() || id.is_number() => Incoming::Call { id, method, params: message.remove("params").unwrap_or(Value::Null) },
         Some(_) => invalid(Value::Null, "\"id\" must be a string or a number"),
     }
 }
@@ -99,42 +85,19 @@ mod tests {
         let call = classify(json!({ "jsonrpc": "2.0", "id": 7, "method": "tools/list" }));
         let named = classify(json!({ "jsonrpc": "2.0", "id": "a", "method": "tools/call", "params": { "name": "x" } }));
 
-        assert_eq!(
-            call,
-            Incoming::Call {
-                id: json!(7),
-                method: "tools/list".to_string(),
-                params: Value::Null
-            }
-        );
-        assert_eq!(
-            named,
-            Incoming::Call {
-                id: json!("a"),
-                method: "tools/call".to_string(),
-                params: json!({ "name": "x" })
-            }
-        );
-        assert_eq!(
-            classify(json!({ "jsonrpc": "2.0", "method": "notifications/initialized" })),
-            Incoming::Notification
-        );
+        assert_eq!(call, Incoming::Call { id: json!(7), method: "tools/list".to_string(), params: Value::Null });
+        assert_eq!(named, Incoming::Call { id: json!("a"), method: "tools/call".to_string(), params: json!({ "name": "x" }) });
+        assert_eq!(classify(json!({ "jsonrpc": "2.0", "method": "notifications/initialized" })), Incoming::Notification);
         assert_eq!(classify(json!({ "jsonrpc": "2.0", "id": 3, "result": {} })), Incoming::Notification);
     }
 
     #[test]
     fn anything_else_is_an_invalid_request_that_keeps_the_id_when_it_has_one() {
-        assert_eq!(
-            code(classify(json!([{ "jsonrpc": "2.0", "id": 1, "method": "ping" }]))),
-            Some(INVALID_REQUEST)
-        );
+        assert_eq!(code(classify(json!([{ "jsonrpc": "2.0", "id": 1, "method": "ping" }]))), Some(INVALID_REQUEST));
         assert_eq!(code(classify(json!("ping"))), Some(INVALID_REQUEST));
         assert_eq!(code(classify(json!({ "id": 1, "method": "ping" }))), Some(INVALID_REQUEST));
         assert_eq!(code(classify(json!({ "jsonrpc": "2.0", "id": 1 }))), Some(INVALID_REQUEST));
-        assert_eq!(
-            code(classify(json!({ "jsonrpc": "2.0", "id": null, "method": "ping" }))),
-            Some(INVALID_REQUEST)
-        );
+        assert_eq!(code(classify(json!({ "jsonrpc": "2.0", "id": null, "method": "ping" }))), Some(INVALID_REQUEST));
         assert!(matches!(classify(json!({ "jsonrpc": "1.0", "id": 5, "method": "ping" })), Incoming::Invalid { id, .. } if id == json!(5)));
     }
 }

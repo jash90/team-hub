@@ -1,0 +1,32 @@
+{
+  "name": "team-hub-e2e-reporter",
+  "version": "0.1.0",
+  "description": "Reporter for the e2e testing framework that posts each finished run to team-hub",
+  "keywords": ["e2e", "reporter", "team-hub", "testing"],
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "prepare": "npm run build"
+  },
+  "peerDependencies": {
+    "e2e": ">=0.22.1 <1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "e2e": "^0.23.0",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": "^22.22.3 || >=24.8.0"
+  }
+}

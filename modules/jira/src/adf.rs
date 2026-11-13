@@ -41,16 +41,17 @@ fn is_inline(node: &Value) -> bool {
     )
 }
 
-/// All the text under a node, for places where structure cannot be kept.
-fn plain(node: &Value, out: &mut String, depth: usize) {
-    if let Some(text) = node["text"].as_str() {
-        out.push_str(text);
-    }
+/// All the text under a node, for places where structure cannot be kept. Walks with its own
+/// stack, so it works at any depth.
+fn plain(node: &Value, out: &mut String) {
+    let mut pending = vec![node];
 
-    if depth < MAX_DEPTH * 2 {
-        for child in children(node) {
-            plain(child, out, depth + 1);
+    while let Some(node) = pending.pop() {
+        if let Some(text) = node["text"].as_str() {
+            out.push_str(text);
         }
+
+        pending.extend(children(node).iter().rev());
     }
 }
 
@@ -93,7 +94,7 @@ fn inline_of(node: &Value) -> String {
 fn block(node: &Value, depth: usize) -> String {
     if depth > MAX_DEPTH {
         let mut text = String::new();
-        plain(node, &mut text, 0);
+        plain(node, &mut text);
 
         return md::escape(&text);
     }
@@ -121,7 +122,7 @@ fn block(node: &Value, depth: usize) -> String {
         "listItem" | "taskItem" | "decisionItem" => item(node, depth),
         "codeBlock" => {
             let mut code = String::new();
-            plain(node, &mut code, 0);
+            plain(node, &mut code);
 
             md::fence(attr(node, "language"), &code)
         }
@@ -304,7 +305,7 @@ fn leaf(node: &Value, out: &mut String) {
             let text = node["text"].as_str().unwrap_or("");
 
             if has_code(node) {
-                out.push_str(&md::wrap_code(text));
+                out.push_str(&md::code_span(text));
             } else {
                 out.push_str(&md::escape(text).replace('\n', "\\\n"));
             }
@@ -340,7 +341,7 @@ fn leaf(node: &Value, out: &mut String) {
         "media" | "mediaInline" => out.push_str(&media(node)),
         _ => {
             let mut text = String::new();
-            plain(node, &mut text, 0);
+            plain(node, &mut text);
             out.push_str(&md::escape(&text));
         }
     }
@@ -586,15 +587,15 @@ mod tests {
 
         if random.next(2) == 0 {
             node["attrs"] = json!({
-                "level": random.next(9), "order": random.next(5), "state": ["TODO", "DONE", ""][random.next(3)], "language": TEXTS[random.next(TEXTS.len())],
-                "panelType": ["info", "x", "warning"][random.next(3)], "text": TEXTS[random.next(TEXTS.len())], "url": TEXTS[random.next(TEXTS.len())],
-                "timestamp": ["1730419200000", "x", "-99999999999999999"][random.next(3)], "type": ["file", "external"][random.next(2)],
+                "level": random.next(9), "order": random.next(5), "state": (["TODO", "DONE", ""][random.next(3)]), "language": TEXTS[random.next(TEXTS.len())],
+                "panelType": (["info", "x", "warning"][random.next(3)]), "text": TEXTS[random.next(TEXTS.len())], "url": TEXTS[random.next(TEXTS.len())],
+                "timestamp": (["1730419200000", "x", "-99999999999999999"][random.next(3)]), "type": (["file", "external"][random.next(2)]),
             });
         }
 
         if random.next(3) == 0 {
             let marks: Vec<Value> = (0..random.next(4))
-                .map(|_| json!({ "type": ["strong", "em", "code", "link", "strike", "weird"][random.next(6)], "attrs": { "href": TEXTS[random.next(TEXTS.len())] } }))
+                .map(|_| json!({ "type": (["strong", "em", "code", "link", "strike", "weird"][random.next(6)]), "attrs": { "href": TEXTS[random.next(TEXTS.len())] } }))
                 .collect();
             node["marks"] = json!(marks);
         }
