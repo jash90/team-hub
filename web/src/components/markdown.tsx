@@ -22,10 +22,12 @@ export function linkify(text: string, projectKeys: string[]): string {
         return part;
       }
 
-      let linked = part.replace(/\[\[([^\]|]+?)\]\]/g, (_whole, target: string) => {
-        const [space, title] = target.includes(':') ? [target.slice(0, target.indexOf(':')), target.slice(target.indexOf(':') + 1)] : ['', target];
+      // `[[Title]]`, `[[SPACE:Title]]` and `[[Title|shown text]]`; only a prefix shaped like a space key names a space.
+      let linked = part.replace(/\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g, (_whole, target: string, shown?: string) => {
+        const colon = target.indexOf(':');
+        const [space, title] = colon > 0 && /^[A-Z][A-Z0-9]{1,9}$/.test(target.slice(0, colon).trim()) ? [target.slice(0, colon), target.slice(colon + 1)] : ['', target];
 
-        return `[${title.trim()}](/wiki-go?title=${encodeURIComponent(title.trim())}${space ? `&space=${encodeURIComponent(space.trim())}` : ''})`;
+        return `[${(shown ?? title).trim()}](/wiki-go?title=${encodeURIComponent(title.trim())}${space ? `&space=${encodeURIComponent(space.trim())}` : ''})`;
       });
 
       if (keys) {

@@ -15,6 +15,7 @@ import { navigate } from '@/router.tsx';
 import { useRemote, useSession } from '@/session.tsx';
 
 import { BASE, openTasks, pagePath, useProjects } from './lib.ts';
+import { templateBody } from './templates.ts';
 
 function suggestKey(name: string): string {
   const words = name
@@ -178,7 +179,7 @@ export function NewPageDialog({ spaceKey, parent, title, onClose }: { spaceKey: 
     event.preventDefault();
 
     void run(async () => {
-      const page = await api.post<WikiPageDetail>(`${BASE}/spaces/${spaceKey}/pages`, { title: name, parentId: parent?.id ?? null, ...(templateId ? { templateId } : {}) });
+      const page = await api.post<WikiPageDetail>(`${BASE}/spaces/${spaceKey}/pages`, { title: name, parentId: parent?.id ?? null, ...(chosen ? { body: templateBody(chosen) } : {}) });
       onClose();
       navigate(pagePath(page.spaceKey, page.id, 'edit'));
     });
@@ -201,7 +202,7 @@ export function NewPageDialog({ spaceKey, parent, title, onClose }: { spaceKey: 
         <Field label={t('Title')}>
           <input className="input" autoFocus required maxLength={255} value={name} onChange={(event) => setName(event.target.value)} />
         </Field>
-        <Field label={t('Start from')} hint={chosen?.description}>
+        <Field label={t('Start from')} hint={chosen ? t(chosen.description) : undefined}>
           <Picker
             value={templateId}
             options={[{ value: null as string | null, label: t('An empty page') }, ...(templates.data ?? []).map((template) => ({ value: template.id as string | null, label: t(template.name) }))]}

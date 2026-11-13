@@ -398,7 +398,7 @@
 
 .reports-load-row {
   display: grid;
-  grid-template-columns: minmax(120px, 200px) minmax(60px, 1fr) 96px 96px 64px;
+  grid-template-columns: minmax(110px, 180px) minmax(60px, 1fr) 104px 64px 56px;
   align-items: center;
   gap: 4px 14px;
   text-align: right;

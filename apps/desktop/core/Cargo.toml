@@ -1,0 +1,61 @@
+[package]
+name = "hub-desktop-core"
+description = "Everything of the team-hub desktop app that is not a window: connection, cache, repositories, agent threads, the runner."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "hub_desktop_core"
+
+[[bin]]
+name = "hub"
+path = "src/bin/hub.rs"
+
+# The agent used by tests and trials: it speaks the sidecar's JSON lines without any model.
+[[bin]]
+name = "hub-fake-agent"
+path = "src/bin/fake_agent.rs"
+
+# Serves the same commands the window uses over HTTP, to look at the interface in a browser.
+[[bin]]
+name = "hub-dev-server"
+path = "src/bin/dev_server.rs"
+required-features = ["dev-server"]
+
+[features]
+dev-server = ["dep:axum"]
+
+[dependencies]
+hub-core.workspace = true
+chrono.workspace = true
+rayon.workspace = true
+regex.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["process", "io-util"] }
+tracing.workspace = true
+ts-rs.workspace = true
+ureq.workspace = true
+axum = { workspace = true, optional = true }
+chacha20poly1305 = "0.10"
+getrandom = "0.3"
+clap = { version = "4", features = ["derive"] }
+dirs = "6"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+keyring = { version = "3", features = ["async-secret-service", "tokio", "crypto-rust"] }
+
+[dev-dependencies]
+axum.workspace = true

@@ -1,5 +1,6 @@
 [workspace]
-members = ["crates/*", "modules/*"]
+members = ["crates/*", "modules/*", "apps/desktop/core"]
+exclude = ["apps/desktop/src-tauri"]
 resolver = "2"
 
 [workspace.package]
