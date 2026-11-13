@@ -1,0 +1,85 @@
+# Serves the landing page as a static site.
+#
+# The container listens on plain HTTP on $PORT (8080 when unset); TLS is the
+# platform's job (Railway's edge, or whatever proxy stands in front).
+# SITE_ROOT exists so that the same file can be tried outside a container:
+#   SITE_ROOT=. PORT=8198 caddy run --config Caddyfile --adapter caddyfile
+{
+	admin off
+	auto_https off
+}
+
+# The page loads nothing from anywhere else, so the policy can say so.
+# No inline script or style is used; if one is ever added, hash it here.
+# A snippet, because error pages do not inherit the headers of the main route.
+(security) {
+	header {
+		Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'self'; script-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), browsing-topics=()"
+		X-Frame-Options "DENY"
+		Cross-Origin-Opener-Policy "same-origin"
+		-Server
+	}
+}
+
+:{$PORT:8080} {
+	root * {$SITE_ROOT:/srv}
+
+	encode zstd gzip
+
+	import security
+
+	# Caching. Screenshots and fonts never change under the same name (a new
+	# picture gets a new name). The stylesheet and the script are linked with
+	# ?v=N and N is raised when they change. Pages are checked again soon.
+	@named path /assets/img/* /assets/fonts/*
+	@versioned {
+		path_regexp ^/assets/[^/]+\.(css|js)$
+		query v=*
+	}
+	@other_assets {
+		path /assets/*
+		not path /assets/img/* /assets/fonts/*
+		not query v=*
+	}
+	@pages not path /assets/*
+
+	header @named Cache-Control "public, max-age=31536000, immutable"
+	header @versioned Cache-Control "public, max-age=31536000, immutable"
+	header @other_assets Cache-Control "public, max-age=3600"
+	header @pages Cache-Control "public, max-age=300, must-revalidate"
+
+	# One address per page. /pl without the slash is redirected to /pl/ by
+	# file_server itself.
+	redir /index.html / 308
+	redir /pl/index.html /pl/ 308
+	redir /en / 308
+	redir /en/ / 308
+
+	# For a platform healthcheck that should not count as a page view in logs.
+	header /healthz Cache-Control "no-store"
+	respond /healthz "ok" 200
+
+	file_server {
+		# Only matters when SITE_ROOT is the repository folder; the image
+		# does not contain these.
+		hide Caddyfile Dockerfile README.md .dockerignore tools
+	}
+
+	handle_errors {
+		import security
+
+		@notfound expression `{err.status_code} == 404`
+		handle @notfound {
+			rewrite * /404.html
+			header Cache-Control "no-store"
+			file_server
+		}
+		handle {
+			header Cache-Control "no-store"
+			respond "{err.status_code} {err.status_text}"
+		}
+	}
+}
