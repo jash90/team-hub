@@ -139,7 +139,7 @@ export function SettingsView({ onStatus }: { onStatus: (status: ConnectionStatus
       {leaving && (
         <ConfirmDialog
           title={t('Disconnect from the server?')}
-          body={t('The token is removed from the keychain and the stored copy of the server’s data is deleted. Threads, working trees and repositories stay.')}
+          body={t('The token is removed from the keychain, and on the server too when the app got it by signing in here. The stored copy of the server’s data is deleted. Threads, working trees and repositories stay.')}
           confirm={t('Disconnect')}
           danger
           onConfirm={async () => {

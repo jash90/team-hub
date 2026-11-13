@@ -10,6 +10,10 @@ use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use crate::error::{CoreError, CoreResult};
 
 pub const TOKEN_ENTRY: &str = "api-token";
+/// The server's id of the token, when the app was given it by a person saying yes in the
+/// tracker: what the app removes on the server when it is disconnected. A token somebody
+/// pasted has no entry here, and is theirs to remove.
+pub const TOKEN_ID_ENTRY: &str = "api-token-id";
 pub const CACHE_KEY_ENTRY: &str = "cache-key";
 /// For machines without a keychain (CI, a container): the token for this process only.
 pub const TOKEN_VARIABLE: &str = "TEAM_HUB_TOKEN";

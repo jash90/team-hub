@@ -4,6 +4,7 @@ import type { ConnectionStatus } from './bindings/ConnectionStatus.ts';
 import type { DashboardView } from './bindings/DashboardView.ts';
 import type { IssueView } from './bindings/IssueView.ts';
 import type { NewThread } from './bindings/NewThread.ts';
+import type { PairingView } from './bindings/PairingView.ts';
 import type { Proposal } from './bindings/Proposal.ts';
 import type { PullRequestPreview } from './bindings/PullRequestPreview.ts';
 import type { PullRequestResult } from './bindings/PullRequestResult.ts';
@@ -33,6 +34,10 @@ export const core = {
   status: () => call<ConnectionStatus>('status'),
   connect: (url: string, token: string) => call<ConnectionStatus>('connect', { url, token }),
   disconnect: () => call<ConnectionStatus>('disconnect'),
+  // Signing in from the window (docs/desktop-pairing.md): ask, then wait for the person's yes.
+  pairStart: (url: string) => call<PairingView>('pair_start', { url }),
+  pairWait: () => call<ConnectionStatus>('pair_wait'),
+  pairCancel: () => call<null>('pair_cancel'),
   settings: () => call<Settings>('settings'),
   saveSettings: (settings: Settings) => call<Settings>('save_settings', settings),
   models: () => call<string[]>('models'),

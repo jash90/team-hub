@@ -13,7 +13,7 @@
 
 use serde_json::Value;
 use tauri::webview::NewWindowResponse;
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, State, Url, Webview, WebviewBuilder, WebviewUrl, Window};
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, State, Url, Webview, WebviewBuilder, WebviewUrl, Window};
 use tauri_plugin_opener::OpenerExt;
 
 use hub_desktop_core::commands;
@@ -62,6 +62,25 @@ fn same_origin(one: &Url, other: &Url) -> bool {
     one.scheme() == other.scheme() && one.host_str() == other.host_str() && one.port_or_known_default() == other.port_or_known_default()
 }
 
+/// The name of the events the window sends to the local interface.
+const STAGE_EVENT: &str = "stage";
+
+/// The run whose thread a link of the server's asks the app to show: `/desktop/thread/12`
+/// on the server itself, and nothing else. Such a link is never followed.
+fn thread_link(url: &Url, server: &Url) -> Option<i64> {
+    if !same_origin(url, server) || url.query().is_some() || url.fragment().is_some() {
+        return None;
+    }
+
+    let run = url.path().strip_prefix("/desktop/thread/")?;
+
+    if run.is_empty() || run.len() > 15 || !run.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+
+    run.parse().ok()
+}
+
 /// A link that leads away from the server opens in the person's browser.
 fn open_outside(app: &AppHandle, url: &Url) {
     if matches!(url.scheme(), "http" | "https") {
@@ -80,7 +99,10 @@ fn introduction(server: &Url, runner: &str, version: &str) -> String {
 
 /// The web interface of the server the app is connected to, made when it is not there yet
 /// and made anew when the server is another one.
-async fn web(app: &AppHandle, shell: &Shell, stage: &Stage) -> Result<Webview, String> {
+///
+/// The second value says that it was made just now: it has no page yet, only an address
+/// it is on its way to.
+async fn web(app: &AppHandle, shell: &Shell, stage: &Stage) -> Result<(Webview, bool), String> {
     let status = commands::invoke(&shell.desktop, "status", Value::Null).await?;
     let server = status["serverUrl"].as_str().and_then(|address| Url::parse(address).ok()).ok_or("The app is not connected to a team-hub server.")?;
     let runner = status["runner"]["id"].as_str().unwrap_or_default().to_string();
@@ -88,7 +110,7 @@ async fn web(app: &AppHandle, shell: &Shell, stage: &Stage) -> Result<Webview, S
 
     if let Some(existing) = app.get_webview(WEB) {
         if current.as_ref().is_some_and(|shown| same_origin(shown, &server)) {
-            return Ok(existing);
+            return Ok((existing, false));
         }
 
         layout::release(app);
@@ -104,6 +126,14 @@ async fn web(app: &AppHandle, shell: &Shell, stage: &Stage) -> Result<Webview, S
         .initialization_script(introduction(&server, &runner, &app.package_info().version.to_string()))
         // The view shows the server and nothing else.
         .on_navigation(move |url| {
+            // The one thing a page of the server can ask of the app: to show the thread of a
+            // run. It changes what the window shows and nothing else; the page stays.
+            if let Some(run) = thread_link(url, &stay) {
+                let _ = leave.emit_to(LOCAL, STAGE_EVENT, serde_json::json!({ "openRun": run }));
+
+                return false;
+            }
+
             if same_origin(url, &stay) || url.scheme() == "about" {
                 return true;
             }
@@ -132,7 +162,7 @@ async fn web(app: &AppHandle, shell: &Shell, stage: &Stage) -> Result<Webview, S
     layout::adopt(&view).map_err(|error| error.to_string())?;
     *current = Some(server);
 
-    Ok(view)
+    Ok((view, true))
 }
 
 /// Shows the server's web interface over this part of the local interface, in the local
@@ -152,7 +182,7 @@ pub async fn web_show(
 ) -> Result<(), String> {
     local_only(&webview)?;
 
-    let view = web(&app, &shell, &stage).await?;
+    let (view, _) = web(&app, &shell, &stage).await?;
 
     layout::place(&app, &view, Some((x.max(0.0), y.max(0.0), width.max(1.0), height.max(1.0)))).map_err(|error| error.to_string())
 }
@@ -177,7 +207,7 @@ pub async fn web_open(app: AppHandle, webview: Webview, shell: State<'_, Shell>,
         return Err("A page of the server starts with one slash.".to_string());
     }
 
-    let view = web(&app, &shell, &stage).await?;
+    let (view, fresh) = web(&app, &shell, &stage).await?;
     let server = stage.server.lock().await.clone().ok_or("The app is not connected to a team-hub server.")?;
     let target = server.join(&path).map_err(|error| error.to_string())?;
 
@@ -186,8 +216,9 @@ pub async fn web_open(app: AppHandle, webview: Webview, shell: State<'_, Shell>,
     }
 
     // The interface is one page that follows the address: on the server already, changing
-    // the address is enough and keeps what the page has loaded.
-    if view.url().is_ok_and(|now| same_origin(&now, &server)) {
+    // the address is enough and keeps what the page has loaded. A view made just now has
+    // no page to tell yet, so it is sent to the address itself.
+    if !fresh && view.url().is_ok_and(|now| same_origin(&now, &server)) {
         let to = Value::String(format!("{}{}", target.path(), target.query().map(|query| format!("?{query}")).unwrap_or_default()));
 
         view.eval(format!("window.history.pushState(null, '', {to}); window.dispatchEvent(new PopStateEvent('popstate'));"))
@@ -418,6 +449,26 @@ mod tests {
         assert!(!same_origin(&url("https://hub.example.com.evil.test/"), &server));
         assert!(!same_origin(&url("https://hub.example.com:8443/"), &server));
         assert!(!same_origin(&url("https://evil.test/https://hub.example.com/"), &server));
+    }
+
+    #[test]
+    fn only_the_servers_own_link_to_a_run_asks_for_its_thread() {
+        let server = url("https://hub.example.com");
+
+        assert_eq!(thread_link(&url("https://hub.example.com/desktop/thread/12"), &server), Some(12));
+        // Another site, another scheme or another port is not the server.
+        assert_eq!(thread_link(&url("https://evil.test/desktop/thread/12"), &server), None);
+        assert_eq!(thread_link(&url("http://hub.example.com/desktop/thread/12"), &server), None);
+        assert_eq!(thread_link(&url("https://hub.example.com:8443/desktop/thread/12"), &server), None);
+        // Digits and nothing but digits.
+        for path in ["/desktop/thread/", "/desktop/thread/12/", "/desktop/thread/12a", "/desktop/thread/-1", "/desktop/thread/1.5", "/desktop/thread/12/x"] {
+            assert_eq!(thread_link(&url(&format!("https://hub.example.com{path}")), &server), None, "{path}");
+        }
+        assert_eq!(thread_link(&url("https://hub.example.com/desktop/thread/%31%32"), &server), None);
+        assert_eq!(thread_link(&url("https://hub.example.com/desktop/thread/12?x=1"), &server), None);
+        assert_eq!(thread_link(&url("https://hub.example.com/desktop/thread/12#x"), &server), None);
+        assert_eq!(thread_link(&url("https://hub.example.com/desktop/thread/99999999999999999999"), &server), None);
+        assert_eq!(thread_link(&url("https://hub.example.com/x/desktop/thread/12"), &server), None);
     }
 
     #[test]

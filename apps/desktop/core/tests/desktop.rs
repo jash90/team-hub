@@ -4,7 +4,7 @@
 
 mod support;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use hub_desktop_core::commands;
 use hub_desktop_core::model::{AppEvent, EventKind, NewThread, ProposalKind, ProposalState, ThreadKind, ThreadOrigin, ThreadState};
@@ -85,6 +85,112 @@ async fn the_token_lives_in_the_keychain_and_in_no_file() {
     let json = serde_json::to_string(&bench.desktop.run(|core| Ok((core.status(), core.settings()))).await.unwrap()).unwrap();
 
     assert!(!json.contains(TOKEN));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn signing_in_from_the_window_gets_the_token_once_a_person_has_said_yes() {
+    use hub_desktop_core::secrets::Keychain;
+
+    let hub = FakeHub::start().await;
+    let bench = open("pairing");
+    let url = format!("{}/", hub.url);
+
+    // Nothing to wait for before anything was asked.
+    assert!(bench.desktop.run(|core| core.pair_wait()).await.unwrap_err().to_string().contains("Nothing is waiting"));
+
+    let pairing = bench.desktop.run(move |core| core.pair_start(&url)).await.unwrap();
+    let asked = hub.state().pairings.values().next().cloned().expect("the server was asked");
+
+    // The server heard which app this is; the window heard the code and where to say yes.
+    assert!(asked.name.starts_with("Desktop") && asked.runner_id.starts_with("desktop-"), "{asked:?}");
+    assert_eq!((pairing.code.as_str(), pairing.path.as_str()), (asked.code.as_str(), format!("/desktop/pair?code={}", asked.code).as_str()));
+    assert_eq!(pairing.server_url, hub.url);
+    assert!(!serde_json::to_string(&pairing).unwrap().contains(&asked.secret), "the secret stays in the core");
+
+    // The address is kept, so the window can show the server's sign-in; connected it is not.
+    let status = bench.desktop.run(|core| Ok(core.status())).await.unwrap();
+    assert_eq!((status.server_url.as_deref(), status.has_token, status.user.is_none()), (Some(hub.url.as_str()), false, true));
+    assert_eq!(bench.keychain.get("api-token").unwrap(), None);
+
+    // The app asks, and asks again, until the person has said yes.
+    let waiting = bench.desktop.clone();
+    let waiter = tokio::spawn(async move { waiting.run(|core| core.pair_wait()).await });
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert!(!waiter.is_finished());
+    hub.answer_pairings(true);
+
+    let status = waiter.await.unwrap().unwrap();
+
+    assert!(status.online && status.has_token);
+    assert_eq!(status.user.unwrap().name, "Ada Nowak");
+    assert_eq!(bench.keychain.get("api-token").unwrap().unwrap().expose(), TOKEN);
+    assert_eq!(bench.keychain.get("api-token-id").unwrap().unwrap().expose(), support::PAIRED_TOKEN_ID.to_string());
+    bench.desktop.run(|core| core.dashboard()).await.unwrap();
+
+    for file in files_under(bench.data.path()) {
+        let bytes = std::fs::read(&file).unwrap();
+
+        for secret in [TOKEN, asked.secret.as_str()] {
+            assert!(!bytes.windows(secret.len()).any(|window| window == secret.as_bytes()), "{secret} is in {}", file.display());
+        }
+    }
+
+    // Asking again while connected is refused: one server, one token.
+    let again = hub.url.clone();
+    assert!(bench.desktop.run(move |core| core.pair_start(&again)).await.unwrap_err().to_string().contains("connected already"));
+
+    // Disconnecting takes the token back on the server, since the app was given it there.
+    let status = bench.desktop.run(|core| core.disconnect()).await.unwrap();
+
+    assert!(!status.has_token);
+    assert_eq!(hub.state().revoked_tokens, [support::PAIRED_TOKEN_ID]);
+    assert_eq!((bench.keychain.get("api-token").unwrap(), bench.keychain.get("api-token-id").unwrap()), (None, None));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_request_to_connect_ends_when_declined_or_given_up_and_a_pasted_token_stays_on_the_server() {
+    let hub = FakeHub::start().await;
+    let bench = open("pairing-no");
+
+    // Declined in the tracker.
+    let url = hub.url.clone();
+    bench.desktop.run(move |core| core.pair_start(&url)).await.unwrap();
+    hub.answer_pairings(false);
+    let declined = bench.desktop.run(|core| core.pair_wait()).await.unwrap_err();
+    assert!(declined.to_string().contains("declined or ran out of time"), "{declined}");
+    assert!(!bench.desktop.run(|core| Ok(core.status())).await.unwrap().has_token);
+
+    // Given up in the app: whoever waits hears it at once, and the server is left alone.
+    let url = hub.url.clone();
+    bench.desktop.run(move |core| core.pair_start(&url)).await.unwrap();
+    let waiting = bench.desktop.clone();
+    let waiter = tokio::spawn(async move { waiting.run(|core| core.pair_wait()).await });
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let before = Instant::now();
+    bench.desktop.run(|core| {
+        core.pair_cancel();
+        Ok(())
+    })
+    .await
+    .unwrap();
+    assert!(waiter.await.unwrap().unwrap_err().to_string().contains("cancelled"));
+    assert!(before.elapsed() < Duration::from_secs(1), "noticed without waiting for the next question");
+    hub.answer_pairings(true);
+    assert!(bench.desktop.run(|core| core.pair_wait()).await.is_err(), "a yes that comes after giving up connects nothing");
+    assert!(!bench.desktop.run(|core| Ok(core.status())).await.unwrap().has_token);
+
+    // A server from before there was such a thing says what to do instead.
+    hub.state().no_pairing = true;
+    let url = hub.url.clone();
+    let old = bench.desktop.run(move |core| core.pair_start(&url)).await.unwrap_err();
+    assert!(old.to_string().contains("API token"), "{old}");
+    assert!(bench.desktop.run(|core| core.pair_start("ftp://hub.example.com")).await.is_err());
+
+    // A token somebody pasted is theirs: disconnecting removes nothing on the server.
+    bench.connect(&hub).await;
+    bench.desktop.run(|core| core.disconnect()).await.unwrap();
+    assert!(hub.state().revoked_tokens.is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -96,6 +96,26 @@ impl RunnerIdentity {
     }
 }
 
+/// What the server hands an app that asks to be connected (docs/desktop-pairing.md).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PairingStarted {
+    pub id: String,
+    /// Shown to the person, who compares it with what the server shows them.
+    pub code: String,
+    /// Kept by the app and sent back to collect the token; never shown.
+    pub secret: Secret,
+    pub expires_at: String,
+}
+
+/// The token an approved pairing ends in, and the id to remove it by when disconnecting.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PairingGrant {
+    pub token: Secret,
+    pub token_id: i64,
+}
+
 #[derive(Clone)]
 pub struct HubClient {
     base: String,
@@ -208,6 +228,35 @@ impl HubClient {
 
     pub fn patch<T: DeserializeOwned>(&self, path: &str, body: &Value) -> CoreResult<T> {
         self.send("PATCH", path, body)
+    }
+
+    // ---------- connecting without a token in anybody's hands: docs/desktop-pairing.md ----------
+
+    /// Asks the server at `base` to connect this app. Nobody is signed in yet.
+    pub fn start_pairing(base: &str, name: &str, runner_id: &str) -> CoreResult<PairingStarted> {
+        let request = agent_for(base, Some(TIMEOUT)).post(format!("{base}/api/desktop/pairings"));
+
+        Self::finish(request.send_json(json!({ "name": name, "runnerId": runner_id })))
+    }
+
+    /// Comes to collect: the token once a person has said yes, nothing while nobody has.
+    /// A request that ran out of time or was declined is an error with status 410.
+    pub fn claim_pairing(base: &str, id: &str, secret: &Secret) -> CoreResult<Option<PairingGrant>> {
+        let request = agent_for(base, Some(TIMEOUT)).post(format!("{base}/api/desktop/pairings/{}/token", encode(id)));
+        let answer: Value = Self::finish(request.send_json(json!({ "secret": secret.expose() })))?;
+
+        if answer["token"].is_string() {
+            Ok(Some(serde_json::from_value(answer)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Removes one of the person's API tokens on the server: the one this app was given.
+    pub fn revoke_token(&self, id: i64) -> CoreResult<()> {
+        let request = self.agent.delete(format!("{}/api/me/tokens/{id}", self.base));
+
+        Self::finish::<Value>(request.header("Authorization", self.authorization()).call()).map(|_| ())
     }
 
     // ---------- the tracker ----------

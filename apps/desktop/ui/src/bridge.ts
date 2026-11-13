@@ -82,6 +82,35 @@ export function listen(handler: (event: AppEvent) => void): () => void {
   };
 }
 
+/** What the window itself tells the local interface (`src-tauri/src/stage.rs`). */
+export type StageEvent = {
+  /** A page of the server asked for the thread of this run to be shown. */
+  openRun?: number;
+};
+
+/** Calls `handler` for what the window says. In a browser the window says nothing. */
+export function listenToStage(handler: (event: StageEvent) => void): () => void {
+  if (!IN_APP) {
+    return () => undefined;
+  }
+
+  let stopped = false;
+  let unlisten: (() => void) | undefined;
+
+  void import('@tauri-apps/api/event').then(async ({ listen: listenTo }) => {
+    unlisten = await listenTo<StageEvent>('stage', (message) => handler(message.payload));
+
+    if (stopped) {
+      unlisten();
+    }
+  });
+
+  return () => {
+    stopped = true;
+    unlisten?.();
+  };
+}
+
 /** A command of the window itself, not of the core. In a browser there is no such thing. */
 async function shell<T>(command: string, args?: Record<string, unknown>): Promise<T | undefined> {
   if (!IN_APP) {

@@ -132,6 +132,7 @@ export const polish: Record<string, string> = {
   Answer: 'Odpowiedz',
   'Asked by {name}': 'Zlecił(a) {name}',
   'Stopping…': 'Zatrzymywanie…',
+  'Open the thread in the app': 'Otwórz wątek w aplikacji',
   Retry: 'Ponów',
   Proposals: 'Propozycje',
   'Approve all': 'Zatwierdź wszystkie',
