@@ -32,7 +32,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["app", "dmg", "nsis", "deb", "rpm", "appimage"],
+    "publisher": "team-hub",
+    "copyright": "Copyright © 2026 the team-hub authors",
+    "category": "DeveloperTool",
+    "shortDescription": "Agent threads for the issues assigned to you in team-hub",
+    "longDescription": "A developer's cockpit on top of a team-hub server. The issues assigned to you become agent threads: an AI agent works on an issue in a local clone of the repository, in a git working tree and branch of its own, and whatever should leave your computer (a comment, a status change, a push, a pull request) waits for your click. The same app is a runner for work delegated to an agent on the web. It needs a team-hub server, git, Node.js 22.18 or newer, and Claude Code signed in or an Anthropic API key.",
+    "homepage": "https://github.com/jash90/team-hub",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -46,6 +52,28 @@
       "../sidecar/package.json": "sidecar/package.json",
       "../sidecar/package-lock.json": "sidecar/package-lock.json",
       "../sidecar/node_modules": "sidecar/node_modules"
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "signingIdentity": "-"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "linux": {
+      "deb": {
+        "section": "devel",
+        "recommends": ["git", "nodejs (>= 22.18)", "bubblewrap", "socat"]
+      },
+      "rpm": {
+        "recommends": ["git", "bubblewrap", "socat"]
+      }
     }
   }
 }
