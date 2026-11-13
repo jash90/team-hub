@@ -825,9 +825,8 @@
               <h3>Pobieranie</h3>
               <p>
                 Instalatory dla macOS, Windows i&nbsp;Linuksa oraz samo polecenie <code>hub</code> są
-                publikowane na stronie wydań w&nbsp;repozytorium; 0.1.0 to pierwsze wydanie. Jeśli na
-                tej stronie nie ma jeszcze żadnego wydania, to nie zostało ono opublikowane: zbuduj
-                aplikację ze źródeł w <code>apps/desktop</code>.
+                publikowane na stronie wydań w&nbsp;repozytorium; aktualne wydanie to 0.1.1. Aplikację
+                można też zbudować ze źródeł w <code>apps/desktop</code>.
               </p>
               <p>
                 Instalator nie zawiera środowiska agenta. Przy pierwszym uruchomieniu aplikacja
@@ -835,8 +834,10 @@
                 330 MB na Linuksie. Dlatego potrzebny jest Node.js 22.18 lub nowszy, razem z&nbsp;npm.
               </p>
               <p>
-                Paczki nie są podpisane, więc macOS i&nbsp;Windows ostrzegą przy pierwszym uruchomieniu.
-                Jak je otworzyć i&nbsp;jak sprawdzić pobrany plik z <code>SHA256SUMS</code>, opisują
+                Aplikacja dla macOS jest podpisana certyfikatem Apple Developer ID i&nbsp;notaryzowana przez
+                Apple. Instalator dla Windows i&nbsp;archiwa <code>hub</code> nie są podpisane, więc Windows
+                ostrzeże przy pierwszym uruchomieniu. Jak przejść przez to ostrzeżenie i&nbsp;jak sprawdzić
+                pobrany plik z <code>SHA256SUMS</code>, opisują
                 <a class="ext" href="https://github.com/jash90/team-hub/blob/main/apps/desktop/RELEASE_NOTES.md"
                   >informacje o&nbsp;wydaniu</a
                 >
@@ -849,16 +850,15 @@
                 >
               </div>
               <p class="honest">
-                Traktuj 0.1.0 jako wersję poglądową. Aplikacja powstała i&nbsp;była uruchamiana
-                wyłącznie na Linuksie. Instalatory zbudowały maszyny GitHuba i&nbsp;żadnego nie
-                zainstalował ani nie wypróbował człowiek, a&nbsp;wersje dla macOS i&nbsp;Windows nie zostały
-                dotąd uruchomione ani razu.
+                Traktuj 0.1.1 jako wersję poglądową. Aplikacja powstała i&nbsp;była uruchamiana
+                wyłącznie na Linuksie. Żadnego instalatora nie zainstalował ani nie wypróbował
+                człowiek przed wydaniem, a&nbsp;wersja dla Windows nie została dotąd uruchomiona ani razu.
               </p>
             </div>
             <div>
               <table class="files">
                 <caption>
-                  Wydanie 0.1.0
+                  Wydanie 0.1.1
                 </caption>
                 <thead>
                   <tr>
@@ -870,46 +870,46 @@
                   <tr>
                     <th scope="row">macOS 13 lub nowszy, Apple silicon</th>
                     <td>
-                      <code>team-hub-desktop-0.1.0-macos-arm64.dmg</code>
+                      <code>team-hub-desktop-0.1.1-macos-arm64.dmg</code>
                     </td>
                   </tr>
                   <tr>
                     <th scope="row">macOS 13 lub nowszy, Intel</th>
                     <td>
-                      <code>team-hub-desktop-0.1.0-macos-x64.dmg</code>
+                      <code>team-hub-desktop-0.1.1-macos-x64.dmg</code>
                     </td>
                   </tr>
                   <tr>
                     <th scope="row">Windows 10 i&nbsp;11, 64-bitowy Intel/AMD</th>
                     <td>
-                      <code>team-hub-desktop-0.1.0-windows-x64-setup.exe</code>
+                      <code>team-hub-desktop-0.1.1-windows-x64-setup.exe</code>
                     </td>
                   </tr>
                   <tr>
                     <th scope="row">Debian 12 lub nowszy, Ubuntu 22.04 lub nowszy</th>
                     <td>
-                      <code>team-hub-desktop-0.1.0-linux-x64.deb</code>
+                      <code>team-hub-desktop-0.1.1-linux-x64.deb</code>
                     </td>
                   </tr>
                   <tr>
                     <th scope="row">Fedora</th>
                     <td>
-                      <code>team-hub-desktop-0.1.0-linux-x64.rpm</code>
+                      <code>team-hub-desktop-0.1.1-linux-x64.rpm</code>
                     </td>
                   </tr>
                   <tr>
                     <th scope="row">Inny Linux (glibc 2.35 lub nowsza)</th>
                     <td>
-                      <code>team-hub-desktop-0.1.0-linux-x64.AppImage</code>
+                      <code>team-hub-desktop-0.1.1-linux-x64.AppImage</code>
                     </td>
                   </tr>
                   <tr>
                     <th scope="row">Samo polecenie <code>hub</code></th>
                     <td>
-                      <code>hub-0.1.0-macos-arm64.tar.gz</code><br />
-                      <code>hub-0.1.0-macos-x64.tar.gz</code><br />
-                      <code>hub-0.1.0-linux-x64.tar.gz</code><br />
-                      <code>hub-0.1.0-windows-x64.zip</code>
+                      <code>hub-0.1.1-macos-arm64.tar.gz</code><br />
+                      <code>hub-0.1.1-macos-x64.tar.gz</code><br />
+                      <code>hub-0.1.1-linux-x64.tar.gz</code><br />
+                      <code>hub-0.1.1-windows-x64.zip</code>
                     </td>
                   </tr>
                   <tr>
