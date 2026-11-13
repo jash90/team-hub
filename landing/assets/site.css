@@ -1080,7 +1080,8 @@ pre .c {
   }
 
   .facts > div {
-    grid-template-columns: 7em minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
   }
 
   .files th,

@@ -71,7 +71,7 @@ Because of that policy the pages must not contain inline `<script>`, inline `<st
 
 ### When something changes
 
-- **`site.css` or `site.js`**: raise the number in `?v=1` in `index.html`,
+- **`site.css` or `site.js`**: raise the number in `?v=N` in `index.html`,
   `pl/index.html` and `404.html`. Browsers keep the old file for a year otherwise.
 - **A screenshot**: give the new file a new name. Files under `assets/img/` are cached
   for a year under their name.
@@ -95,20 +95,36 @@ In the two HTML files, nowhere else. They have the same structure, section for s
 and figure for figure, so a change in one is easy to find in the other. Change both.
 
 The source of every claim is the repository's own documentation: `README.md` at the top,
-`apps/desktop/README.md`, `docs/architecture.md`, `docs/agent-runs.md` and the modules'
-READMEs. When those change, this page should follow, in particular:
+`apps/desktop/README.md` and `apps/desktop/RELEASE_NOTES.md`, `docs/architecture.md`,
+`docs/agent-runs.md`, `docs/runners.md`, `docs/cloud-runner.md`, `docs/e2e-jobs.md`,
+`docs/schedule.md` and the modules' READMEs. The page says nothing they do not say. When
+those change, this page should follow, in particular:
 
 - **"Not yet"** (`#not-yet`) mirrors "What it does not do yet" and "Known gaps" in the
-  top README.
-- **"Download"** (`#desktop`) is worded to be true before and after the first release of
-  the desktop app. Once installers exist and are signed, rewrite it, and drop the sentence
-  about building from source being the only way.
-- **Nothing about a licence** is said, because the repository has no licence file. The
-  page says "source on GitHub".
+  top README. The same admissions are repeated next to the feature they concern (the
+  indented notes with a rule on their left): keep the two in step.
+- **"Download"** (`#download`) follows `apps/desktop/RELEASE_NOTES.md`: what the first
+  start downloads and how big it is, Node.js and npm, unsigned builds, and the table of the
+  release's files. The file names carry the version, so the table, its caption and the
+  sentence "0.1.0 is the first" change with every release. The button points at
+  `/releases/latest` and stays as it is. The wording is true before the release is
+  published too ("if the page shows no release yet").
+- **"How it is built"** (`#built`): the sign-in row repeats `docs/architecture.md`,
+  "Sign-in and safety", and nothing more. The page does not say what the server needs
+  "nothing" of: say what is there (one binary, SQLite in one file, runners for work in
+  code) instead.
+- **The licence** is MIT (`LICENSE` at the top of the repository): named in "How it is
+  built" and in the footer.
+- **Captures that are not the real thing say so in their caption**: the desktop thread and
+  the push preview come from the app's end-to-end check with a scripted test agent; the
+  test session's recording was made by hand in the framework's format. The desktop
+  Runners and Tests views are real captures.
 
 Polish: the words are the interface's own (`zadanie`, `tablica`, `backlog`, `baza wiedzy`,
-`wydanie`, `oś czasu`, `przebieg` for a test run, `zlecenie` for an agent run,
-`propozycja`, `wątek`, `drzewo robocze`). Single-letter words (`w`, `z`, `i`, `a`, `o`,
+`wydanie`, `oś czasu`, `przebieg` for a test run, `uruchomienie testów` for a test job,
+`sesja` and `nagranie` for what a run opens as, `zlecenie` for an agent run, `propozycja`,
+`wątek`, `drzewo robocze`, `runner` and `wspólny runner`, `harmonogram` and, for a
+scheduled task, `czynność`, because `zadanie` is taken by issues). Single-letter words (`w`, `z`, `i`, `a`, `o`,
 `u`) are followed by `&nbsp;` so that they never end a line; keep that when editing.
 
 The headline and the kicker also appear in the link-preview images; after changing them,
@@ -145,7 +161,12 @@ Nothing is mocked up.
    example). When only a light capture exists, give the `<img>` `class="light-only"`: the
    stylesheet dims it a little on a dark page. The hero has two more sources, for
    phones: one column of the board instead of the whole of it, which would be too small
-   to read (`board-*-phone.webp`).
+   to read (`board-*-phone.webp`). When the files of one `<picture>` differ in shape, each
+   `<source>` carries its own `width` and `height`.
+
+   Two more classes: `shot small` for a dialog captured at twice its size, so that it is
+   not stretched to the column, and a `<div class="stack">` around two figures that belong
+   to one claim.
 
 4. Captions are numbered by the stylesheet ("Fig. 3", "Rys. 3"); do not number by hand.
    The lightbox picks up every `.shot a.frame` by itself.
@@ -153,14 +174,26 @@ Nothing is mocked up.
 5. Do it in both pages. Where the interface was captured in one language only, say so in
    the caption of the other.
 
+6. Crop the application's own sidebar out. It lists the modules of the build the capture
+   was made with, and an older capture then contradicts the text beside it. For the same
+   reason the Modules screenshot shows the top of the list only.
+
+7. `tools/verify.js` knows how many figures each chapter has (`FIGURES` at its top): change
+   the number there with the page.
+
 ## Checking it
 
 `tools/verify.js` opens both pages in a real browser (Playwright) and checks: no console
 errors, no failed request, no request that leaves the host, no CSP violation, no inline
 style or script, `lang` / `hreflang` / canonical, every internal link, anchor, image and
-`srcset` file, image dimensions and alt text, heading order, the lightbox from the
-keyboard (opens, arrows, Escape, focus returns), tab order, 360 / 768 / 1280 / 1600 px in
-light and dark for horizontal overflow, the page with JavaScript off, and the 404 page.
+`srcset` file, image dimensions and alt text, heading order, the ten chapters and their
+numbers, a caption on every figure, the figures each chapter is expected to have, the
+download block (the release's files, all of one version; `/releases/latest`; what the
+first start needs), the licence, the lightbox from the keyboard (opens, arrows, Escape,
+focus returns), tab order, 360 / 768 / 1280 / 1600 px in light and dark for horizontal
+overflow and for pictures whose declared size does not match the file shown, the page
+with JavaScript off, the 404 page, and that both languages have the same chapters,
+figures and anchors.
 
 ```bash
 node tools/verify.js http://127.0.0.1:8198/

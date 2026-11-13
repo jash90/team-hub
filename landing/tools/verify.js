@@ -9,8 +9,12 @@
 // requests that leave the host, CSP violations, inline style or script,
 // lang/hreflang/canonical, head resources, internal links and anchors, images
 // (broken, dimensions, alt text, every srcset file), heading order, landmarks,
-// the lightbox from the keyboard, tab order, 360/768/1280/1600 px in light and
-// dark for horizontal overflow, the page with JavaScript off, and the 404 page.
+// the chapters and their numbers, a caption on every figure, the figures each
+// chapter is expected to have, the download block and the licence, the
+// lightbox from the keyboard, tab order, 360/768/1280/1600 px in light and
+// dark for horizontal overflow and for pictures whose declared size does not
+// match the file shown, the page with JavaScript off, the 404 page, and that
+// the two languages have the same chapters, figures and anchors.
 const { chromium } = require('playwright');
 const BASE = process.argv[2] || 'http://127.0.0.1:8198/';
 let failures = 0;
@@ -61,6 +65,50 @@ async function loadAll(page) {
     { timeout: 15000 },
   );
 }
+
+// Runs in the page. For every image: the file shown, its real size, and the size
+// the markup declares for it. A <source> that supplied the picture declares the
+// size of its own file; otherwise the <img> does.
+const pictures = () =>
+  [...document.images]
+    .filter((i) => i.getAttribute('src'))
+    .map((i) => {
+      const inPicture = i.parentElement.tagName === 'PICTURE';
+      const source = inPicture
+        ? [...i.parentElement.querySelectorAll('source')].find((s) => matchMedia(s.media || 'all').matches)
+        : null;
+      const sized = source && source.getAttribute('width') ? source : i;
+      return {
+        src: i.currentSrc,
+        w: +sized.getAttribute('width'),
+        h: +sized.getAttribute('height'),
+        nw: i.naturalWidth,
+        nh: i.naturalHeight,
+        alt: i.getAttribute('alt'),
+        inFigure: !!i.closest('figure'),
+      };
+    });
+const skewed = (list) =>
+  list
+    // 1.5%: the smaller file of a pair has a rounded height, and the browser rounds again
+    .filter((i) => Math.abs(i.w / i.h / (i.nw / i.nh) - 1) > 0.015)
+    .map((i) => `${i.src.split('/').pop()} declared ${i.w}x${i.h}, is ${i.nw}x${i.nh}`);
+
+// What the page is expected to hold. Change this together with the page.
+const CHAPTERS = [
+  'code',
+  'knowledge',
+  'agents',
+  'runners',
+  'desktop',
+  'everyday',
+  'modules',
+  'built',
+  'run',
+  'not-yet',
+];
+const FIGURES = { code: 3, knowledge: 3, agents: 1, runners: 4, desktop: 4, everyday: 3, modules: 2 };
+const shapes = {};
 
 (async () => {
   const browser = await chromium.launch();
@@ -180,21 +228,7 @@ async function loadAll(page) {
     ok(true, `[${name}] ${internal.size} internal links checked`);
 
     // images
-    const imgs = await page.evaluate(() =>
-      [...document.images]
-        .filter((i) => i.getAttribute('src'))
-        .map((i) => ({
-          src: i.currentSrc,
-          w: +i.getAttribute('width'),
-          h: +i.getAttribute('height'),
-          nw: i.naturalWidth,
-          nh: i.naturalHeight,
-          alt: i.getAttribute('alt'),
-          lazy: i.loading,
-          dec: i.decoding,
-          inFigure: !!i.closest('figure'),
-        })),
-    );
+    const imgs = await page.evaluate(pictures);
     ok(
       imgs.every((i) => i.nw > 0),
       `[${name}] ${imgs.length} images, none broken`,
@@ -207,12 +241,8 @@ async function loadAll(page) {
       imgs.every((i) => i.w > 0 && i.h > 0),
       `[${name}] every image has width and height`,
     );
-    const skew = imgs.filter((i) => Math.abs(i.w / i.h - i.nw / i.nh) > 0.01);
-    ok(
-      skew.length === 0,
-      `[${name}] width/height match the files' aspect ratio`,
-      skew.map((i) => `${i.src.split('/').pop()} ${i.w}x${i.h} vs ${i.nw}x${i.nh}`).join(' | '),
-    );
+    const skew = skewed(imgs);
+    ok(skew.length === 0, `[${name}] width/height match the files' aspect ratio`, skew.join(' | '));
     ok(
       imgs.every((i) => i.alt !== null) && imgs.filter((i) => i.inFigure).every((i) => i.alt.length > 60),
       `[${name}] every screenshot has descriptive alt text`,
@@ -234,6 +264,84 @@ async function loadAll(page) {
       }
     }
     ok(badset === 0, `[${name}] ${new Set(sets).size} srcset / lightbox files exist`);
+
+    // chapters, figures and what the newer chapters must show
+    const shape = await page.evaluate(() => ({
+      chapters: [...document.querySelectorAll('main section[id]')].map((e) => e.id),
+      numbers: [...document.querySelectorAll('main .chapter-head .num')].map((e) => e.textContent),
+      figures: Object.fromEntries(
+        [...document.querySelectorAll('main section[id]')].map((e) => [
+          e.id,
+          e.querySelectorAll('figure').length,
+        ]),
+      ),
+      heroFigures: document.querySelectorAll('.hero figure').length,
+      uncaptioned: [...document.querySelectorAll('figure')].filter(
+        (f) => !f.querySelector('figcaption') || f.querySelector('figcaption').textContent.trim().length < 30,
+      ).length,
+      ids: [...document.querySelectorAll('main [id]')].map((e) => e.id),
+      nav: [...document.querySelectorAll('.site-nav a')].map((a) => a.getAttribute('href').slice(1)),
+      inSession: document.querySelectorAll('#test-jobs figure').length,
+      inKeys: document.querySelectorAll('#keys figure').length,
+      inSchedule: document.querySelectorAll('#schedule figure').length,
+      fileRows: document.querySelectorAll('#download table.files tbody tr').length,
+      fileNames: [...document.querySelectorAll('#download table.files td code')].map((c) => c.textContent),
+      download: (document.querySelector('#download') || document.body).textContent.replace(/\s+/g, ' '),
+      releases: [...document.querySelectorAll('#download a')].filter((a) =>
+        /\/releases\/latest$/.test(a.href),
+      ).length,
+      licence: [...document.querySelectorAll('a')].filter((a) => /\/blob\/main\/LICENSE$/.test(a.href))
+        .length,
+      footer: document.querySelector('footer').textContent,
+      built: document.querySelector('#built').textContent,
+    }));
+    shapes[name] = shape;
+    ok(
+      JSON.stringify(shape.chapters) === JSON.stringify(CHAPTERS),
+      `[${name}] the ${CHAPTERS.length} chapters, in order`,
+      shape.chapters.join(' '),
+    );
+    ok(
+      shape.numbers.join(' ') === CHAPTERS.map((_, i) => String(i + 1).padStart(2, '0')).join(' '),
+      `[${name}] chapters are numbered 01 to ${String(CHAPTERS.length).padStart(2, '0')}`,
+      shape.numbers.join(' '),
+    );
+    const figuresOff = Object.entries(FIGURES).filter(([id, n]) => shape.figures[id] !== n);
+    ok(
+      figuresOff.length === 0 && shape.heroFigures === 1,
+      `[${name}] every chapter has the figures it is expected to have (${Object.values(FIGURES).reduce((a, b) => a + b, 1)} in all)`,
+      figuresOff.map(([id, n]) => `${id}: ${shape.figures[id]} instead of ${n}`).join(' | '),
+    );
+    ok(shape.uncaptioned === 0, `[${name}] every figure has a caption`);
+    ok(
+      shape.inSession === 1 && shape.inKeys === 1 && shape.inSchedule === 1,
+      `[${name}] the test session, a person's keys and the schedule each have their figure`,
+    );
+    ok(
+      shape.nav.every((id) => CHAPTERS.includes(id)),
+      `[${name}] every link of the header's navigation leads to a chapter`,
+      shape.nav.join(' '),
+    );
+    ok(
+      shape.fileRows === 8 &&
+        shape.fileNames.length === 11 &&
+        shape.fileNames.every(
+          (n) => n === 'SHA256SUMS' || /^(team-hub-desktop|hub)-\d+\.\d+\.\d+-/.test(n),
+        ) &&
+        new Set(shape.fileNames.filter((n) => n !== 'SHA256SUMS').map((n) => n.match(/-(\d+\.\d+\.\d+)-/)[1]))
+          .size === 1,
+      `[${name}] the download block lists the release's files, all of one version`,
+      shape.fileNames.join(' '),
+    );
+    ok(
+      shape.releases === 1 &&
+        ['22.18', '165', '330', 'npm', 'SHA256SUMS'].every((w) => shape.download.includes(w)),
+      `[${name}] the download block points at /releases/latest and says what the first start needs`,
+    );
+    ok(
+      shape.licence >= 2 && shape.footer.includes('MIT') && shape.built.includes('MIT'),
+      `[${name}] the licence is named and linked in "how it is built" and in the footer`,
+    );
 
     // headings
     const heads = await page.evaluate(() =>
@@ -343,6 +451,7 @@ async function loadAll(page) {
       for (const width of [360, 768, 1280, 1600]) {
         const { ctx, page, log } = await open(browser, path, { width, scheme });
         await loadAll(page);
+        const skew = skewed(await page.evaluate(pictures));
         const r = await page.evaluate(() => {
           const vw = document.documentElement.clientWidth;
           const wide = [...document.querySelectorAll('body *')]
@@ -362,12 +471,36 @@ async function loadAll(page) {
         });
         const expectHero = scheme === 'dark' ? /board-dark/ : /board-light/;
         ok(
-          r.sw <= r.vw && r.wide.length === 0 && log.errors.length === 0 && expectHero.test(r.hero),
-          `[${path || 'en'} ${width}px ${scheme}] no horizontal overflow, no errors, hero is ${r.hero}`,
-          r.wide.join(' ') + ' ' + log.errors.join(' '),
+          r.sw <= r.vw &&
+            r.wide.length === 0 &&
+            log.errors.length === 0 &&
+            expectHero.test(r.hero) &&
+            skew.length === 0,
+          `[${path || 'en'} ${width}px ${scheme}] no horizontal overflow, no errors, every picture has the shape it declares, hero is ${r.hero}`,
+          [r.wide.join(' '), log.errors.join(' '), skew.join(' | ')].join(' ').trim(),
         );
         await ctx.close();
       }
+
+  // the two languages hold the same things
+  {
+    const [en, pl] = [shapes.en, shapes['pl/']];
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    ok(
+      same(en.chapters, pl.chapters) &&
+        same(en.figures, pl.figures) &&
+        same(en.ids, pl.ids) &&
+        same(en.nav, pl.nav),
+      '[en = pl] the same chapters, figures per chapter, anchors and navigation in both languages',
+      same(en.ids, pl.ids)
+        ? ''
+        : en.ids
+            .filter((i) => !pl.ids.includes(i))
+            .concat(pl.ids.filter((i) => !en.ids.includes(i)))
+            .join(' '),
+    );
+    ok(same(en.fileNames, pl.fileNames), '[en = pl] the same release files in both languages');
+  }
 
   // dark lightbox picks the dark file
   {
