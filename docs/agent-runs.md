@@ -163,3 +163,29 @@ Every change to a run announces `agent.run` on the live stream (`GET /api/stream
 itself (description, comments, links, code state, linked pages) is read through the ordinary
 API or through the MCP tools (`get_issue`, `get_issue_development`, `search_pages`, …), which
 a coding agent can use directly.
+
+## Headless runners
+
+A runner that has nobody at it (a container, a server) says so on every heartbeat:
+`{ runnerId, name, kinds, projects?, version, interactive: false }` (`interactive` defaults
+to true: the desktop app). `AgentRunner.interactive` reports it.
+
+For a run held by a headless runner, the web is where things are decided:
+
+- **Changes.** The runner uploads what the thread has committed, so a person can look
+  before anything is pushed: `PUT /runs/{id}/changes`
+  `{ base, head, commits: [{ sha, subject, author? }], files: [{ path, status, additions, deletions }], patch, truncated }`
+  (`patch` is a unified diff of at most 2 MB; `truncated` says it was cut; `status` is
+  `added | modified | deleted | renamed`). `GET /runs/{id}/changes` returns it (404 when there
+  is none) to anyone who can see the run; `AgentRun.hasChanges` says whether there is one.
+- **`push` and `pull_request` proposals** are decided with the ordinary
+  `POST /proposals/{id}/decide`. Approving does not apply anything on the server: the
+  proposal becomes `approved` with `result: null`, which means "approved, the runner is
+  carrying it out". A `push` proposal's payload carries the `commit` that was shown; the
+  runner pushes that commit and no later one.
+- The runner reports with `POST /proposals/{id}/result`: `{ result }` (`{ commit }` for a
+  push, `{ url }` for a pull request) or `{ error }`, which turns the proposal `failed` with
+  the error as its note. Only the run's runner may, only for these two kinds, only while the
+  proposal is `approved` with no result yet; also after the run has ended.
+- `settle` (the desktop app's call) is refused for a headless runner's run, and `decide` is
+  refused for an interactive runner's `push` / `pull_request`, as before.
