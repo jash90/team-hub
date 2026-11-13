@@ -24,6 +24,10 @@ async fn stream(State(app): State<App>, user: AuthUser) -> Sse<impl Stream<Item 
         async move {
             let event = event.ok()?;
 
+            if event.admins_only && !user.is_admin() {
+                return None;
+            }
+
             if let Some(project_id) = event.project_id {
                 app.read(|connection| project_access_by_id(connection, &user, project_id)).ok()?;
             }

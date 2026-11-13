@@ -99,7 +99,7 @@ pub fn dashboard(app: &App, user: &AuthUser) -> ApiResult<Dashboard> {
         let mut ext = std::collections::BTreeMap::new();
 
         for module in app.enabled_modules() {
-            if let Some(section) = module.dashboard(connection, user)? {
+            if let Some(section) = module.dashboard(connection, &user.through(module.meta().id))? {
                 ext.insert(module.meta().id.to_string(), section);
             }
         }
@@ -212,7 +212,7 @@ pub fn quick_search(app: &App, connection: &Connection, user: &AuthUser, text: &
     }
 
     for module in app.enabled_modules() {
-        hits.extend(module.quick_search(connection, user, text)?);
+        hits.extend(module.quick_search(connection, &user.through(module.meta().id), text)?);
     }
 
     Ok(hits)

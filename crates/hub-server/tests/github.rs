@@ -180,6 +180,21 @@ async fn code_moves_the_issue_through_the_workflow() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_project_that_switched_the_module_off_takes_no_deliveries() {
+    let mut hub = Hub::new().await;
+    let key = hub.issue("Card payments").await;
+
+    hub.client.put("/api/projects/WEB/modules/github", json!({ "enabled": false })).await;
+    let answer = hub.deliver("push", push("feature/web-1-card-payments", true, &["WEB-1 Card form"])).await;
+    assert!(answer["outcome"].as_str().is_some_and(|outcome| outcome.starts_with("ignored")), "{answer}");
+    assert_eq!(hub.status(&key).await, "To Do", "the code does not move the issue");
+
+    hub.client.put("/api/projects/WEB/modules/github", json!({ "enabled": true })).await;
+    hub.deliver("push", push("feature/web-1-card-payments", true, &["WEB-1 Card form"])).await;
+    assert_eq!(hub.status(&key).await, "In Progress");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn a_merge_finishes_an_issue_only_when_no_pull_request_is_left_open() {
     let mut hub = Hub::new().await;
     let key = hub.issue("Two parts").await;

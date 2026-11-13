@@ -3,6 +3,10 @@
 //! An open project is visible to every signed-in person, and they may all work in it. A
 //! private project exists only for its members. Viewers read; members edit issues;
 //! project admins (and the lead, and instance administrators) change its configuration.
+//!
+//! A request that passes through a module (`AuthUser::through`) sees one thing less: a
+//! project that has switched that module off is, for that request, not there. So a module's
+//! routes and tools need no check of their own to respect the project's switch.
 
 use hub_core::{Id, ProjectRole};
 use rusqlite::types::Value;
@@ -57,6 +61,15 @@ fn resolve(connection: &Connection, user: &AuthUser, found: Option<(Id, String, 
         return Err(ApiError::not_found("Project"));
     };
 
+    for module_id in &user.through {
+        let off: Option<i64> =
+            query_one(connection, "SELECT 1 FROM project_module_off WHERE project_id = ?1 AND module_id = ?2", (id, module_id), |row| row.get(0))?;
+
+        if off.is_some() {
+            return Err(ApiError::not_found("Project"));
+        }
+    }
+
     Ok(ProjectAccess { id, key, role })
 }
 
@@ -80,14 +93,21 @@ pub fn project_access_by_id(connection: &Connection, user: &AuthUser, id: Id) ->
 
 /// A condition limiting `column` (a project id) to the projects `user` may see.
 pub fn visible_projects(user: &AuthUser, column: &str) -> (String, Vec<Value>) {
-    if user.is_admin() {
-        return ("1 = 1".to_string(), Vec::new());
+    let (mut condition, mut params) = if user.is_admin() {
+        ("1 = 1".to_string(), Vec::new())
+    } else {
+        (
+            format!(
+                "{column} IN (SELECT id FROM project WHERE is_private = 0 OR lead_id = ? OR id IN (SELECT project_id FROM project_member WHERE user_id = ?))"
+            ),
+            vec![Value::Integer(user.id), Value::Integer(user.id)],
+        )
+    };
+
+    for module_id in &user.through {
+        condition.push_str(&format!(" AND {column} NOT IN (SELECT project_id FROM project_module_off WHERE module_id = ?)"));
+        params.push(Value::Text(module_id.to_string()));
     }
 
-    (
-        format!(
-            "{column} IN (SELECT id FROM project WHERE is_private = 0 OR lead_id = ? OR id IN (SELECT project_id FROM project_member WHERE user_id = ?))"
-        ),
-        vec![Value::Integer(user.id), Value::Integer(user.id)],
-    )
+    (condition, params)
 }

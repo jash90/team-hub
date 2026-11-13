@@ -80,18 +80,25 @@ it in `disabledModules`. The module is not asked and does not have to know:
 
 - the host drops the module's `ext` entry from that project's issue rows and does not call
   `issue_panel` for its issues;
+- a request inside the module's routes (`/api/m/<id>/…`) does not see the project: the user
+  it is given carries the module (`AuthUser::through`), and `access::project_access`,
+  `issue_access` and `visible_projects` treat a project that has switched the module off
+  as one that is not there. The same user is handed to `call_tool`, `dashboard` and
+  `quick_search`, so whatever they look up with the usual access checks leaves the project
+  out too;
+- the module's query-language fields match nothing in that project;
+- `on_event` is not called for events about that project;
 - the interface leaves the module out of that project: its project navigation, its pages
   under `/p/:key/…`, its tab in the project's settings, its panel and its badges.
 
-What a module gathers across projects is the module's to limit, because the host cannot see
-into it. Its section of "My work" leaves out the projects where it is off by adding
-`hub_app::services::project_modules::on_in_project("<id>", "i.project_id")` to its query: a
-condition on a project-id column. The three modules that have a section do.
-
-Everything else stays per instance: the module's own routes, its events, its tools, and its
-query-language fields, which still match that project's issues. A module that wants to
-respect the switch there uses the same condition, or reads
-`project_modules::disabled_modules(connection, project_id)`.
+All of this follows from using the host's access checks, which a module does anyway. What
+the host cannot see is left to the module: a query over its own tables that never asks
+about access, work it starts itself (`start`), and calls from other systems (`hooks`),
+which carry no user. There the module adds
+`hub_app::services::project_modules::on_in_project("<id>", "<project id column>")` to its
+query, or reads `project_modules::disabled_modules(connection, project_id)`: the code
+module does both, so a project that switched it off takes no webhook deliveries and is not
+polled. A module that authenticates callers itself wraps the user in `.through("<id>")`.
 
 Every open browser learns of a switch at once: it is announced as `project.updated`, and the
 interface then asks for the list of projects again.

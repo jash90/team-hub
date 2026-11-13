@@ -38,7 +38,7 @@ fn person(app: &App, name: &str, email: &str, role: Role) -> (AuthUser, String) 
         })
         .expect("a user with a token");
 
-    (AuthUser { id: user.id, name: user.name, email: user.email, role, via_token: true }, token)
+    (AuthUser { id: user.id, name: user.name, email: user.email, role, via_token: true, through: Vec::new() }, token)
 }
 
 fn demo() -> Demo {

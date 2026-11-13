@@ -61,13 +61,11 @@ pub fn create(tx: &Tx, kind: &str, project_key: &str, started_by: Id) -> ApiResu
     Ok(job)
 }
 
-/// Tells the open pages that a job moved. The event names no project: the import page is for
-/// administrators, who ask for the details themselves.
+/// Tells the open pages that a job moved. Only administrators hear it: the import page is
+/// theirs, and the project being imported may be one that not everybody will see.
 fn announce(tx: &Tx, job: &JiraJob) -> ApiResult<()> {
-    tx.emit(
+    tx.emit_to_admins(
         EVENT,
-        None,
-        None,
         json!({
             "jobId": job.id,
             "projectKey": job.project_key,

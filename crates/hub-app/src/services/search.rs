@@ -15,6 +15,7 @@ use crate::db::query_all;
 use crate::error::ApiResult;
 use crate::module::QueryScope;
 use crate::services::issues::load_rows;
+use crate::services::project_modules;
 use crate::services::users::resolve_user;
 
 pub struct Compiled {
@@ -440,7 +441,8 @@ impl Compiler<'_> {
                         let compiled = compiled.map_err(|error| QueryError::new(error.message, clause.position))?;
                         self.params.extend(compiled.params);
 
-                        return Ok(format!("({})", compiled.sql));
+                        // A module's field never matches in a project that has switched the module off.
+                        return Ok(format!("(({}) AND {})", compiled.sql, project_modules::on_in_project(module.meta().id, "i.project_id")));
                     }
                 }
 

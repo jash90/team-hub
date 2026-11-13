@@ -271,6 +271,12 @@ impl Module for GithubModule {
 
             if has_token {
                 for repo in app.read(model::all_repos).unwrap_or_default() {
+                    let off = app.read(|connection| hub_app::services::project_modules::disabled_modules(connection, repo.project_id)).unwrap_or_default();
+
+                    if off.iter().any(|id| id == "github") {
+                        continue;
+                    }
+
                     if let Err(error) = client::sync_and_record(&app, &repo) {
                         tracing::warn!("sync of {}: {}", repo.full_name, error.message);
                     }

@@ -72,5 +72,5 @@ pub fn listing(app: &App) -> Vec<Value> {
 pub fn call(app: &App, user: &AuthUser, name: &str, arguments: &Value) -> Option<ApiResult<Value>> {
     builtin::call(app, user, name, arguments)
         .or_else(|| runner_tools::call(app, user, name, arguments))
-        .or_else(|| app.enabled_modules().find_map(|module| module.call_tool(app, user, name, arguments)))
+        .or_else(|| app.enabled_modules().find_map(|module| module.call_tool(app, &user.through(module.meta().id), name, arguments)))
 }

@@ -22,7 +22,7 @@ fn setup() -> (App, AuthUser, Project) {
     let new =
         NewUser { name: "Ada Admin".to_string(), email: "ada@example.com".to_string(), password: None, role: Some(Role::Admin), github_login: None };
     let user = app.db.write(|tx| create_user(tx, &new)).unwrap();
-    let admin = AuthUser { id: user.id, name: user.name, email: user.email, role: Role::Admin, via_token: true };
+    let admin = AuthUser { id: user.id, name: user.name, email: user.email, role: Role::Admin, via_token: true, through: Vec::new() };
     let project = NewProject {
         key: "WEB".to_string(),
         name: "Web".to_string(),

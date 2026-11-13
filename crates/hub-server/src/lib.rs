@@ -9,6 +9,7 @@ use axum::http::header::{HeaderName, HeaderValue};
 use axum::middleware::{self, Next};
 use axum::response::IntoResponse;
 use axum::Router;
+use hub_app::auth::ModuleScope;
 use hub_app::{ApiError, App, Module};
 use tower_http::compression::CompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
@@ -39,10 +40,13 @@ pub fn modules() -> Vec<Arc<dyn Module>> {
     modules
 }
 
-/// Wraps a module's routes so that they do not exist while the module is switched off.
+/// Wraps a module's routes so that they do not exist while the module is switched off, and
+/// marks the request as the module's, so that a project which has switched the module off
+/// does not exist for it either.
 fn guarded(app: &App, id: &'static str, routes: Router<App>) -> Router<App> {
-    routes.route_layer(middleware::from_fn_with_state(app.clone(), move |State(app): State<App>, request: Request, next: Next| async move {
+    routes.route_layer(middleware::from_fn_with_state(app.clone(), move |State(app): State<App>, mut request: Request, next: Next| async move {
         if app.module_enabled(id) {
+            request.extensions_mut().insert(ModuleScope(id));
             next.run(request).await
         } else {
             ApiError::not_found("Module").into_response()

@@ -52,6 +52,10 @@ pub struct Event {
     pub project_id: Option<Id>,
     pub issue_id: Option<Id>,
     pub payload: serde_json::Value,
+    /// True for an event only administrators may hear on the live stream. An event about a
+    /// project needs no such mark: it reaches whoever can see the project.
+    #[serde(skip)]
+    pub admins_only: bool,
 }
 
 /// A transaction in progress. Dereferences to the connection, and collects the events to
@@ -73,6 +77,16 @@ impl Deref for Tx<'_> {
 
 impl Tx<'_> {
     pub fn emit(&self, kind: &str, project_id: Option<Id>, issue_id: Option<Id>, payload: serde_json::Value) -> ApiResult<()> {
+        self.announce(kind, project_id, issue_id, payload, false)
+    }
+
+    /// An event about the instance's administration (an import under way, say), which is
+    /// about no project and is nobody else's business.
+    pub fn emit_to_admins(&self, kind: &str, payload: serde_json::Value) -> ApiResult<()> {
+        self.announce(kind, None, None, payload, true)
+    }
+
+    fn announce(&self, kind: &str, project_id: Option<Id>, issue_id: Option<Id>, payload: serde_json::Value, admins_only: bool) -> ApiResult<()> {
         self.connection.execute(
             "INSERT INTO event (at, actor_id, actor_label, kind, project_id, issue_id, payload) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             (&self.now, self.actor.user_id, &self.actor.label, kind, project_id, issue_id, payload.to_string()),
@@ -86,6 +100,7 @@ impl Tx<'_> {
             project_id,
             issue_id,
             payload,
+            admins_only,
         });
 
         Ok(())
@@ -180,7 +195,13 @@ impl App {
 
     fn dispatch(&self, events: Vec<Event>) {
         for event in events {
-            for module in self.enabled_modules() {
+            // A module hears nothing about a project that has switched it off.
+            let off = event
+                .project_id
+                .and_then(|project_id| self.read(|connection| crate::services::project_modules::disabled_modules(connection, project_id)).ok())
+                .unwrap_or_default();
+
+            for module in self.enabled_modules().filter(|module| !off.iter().any(|id| id == module.meta().id)) {
                 let handled = std::panic::catch_unwind(AssertUnwindSafe(|| module.on_event(self, &event)));
 
                 if handled.is_err() {

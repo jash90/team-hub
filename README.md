@@ -148,7 +148,5 @@ Known gaps in what is there:
   imports, the GitHub API calls, and the server's own agent runs (a fake model). The
   desktop app has run on Linux only; its macOS and Windows sandboxes, the tray,
   notifications and installers are unverified.
-- A module switched off for one project still answers its own routes, query fields and
-  agent tools for that project; only its badges, panels and screens disappear.
 - Texts that come from the server (errors, notifications, agent status lines) are English
   even when the interface is in Polish.

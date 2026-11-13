@@ -45,7 +45,7 @@ pub fn person(app: &App, name: &str, role: Role) -> Client {
     let user = app.db.write(|tx| create_user(tx, &new)).expect("a user");
     let token = app.db.write(|tx| create_token(tx, user.id, "tests")).expect("a token");
 
-    Client { router: router(app), bearer: Some(token), user: AuthUser { id: user.id, name: user.name, email, role, via_token: true } }
+    Client { router: router(app), bearer: Some(token), user: AuthUser { id: user.id, name: user.name, email, role, via_token: true, through: Vec::new() } }
 }
 
 impl Client {

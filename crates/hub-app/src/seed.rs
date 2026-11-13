@@ -217,7 +217,7 @@ fn comment(app: &App, author: Id, day: i64, key: &str, body: &str) -> ApiResult<
 /// Fills an instance that has exactly one user (whoever just set it up) with example data.
 pub fn seed_demo(app: &App, owner_id: Id) -> ApiResult<()> {
     let owner = app.read(|connection| get_user(connection, owner_id))?;
-    let admin = AuthUser { id: owner.id, name: owner.name.clone(), email: owner.email.clone(), role: Role::Admin, via_token: false };
+    let admin = AuthUser { id: owner.id, name: owner.name.clone(), email: owner.email.clone(), role: Role::Admin, via_token: false, through: Vec::new() };
     let mut people = vec![owner.id];
 
     for (name, email, login) in [

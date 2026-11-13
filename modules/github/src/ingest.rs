@@ -75,7 +75,10 @@ pub fn project_keys(connection: &Connection) -> ApiResult<HashSet<String>> {
 pub fn repo_id(connection: &Connection, full_name: &str) -> ApiResult<Option<Id>> {
     let Some((owner, name)) = full_name.split_once('/') else { return Ok(None) };
 
-    query_one(connection, "SELECT id FROM gh_repo WHERE owner = ?1 AND name = ?2", (owner, name), |row| row.get(0))
+    // A repository of a project that has switched this module off is, for a delivery, not connected.
+    let on = hub_app::services::project_modules::on_in_project("github", "project_id");
+
+    query_one(connection, &format!("SELECT id FROM gh_repo WHERE owner = ?1 AND name = ?2 AND {on}"), (owner, name), |row| row.get(0))
 }
 
 /// Replaces the issues one pull request, branch or commit is linked to; returns the issues

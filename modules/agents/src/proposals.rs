@@ -116,7 +116,7 @@ pub fn person(connection: &Connection, id: Id) -> ApiResult<AuthUser> {
         return Err(ApiError::forbidden("The person who asked for this run is no longer active"));
     }
 
-    Ok(AuthUser { id: user.id, name: user.name, email: user.email, role: user.role, via_token: false })
+    Ok(AuthUser { id: user.id, name: user.name, email: user.email, role: user.role, via_token: false, through: vec![crate::catalog::OWN_MODULE] })
 }
 
 fn issue_level(connection: &Connection, issue_id: Id) -> ApiResult<String> {

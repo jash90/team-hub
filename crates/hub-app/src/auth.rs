@@ -34,9 +34,29 @@ pub struct AuthUser {
     pub role: Role,
     /// Signed in with an API token rather than a browser session.
     pub via_token: bool,
+    /// The modules this request passes through. A project that has switched one of them off
+    /// does not exist for the request: see `access`.
+    pub through: Vec<&'static str>,
 }
 
+/// Marks a request as being inside a module's routes; the host sets it, and the user taken
+/// from the request carries it.
+#[derive(Debug, Clone, Copy)]
+pub struct ModuleScope(pub &'static str);
+
 impl AuthUser {
+    /// The same person acting through a module: for the host when it hands the user to a
+    /// module's hook, and for a module that authenticates its callers itself.
+    pub fn through(&self, module_id: &'static str) -> AuthUser {
+        let mut user = self.clone();
+
+        if !user.through.contains(&module_id) {
+            user.through.push(module_id);
+        }
+
+        user
+    }
+
     pub fn is_admin(&self) -> bool {
         self.role == Role::Admin
     }
@@ -170,7 +190,7 @@ fn bearer_token(parts: &Parts) -> Option<String> {
 fn user_from_row(row: &rusqlite::Row, via_token: bool) -> rusqlite::Result<AuthUser> {
     let role: String = row.get(3)?;
 
-    Ok(AuthUser { id: row.get(0)?, name: row.get(1)?, email: row.get(2)?, role: Role::parse(&role).unwrap_or(Role::Member), via_token })
+    Ok(AuthUser { id: row.get(0)?, name: row.get(1)?, email: row.get(2)?, role: Role::parse(&role).unwrap_or(Role::Member), via_token, through: Vec::new() })
 }
 
 /// The user an API token belongs to. Also used by modules that accept tokens on their own routes.
@@ -238,6 +258,11 @@ impl FromRequestParts<App> for AuthUser {
     type Rejection = ApiError;
 
     async fn from_request_parts(parts: &mut Parts, app: &App) -> Result<Self, Self::Rejection> {
-        authenticate(app, parts)?.user.ok_or_else(ApiError::unauthorized)
+        let user = authenticate(app, parts)?.user.ok_or_else(ApiError::unauthorized)?;
+
+        Ok(match parts.extensions.get::<ModuleScope>() {
+            Some(ModuleScope(module_id)) => user.through(module_id),
+            None => user,
+        })
     }
 }

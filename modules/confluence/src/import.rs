@@ -214,7 +214,7 @@ fn store_pages(
         )?;
         tx.emit(
             "confluence.imported",
-            None,
+            space.project_id,
             None,
             json!({
                 "wikiSpaceKey": space.key,
