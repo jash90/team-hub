@@ -1,7 +1,19 @@
 # team-hub landing page
 
-The public page about team-hub: what it is, what makes it different, how to run it, where
-to get the desktop app, and what it does not do yet. English at `/`, Polish at `/pl/`.
+The first page a visitor of a team-hub instance sees: what team-hub is, what makes it
+different, how to run it, where to get the desktop app, and what it does not do yet, with
+the way to the sign-in. English at `/`, Polish at `/pl/`.
+
+It is not a site of its own. The server serves this folder (`crates/hub-server/src/landing.rs`):
+
+- `/` is this page for somebody who is not signed in, and the application for somebody
+  who is. An instance nobody has set up yet shows its setup form there instead.
+- `/pl/` is the Polish page, for anyone.
+- **Sign in** leads to `/login`, which is the application's sign-in form; **Get the desktop
+  app** leads to the download chapter and from there to the releases on GitHub.
+- `TEAM_HUB_LANDING=off` on the server leaves the page out: a visitor then gets the
+  sign-in right away. `TEAM_HUB_LANDING_DIR` says where this folder is (`landing`, and
+  `/app/landing` in the image).
 
 Hand-written HTML, one stylesheet and one small script. There is no build step, no
 framework and no dependency: what is in this folder is what is served. The page makes no
@@ -9,86 +21,71 @@ request to any other host (no analytics, no trackers, no fonts or scripts from e
 and it reads fully with JavaScript off.
 
 ```
-index.html        the English page
-pl/index.html     the Polish page
-404.html          served for any path that does not exist (both languages on one page)
+index.html                  the English page
+pl/index.html               the Polish page
 robots.txt
-assets/site.css   the only stylesheet, shared by all three pages
-assets/site.js    the lightbox for screenshots and the copy buttons; an enhancement only
-assets/img/       screenshots: WebP, most in a 1600 px and an 800 px width; en-* for the
-                  English page, pl-* for the Polish one
-assets/fonts/     Newsreader (headings), two subsets, with its licence (OFL.txt)
-assets/og-*.png   link-preview images, 1200 x 630
-assets/favicon.*  the tracker's own mark
-Caddyfile         how the site is served: headers, caching, redirects, the 404 page
-Dockerfile        caddy:2-alpine with the files above
-tools/            two optional scripts, see "Checking it"; nothing here is served
+landing-assets/site.css     the only stylesheet, shared by both pages
+landing-assets/site.js      the lightbox for screenshots and the copy buttons; an enhancement only
+landing-assets/img/         screenshots: WebP, most in a 1600 px and an 800 px width; en-* for
+                            the English page, pl-* for the Polish one
+landing-assets/fonts/       Newsreader (headings), two subsets, with its licence (OFL.txt)
+landing-assets/og-*.png     link-preview images, 1200 x 630
+landing-assets/favicon.*    the tracker's own mark
+tools/                      two optional scripts, see "Checking it"; nothing here is served
 ```
 
+The folder with the files is called `landing-assets` and not `assets` because the pages
+live at the same address as the application, whose own files are under `/assets`.
+
 ## Previewing it
+
+The pages alone, without a server:
 
 ```bash
 python3 -m http.server 8198
 ```
 
-in this folder, then <http://localhost:8198/> and <http://localhost:8198/pl/>. The 404 page
-and the response headers only exist under Caddy:
+in this folder, then <http://localhost:8198/> and <http://localhost:8198/pl/>. The sign-in
+link leads nowhere there, and the response headers are not the server's.
 
-```bash
-SITE_ROOT=. PORT=8198 caddy run --config Caddyfile --adapter caddyfile
-```
+As it is served: start team-hub from the top of the repository (`cargo run -p hub-server`,
+with the interface built) and open it signed out.
 
-## How it is deployed
+## How it is served
 
-As a container that serves this folder with Caddy on `$PORT` (8080 when unset), plain
-HTTP; TLS belongs to whatever stands in front.
+By the team-hub server, from this folder; the image copies the two pages, `robots.txt`
+and `landing-assets/` to `/app/landing`. What the server does:
 
-```bash
-docker build -t team-hub-landing .
-```
-
-```bash
-docker run --rm -p 8080:8080 team-hub-landing
-```
-
-On Railway: a service of this repository with **root directory `landing`**, so that this
-folder is the build context and the `Dockerfile` here is the one that is found. Railway
-sets `PORT`; the healthcheck path can be `/healthz`. No volume and no variables.
-
-What the `Caddyfile` does:
-
-- gzip and zstd for text;
-- a Content-Security-Policy that allows only this origin (`default-src 'none'`, then
-  `'self'` for images, style, script and fonts), `X-Content-Type-Options`,
-  `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options`, on error pages too;
-- `Cache-Control`: a year and `immutable` for `assets/img/`, `assets/fonts/` and for
-  `site.css` / `site.js` when they are asked for with `?v=`; an hour for other assets;
-  five minutes for pages;
-- `/pl` → `/pl/`, `/index.html` → `/`, `/pl/index.html` → `/pl/`, `/en` → `/`;
-- `404.html` with status 404 for anything else.
+- a Content-Security-Policy on both pages that allows only this origin (`default-src
+  'none'`, then `'self'` for images, style, script and fonts);
+- `Cache-Control`: `no-store` for `/`, because what is there depends on who asks; five
+  minutes for `/pl/`; a year and `immutable` for `landing-assets/img/`,
+  `landing-assets/fonts/` and for `site.css` / `site.js` when they are asked for with
+  `?v=`; an hour for the other files;
+- `/pl` → `/pl/`;
+- a file that `landing-assets/` does not have is a 404; any other address is the
+  application's.
 
 Because of that policy the pages must not contain inline `<script>`, inline `<style>` or
 `style="…"` attributes. `tools/verify.js` fails when one appears.
 
 ### When something changes
 
-- **`site.css` or `site.js`**: raise the number in `?v=N` in `index.html`,
-  `pl/index.html` and `404.html`. Browsers keep the old file for a year otherwise.
-- **A screenshot**: give the new file a new name. Files under `assets/img/` are cached
-  for a year under their name.
-- **Pages**: nothing to do; they are checked again after five minutes.
+- **`site.css` or `site.js`**: raise the number in `?v=N` in `index.html` and
+  `pl/index.html`. Browsers keep the old file for a year otherwise.
+- **A screenshot**: give the new file a new name. Files under `landing-assets/img/` are
+  cached for a year under their name.
+- **Pages**: nothing to do.
 
 ### The site's address
 
-Every address in the pages is relative, so the site works on any domain and under
-`python3 -m http.server`. Search engines and link previews prefer absolute addresses in a
-few places. Once the site has its address (say `https://team-hub.example`), put it in:
+Every address in the pages is relative, except the sign-in (`/login`), so the pages work
+on any domain. Search engines and link previews prefer absolute addresses in a few
+places. For an instance with a public address (say `https://team-hub.example`), put it in:
 
 1. `<link rel="canonical">` in both pages (`https://team-hub.example/` and `…/pl/`);
 2. the three `<link rel="alternate" hreflang>` lines in both pages;
-3. `og:url`, `og:image` and `twitter:image` in both pages;
-4. `robots.txt`: add `Sitemap: https://team-hub.example/sitemap.xml` if you write one
-   (two addresses; not worth it before the site has more pages).
+3. `og:url`, `og:image` and `twitter:image` in both pages.
 
 ## Where the copy lives
 
@@ -158,11 +155,11 @@ or a window") and has its own language switch.
    is scaled to the column), then write two widths:
 
    ```bash
-   ffmpeg -i shot.png -vf "crop=2364:648:490:486,scale=1600:-1" -quality 82 assets/img/en-name-1600.webp
+   ffmpeg -i shot.png -vf "crop=2364:648:490:486,scale=1600:-1" -quality 82 landing-assets/img/en-name-1600.webp
    ```
 
    ```bash
-   ffmpeg -i shot.png -vf "crop=2364:648:490:486,scale=800:-1" -quality 82 assets/img/en-name-800.webp
+   ffmpeg -i shot.png -vf "crop=2364:648:490:486,scale=800:-1" -quality 82 landing-assets/img/en-name-800.webp
    ```
 
    (`crop=width:height:x:y`, in pixels of the capture. A capture narrower than 1600 px
@@ -211,15 +208,19 @@ download block (the release's files, all of one version; `/releases/latest`; wha
 first start needs), the licence, the lightbox from the keyboard (opens, arrows, Escape,
 focus returns), tab order, 360 / 768 / 1280 / 1600 px in light and dark for horizontal
 overflow and for pictures whose declared size does not match the file shown, the page
-with JavaScript off, the 404 page, that both languages have the same chapters, figures
+with JavaScript off, the way to the sign-in, that both languages have the same chapters, figures
 and anchors, and that each page references only screenshots of its own language.
 
 ```bash
-node tools/verify.js http://127.0.0.1:8198/
+node tools/verify.js http://127.0.0.1:8080/
 ```
 
+against a team-hub server that has been set up, opened signed out: that is the page as it
+is served, policy included.
+
 `tools/og-image.js` renders the two link-preview images from the page's own stylesheet
-(serve the folder with `python3 -m http.server 8198` for it, not with Caddy).
+(serve the folder with `python3 -m http.server 8198` for it, not with the team-hub server,
+whose policy forbids the card's inline style).
 
 Both need `npm i playwright` somewhere Node can find it; neither is needed to serve or to
 edit the page.
@@ -236,6 +237,6 @@ Colours are the custom properties at the top of `site.css`. Text colours were ch
 against their backgrounds for WCAG AA (4.5 : 1 or better, in both schemes); check again
 when changing one.
 
-Newsreader is licensed under the SIL Open Font License 1.1 (`assets/fonts/OFL.txt`); the
+Newsreader is licensed under the SIL Open Font License 1.1 (`landing-assets/fonts/OFL.txt`); the
 two files are the `latin` and `latin-ext` subsets of the variable font as packaged by
 Fontsource.

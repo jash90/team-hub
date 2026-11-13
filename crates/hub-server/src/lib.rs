@@ -1,6 +1,7 @@
 //! The HTTP server: the core API, each module's routes, and the built web interface.
 
 pub mod api;
+mod landing;
 
 use std::sync::Arc;
 
@@ -80,9 +81,13 @@ pub fn build_router(app: App) -> Router {
     let index = app.config.web_dir.join("index.html");
     let web = ServeDir::new(&app.config.web_dir).fallback(ServeFile::new(index));
 
-    Router::new()
-        .nest("/api", api.fallback(api::not_found))
-        .nest("/hooks", hooks.fallback(api::not_found))
+    let mut router = Router::new().nest("/api", api.fallback(api::not_found)).nest("/hooks", hooks.fallback(api::not_found));
+
+    if let Some(directory) = landing::directory(&app) {
+        router = router.merge(landing::routes(&app, directory));
+    }
+
+    router
         .fallback_service(web)
         // A recording is compressed already, and a player or a download wants its length.
         .layer(CompressionLayer::new().compress_when(DefaultPredicate::new().and(NotForContentType::const_new("video/"))))

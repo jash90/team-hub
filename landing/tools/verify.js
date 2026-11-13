@@ -1,9 +1,11 @@
 // Checks the landing page in a real browser and prints one PASS or FAIL line
 // per check. Not part of serving the page; run it after changing the page.
 //
-//   python3 -m http.server 8198      (in landing/), or Caddy with the Caddyfile,
-//                                     which also puts the Content-Security-Policy to the test
 //   node tools/verify.js [base URL]  (needs Playwright: npm i playwright)
+//
+// The base URL is a team-hub server that has been set up, opened signed out: that is how
+// the page is served, with its Content-Security-Policy, and where the sign-in link leads
+// somewhere. The folder under `python3 -m http.server 8198` works too, except for that link.
 //
 // What it looks at, for both languages: console errors, failed requests,
 // requests that leave the host, CSP violations, inline style or script,
@@ -13,7 +15,7 @@
 // chapter is expected to have, the download block and the licence, the
 // lightbox from the keyboard, tab order, 360/768/1280/1600 px in light and
 // dark for horizontal overflow and for pictures whose declared size does not
-// match the file shown, the page with JavaScript off, the 404 page, and that
+// match the file shown, the page with JavaScript off, the way to the sign-in, and that
 // the two languages have the same chapters, figures and anchors, and that the
 // two pages share no screenshot file (each page shows captures in its own language).
 const { chromium } = require('playwright');
@@ -227,6 +229,17 @@ const shapes = {};
       if (s !== 200) ok(false, `[${name}] internal link ${u}`, String(s));
     }
     ok(true, `[${name}] ${internal.size} internal links checked`);
+
+    // the way in: the header and the first screen both lead to the sign-in
+    const signIn = links.filter((l) => l.raw === '/login').length;
+    ok(signIn === 2, `[${name}] the header and the hero link to the sign-in`, `${signIn} links to /login`);
+    ok(
+      await page.evaluate(() => {
+        const first = document.querySelector('.hero .actions a');
+        return !!first && first.getAttribute('href') === '/login' && first.classList.contains('primary');
+      }),
+      `[${name}] signing in is the first action on the page`,
+    );
 
     // images
     const imgs = await page.evaluate(pictures);
@@ -496,7 +509,7 @@ const shapes = {};
       files[name] = await page.evaluate(() => {
         const found = new Set();
         const take = (url) => {
-          const m = new URL(url, location.href).pathname.match(/assets\/img\/([^/]+)$/);
+          const m = new URL(url, location.href).pathname.match(/landing-assets\/img\/([^/]+)$/);
           if (m) found.add(m[1]);
         };
         for (const e of document.querySelectorAll('img[src]')) take(e.getAttribute('src'));
@@ -586,29 +599,6 @@ const shapes = {};
     ok(
       (await status(ctx, new URL(sw, BASE + path).href)) === 200,
       `[${path || 'en'} no JS] the other language is one plain link away (${sw})`,
-    );
-    await ctx.close();
-  }
-
-  // 404 page
-  {
-    const ctx = await browser.newContext();
-    const page = await ctx.newPage();
-    const errs = [];
-    page.on('console', (m) => {
-      if (m.type() === 'error' && !/404/.test(m.text())) errs.push(m.text());
-    });
-    const resp = await page.goto(BASE + 'no/such/page');
-    const st = resp.status();
-    const h1 = st === 404 ? await page.locator('h1').count() : 0;
-    const styled =
-      st === 404 && h1
-        ? await page.evaluate(() =>
-            getComputedStyle(document.querySelector('h1')).fontFamily.includes('Newsreader'),
-          )
-        : false;
-    console.log(
-      `INFO 404: status ${st}, custom page ${h1 ? 'yes' : 'no'}, styled ${styled}, errors ${errs.length}`,
     );
     await ctx.close();
   }

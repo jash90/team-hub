@@ -1,18 +1,18 @@
-// Renders the two link-preview images, assets/og-en.png and assets/og-pl.png
+// Renders the two link-preview images, landing-assets/og-en.png and landing-assets/og-pl.png
 // (1200 x 630), from a small HTML card that uses the page's own stylesheet,
 // font and hero screenshot. Not part of serving the page; run it by hand when
 // the headline or the hero screenshot changes. Each card uses the board capture of its own language.
 //
-//   python3 -m http.server 8198          (in landing/; not Caddy: its policy
-//                                          forbids the card's inline style)
+//   python3 -m http.server 8198          (in landing/; not the team-hub server:
+//                                          its policy forbids the card's inline style)
 //   node tools/og-image.js               (needs Playwright: npm i playwright)
 //
 const path = require('path');
 const { chromium } = require('playwright');
 
 const base = process.argv[2] || 'http://127.0.0.1:8198/';
-const assets = base + 'assets/';
-const out = path.join(__dirname, '..', 'assets');
+const assets = base + 'landing-assets/';
+const out = path.join(__dirname, '..', 'landing-assets');
 
 // Keep these in step with the <h1> and the kicker of the two pages.
 const cards = {
@@ -56,12 +56,12 @@ const card = (lang, [kicker, claim, fact]) => `<!doctype html>
   for (const [lang, words] of Object.entries(cards)) {
     const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, colorScheme: 'light' });
     // Start on a page of the site, so that the font is same-origin for the card.
-    await page.goto(base + '404.html');
+    await page.goto(base + 'robots.txt');
     await page.setContent(card(lang, words), { waitUntil: 'networkidle' });
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: path.join(out, `og-${lang}.png`) });
     await page.close();
-    console.log(`assets/og-${lang}.png`);
+    console.log(`landing-assets/og-${lang}.png`);
   }
   await browser.close();
 })();

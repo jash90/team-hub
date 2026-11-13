@@ -1,4 +1,5 @@
-# team-hub as one image: the server binary and the built interface.
+# team-hub as one image: the server binary, the built interface, and the page a visitor
+# who is not signed in sees first (landing/).
 #
 #   docker build -t team-hub .
 #   docker run -p 8080:8080 -v team-hub-data:/data team-hub
@@ -31,9 +32,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /app
 COPY --from=server /src/target/release/team-hub /app/team-hub
 COPY --from=web /src/web/dist /app/web
+# The page at / for somebody who is not signed in. TEAM_HUB_LANDING=off leaves it out:
+# such a visitor then gets the sign-in right away.
+COPY landing/index.html landing/robots.txt /app/landing/
+COPY landing/pl /app/landing/pl
+COPY landing/landing-assets /app/landing/landing-assets
 # Listens on $PORT when the platform sets one, else on 8080.
 ENV TEAM_HUB_BIND=0.0.0.0 \
     TEAM_HUB_DATA_DIR=/data \
-    TEAM_HUB_WEB_DIR=/app/web
+    TEAM_HUB_WEB_DIR=/app/web \
+    TEAM_HUB_LANDING_DIR=/app/landing
 EXPOSE 8080
 CMD ["/app/team-hub"]

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { api, errorMessage } from './api.ts';
 import type { Bootstrap } from './bindings/Bootstrap.ts';
@@ -82,6 +82,14 @@ export function App() {
     }
 
     return undefined;
+  }, [boot?.user?.id]);
+
+  // The front page's "Sign in" leads to /login: an address where the sign-in form shows,
+  // and no page of the application. Whoever is signed in there belongs on the start page.
+  useLayoutEffect(() => {
+    if (boot?.user && window.location.pathname === '/login') {
+      navigate('/', { replace: true });
+    }
   }, [boot?.user?.id]);
 
   if (error) {

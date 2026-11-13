@@ -107,6 +107,8 @@ The desktop app is built separately, from `apps/desktop`; see
 | `TEAM_HUB_BASE_URL` | `http://localhost:<port>` | The address people use; appears in webhook URLs and makes the session cookie `Secure` when it is `https://` |
 | `TEAM_HUB_DATA_DIR` | `data` | Database, attachments, and the generated instance key |
 | `TEAM_HUB_WEB_DIR` | `web/dist` | The built interface |
+| `TEAM_HUB_LANDING` | on | The page about team-hub that a visitor who is not signed in sees at `/`, with the way to the sign-in and to the desktop app ([`landing/`](landing/README.md)). `off`: such a visitor gets the sign-in right away |
+| `TEAM_HUB_LANDING_DIR` | `landing` | Where that page is |
 | `TEAM_HUB_SECRET_KEY` | generated into the data directory | 64 hex characters; encrypts stored integration tokens |
 | `TEAM_HUB_SETUP_TOKEN` | none | When set, creating the first account asks for it. Set it wherever the address is reachable by others before you have set the instance up. |
 
@@ -120,7 +122,7 @@ docker build -t team-hub .
 docker run -p 8080:8080 -v team-hub-data:/data -e TEAM_HUB_SETUP_TOKEN=choose-one team-hub
 ```
 
-The image holds the server and the built interface, listens on all interfaces, and keeps
+The image holds the server, the built interface and the landing page, listens on all interfaces, and keeps
 everything in `/data`. On [Railway](https://railway.com) the repository deploys as it is:
 connect it to a service, add a volume mounted at `/data`, a public domain, the variables
 `TEAM_HUB_BASE_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}` and `TEAM_HUB_SETUP_TOKEN`, and set

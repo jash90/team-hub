@@ -12,6 +12,10 @@ pub struct Config {
     pub base_url: String,
     /// The built web interface.
     pub web_dir: PathBuf,
+    /// The page about team-hub that a visitor who is not signed in sees at `/`, with the
+    /// way to the sign-in and to the desktop app. `None`: such a visitor gets the sign-in
+    /// right away.
+    pub landing_dir: Option<PathBuf>,
     /// Encrypts stored integration tokens.
     pub secret_key: [u8; 32],
     /// When set, the first account can only be created by someone who knows it. For an
@@ -74,6 +78,10 @@ impl Config {
             bind: env("TEAM_HUB_BIND").unwrap_or_else(|| "127.0.0.1".to_string()),
             base_url: env("TEAM_HUB_BASE_URL").unwrap_or_else(|| format!("http://localhost:{port}")),
             web_dir: PathBuf::from(env("TEAM_HUB_WEB_DIR").unwrap_or_else(|| "web/dist".to_string())),
+            landing_dir: match env("TEAM_HUB_LANDING").as_deref().map(str::trim) {
+                Some("off") => None,
+                _ => Some(PathBuf::from(env("TEAM_HUB_LANDING_DIR").unwrap_or_else(|| "landing".to_string()))),
+            },
             data_dir,
             port,
             secret_key,
@@ -89,6 +97,7 @@ impl Config {
             port: 0,
             base_url: "http://localhost".to_string(),
             web_dir: PathBuf::from("web/dist"),
+            landing_dir: None,
             secret_key: [7; 32],
             setup_token: None,
         }

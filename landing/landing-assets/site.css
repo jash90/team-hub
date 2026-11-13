@@ -250,6 +250,7 @@ strong {
   font-size: 1.0625rem;
   letter-spacing: -0.01em;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .brand img {
@@ -285,6 +286,21 @@ strong {
   padding-left: 1.5rem;
   border-left: 1px solid var(--rule);
   font-size: 0.9375rem;
+}
+
+/* The way into the instance this page stands in front of. */
+.site-tools .signin {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--ink-3);
+  border-radius: 6px;
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.site-tools .signin:hover {
+  border-color: var(--ink);
+  text-decoration: none;
 }
 
 .site-tools .lang {
@@ -1072,6 +1088,16 @@ pre .c {
 @media (max-width: 30em) {
   body {
     font-size: 1rem;
+  }
+
+  /* Room for the name, the language and the sign-in; the source is linked in the first
+     screen and in the footer. */
+  .site-tools {
+    gap: 0.85rem;
+  }
+
+  .site-tools .ext {
+    display: none;
   }
 
   .actions .button {
