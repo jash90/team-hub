@@ -69,8 +69,42 @@ interface fetches the screens of those only, so one built `web/dist` serves any 
 | Global quick search | `fn quick_search` → `QuickHit`s. |
 | A section of "My work" | `fn dashboard`. |
 | Tools for AI agents (MCP) | `fn tools` + `fn call_tool`. |
+| Work on a schedule | `fn task_kinds` (what it can run, with the form for it) and `fn start_task` (run one). See below. |
 | Background work | `fn start(&App)`: spawn a plain thread; never block the Rayon pool on the network. |
 | Demo data | `fn seed_demo(&App)`. |
+
+### Work on a schedule
+
+The core owns the schedule ([schedule.md](schedule.md)): tasks, the two daily slots, the
+page. A module owns the *kinds* of task. `task_kinds()` lists them: each a `TaskKind` with
+the id `"<module id>.<name>"`, `module` set to the module's id (the host leaves out a kind
+that is not named after its module), a name and a description, and the `fields` of its
+form. The host draws the form, checks what is saved against it (required, the right type,
+one of the options, a query the tracker understands) and stores it as the task's `config`;
+what the values mean is the module's to check when the task runs.
+
+`start_task(app, task, actor)` runs one: answer `None` for a kind that is not yours. It is
+called outside any transaction, on a thread of the schedule's, never while the module is
+off for the instance or for the task's project. `actor` is the person the task runs as,
+already acting through the module, so `project_access`, `issue_access` and
+`visible_projects` say what they may do; scope the work to `task.project_key` yourself,
+whatever the task's settings say. Answer quickly:
+
+- `Ok(TaskStarted::Done { summary, link })` when the work is over or handed on;
+- `Ok(TaskStarted::Running { summary })` when it goes on. The task then stays `running`
+  until the module calls `hub_app::services::schedule::finish(tx, task.id, outcome)` in the
+  transaction in which the work ends: `Ok(Outcome { summary, link })`, or `Err(reason)`.
+  Keep `task.id` with whatever you started (a column on your job's row). `finish` does
+  nothing for a task that was deleted meanwhile, and a task nobody finishes is marked
+  failed after six hours;
+- `Err(…)` when it cannot start; the error's message is what the page shows.
+
+Summaries, reasons, and the names, labels and hints of a kind are English, like everything
+the server says, with their Polish in `web/src/i18n/server.pl.ts`. The build finds the
+texts written in place (`TaskKind { name: "…" }`, `TaskStarted::Done { summary: format!(…) }`,
+an `ApiError`'s message) and fails when one has no Polish; for a text that reaches `finish`
+some other way, add the entry all the same. `modules/agents/src/scheduled.rs` is the
+reference: one kind, its form, its start, and its example tasks for the demo.
 
 ## Per project
 

@@ -17,7 +17,10 @@ pub struct Repos {
     root: PathBuf,
     /// Where `owner/name` is cloned from: GitHub, or what stands in for it in a test.
     base: String,
+    /// The runner's own token; none for a shared runner, which is given one with each piece of work.
     auth: Option<RemoteAuth>,
+    /// A shared runner: a failure to read is the requester's token's, and is said so.
+    shared: bool,
     /// One at a time per clone: git does not like two fetches into the same repository.
     busy: Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>,
 }
@@ -42,10 +45,26 @@ pub fn parse_name(name: &str) -> CoreResult<(String, String)> {
 }
 
 impl Repos {
-    pub fn new(root: PathBuf, base: &str, token: Option<Secret>) -> Self {
+    pub fn new(root: PathBuf, base: &str, token: Option<Secret>, shared: bool) -> Self {
         let base = base.trim().trim_end_matches('/').to_string();
 
-        Self { auth: token.map(|token| RemoteAuth::new(&base, token)), root, base, busy: Mutex::new(HashMap::new()) }
+        Self { auth: token.map(|token| RemoteAuth::new(&base, token)), shared, root, base, busy: Mutex::new(HashMap::new()) }
+    }
+
+    /// The token for one command: the one that came with the work, else the runner's own.
+    fn auth_of(&self, token: Option<&Secret>) -> Option<RemoteAuth> {
+        token.map(|token| RemoteAuth::new(&self.base, token.clone())).or_else(|| self.auth.clone())
+    }
+
+    /// On a shared runner a repository that cannot be read is the requester's to fix: the
+    /// reason names where, and the clone another person's token made is not used instead.
+    fn unreadable(&self, name: &str, error: CoreError) -> CoreError {
+        match (self.shared, error) {
+            (true, CoreError::Git { command, reason }) => CoreError::not_possible(format!(
+                "Your GitHub token cannot read {name} (git {command}: {reason}). Set one that can in team-hub under Settings → My keys, and start this again"
+            )),
+            (_, error) => error,
+        }
     }
 
     pub fn root(&self) -> &Path {
@@ -65,7 +84,11 @@ impl Repos {
 
     /// The clone of `owner/name`, up to date with its origin: cloned when it is not there yet,
     /// fetched when it is.
-    pub fn ensure(&self, name: &str) -> CoreResult<PathBuf> {
+    pub fn ensure(&self, name: &str, token: Option<&Secret>) -> CoreResult<PathBuf> {
+        self.ensure_with(name, self.auth_of(token).as_ref()).map_err(|error| self.unreadable(name, error))
+    }
+
+    fn ensure_with(&self, name: &str, auth: Option<&RemoteAuth>) -> CoreResult<PathBuf> {
         let (owner, repo) = parse_name(name)?;
         let url = self.url_of(&owner, &repo);
         let folder = self.root.join(&owner);
@@ -82,7 +105,7 @@ impl Repos {
                     )));
                 }
 
-                git::fetch(&path, self.auth.as_ref())?;
+                git::fetch(&path, auth)?;
 
                 return Ok(path.clone());
             }
@@ -94,7 +117,7 @@ impl Repos {
             let unfinished = folder.join(format!(".{repo}.cloning-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&unfinished);
             let _ = std::fs::remove_dir_all(&path);
-            let cloned = git::clone(&url, &unfinished, self.auth.as_ref()).and_then(|()| Ok(std::fs::rename(&unfinished, &path)?));
+            let cloned = git::clone(&url, &unfinished, auth).and_then(|()| Ok(std::fs::rename(&unfinished, &path)?));
 
             if cloned.is_err() {
                 let _ = std::fs::remove_dir_all(&unfinished);
@@ -104,18 +127,22 @@ impl Repos {
         })
     }
 
-    /// Fetches a clone this runner made. A clone it did not make has no token to fetch with.
-    pub fn fetch(&self, clone: &Path) -> CoreResult<()> {
-        self.alone(clone, || git::fetch(clone, self.auth_for(clone)))
+    /// Fetches a clone this runner made. A clone it did not make gets no token.
+    pub fn fetch(&self, clone: &Path, token: Option<&Secret>) -> CoreResult<()> {
+        let auth = self.auth_for(clone, token);
+
+        self.alone(clone, || git::fetch(clone, auth.as_ref()))
     }
 
     /// Pushes exactly `commit` to `branch` on origin, never forced.
-    pub fn push(&self, clone: &Path, branch: &str, commit: &str) -> CoreResult<()> {
-        self.alone(clone, || git::push_as(clone, branch, commit, self.auth_for(clone)))
+    pub fn push(&self, clone: &Path, branch: &str, commit: &str, token: Option<&Secret>) -> CoreResult<()> {
+        let auth = self.auth_for(clone, token);
+
+        self.alone(clone, || git::push_as(clone, branch, commit, auth.as_ref()))
     }
 
-    fn auth_for(&self, clone: &Path) -> Option<&RemoteAuth> {
-        self.auth.as_ref().filter(|_| clone.starts_with(&self.root))
+    fn auth_for(&self, clone: &Path, token: Option<&Secret>) -> Option<RemoteAuth> {
+        self.auth_of(token).filter(|_| clone.starts_with(&self.root))
     }
 }
 
@@ -135,7 +162,7 @@ mod tests {
 
     #[test]
     fn the_address_holds_no_token() {
-        let repos = Repos::new(PathBuf::from("/data/repos"), "https://github.com/", Some(Secret::new("ghp_secret")));
+        let repos = Repos::new(PathBuf::from("/data/repos"), "https://github.com/", Some(Secret::new("ghp_secret")), false);
 
         assert_eq!(repos.url_of("acme", "web"), "https://github.com/acme/web.git");
         assert!(!format!("{:?}", repos.auth).contains("ghp_secret"));

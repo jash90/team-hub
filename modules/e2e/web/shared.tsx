@@ -124,8 +124,25 @@ export function IssueChips({ issues, failing, onRemove }: { issues: E2eIssueRef[
 
 // ---------- a run, summed up ----------
 
+/** What only a job's page or a session cares about: a line of output, a file that arrived. */
+const QUIET = ['e2e.job', 'e2e.job.log', 'e2e.artifact'];
+
+/** A change to the project's runs, tests or their issues; jobs have their own list. */
 export function isOurs(project: Project) {
-  return (event: LiveEvent) => event.projectId === project.id && (event.kind.startsWith('e2e.') || event.kind === 'issue.transitioned' || event.kind === 'issue.deleted');
+  return (event: LiveEvent) =>
+    event.projectId === project.id && ((event.kind.startsWith('e2e.') && !QUIET.includes(event.kind)) || event.kind === 'issue.transitioned' || event.kind === 'issue.deleted');
+}
+
+export function jobPath(projectKey: string, jobId: number): string {
+  return `/p/${projectKey}/tests/jobs/${jobId}`;
+}
+
+export function sessionPath(projectKey: string, resultId: number): string {
+  return `/p/${projectKey}/tests/results/${resultId}`;
+}
+
+export function artifactUrl(artifactId: number): string {
+  return `${BASE}/artifacts/${artifactId}`;
 }
 
 export function useTests(project: Project) {

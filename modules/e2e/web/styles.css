@@ -703,3 +703,1400 @@
     flex-direction: column;
   }
 }
+
+/* ---------- the page head: back link, the button that starts a job ---------- */
+
+.e2e-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  width: fit-content;
+}
+
+.e2e-back:hover {
+  color: var(--accent);
+}
+
+.e2e-head-title {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.e2e-head-title h1 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+
+.e2e-run-tests {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.e2e-run-tests-why {
+  max-width: 340px;
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.e2e-hold {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--amber-soft);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.e2e-hold > .icon {
+  flex: none;
+  color: var(--amber);
+}
+
+/* ---------- where a job is carried out (the look of the agents' dialog) ---------- */
+
+.e2e-where-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.e2e-where-pick > strong {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.e2e-where {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.e2e-where:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.e2e-where > input {
+  margin-top: 3px;
+}
+
+.e2e-where > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.e2e-where-note {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.e2e-runner-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.e2e-runner-kind {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--sunk);
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.e2e-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.e2e-dot-on {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+/* ---------- the project's jobs ---------- */
+
+.e2e-job {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 0 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.e2e-job:last-child {
+  border-bottom: 0;
+}
+
+.e2e-job-main {
+  display: grid;
+  grid-template-columns: 150px minmax(120px, 1fr) minmax(0, 1.2fr) auto;
+  align-items: center;
+  gap: 4px 14px;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 0 9px 14px;
+  color: inherit;
+}
+
+.e2e-job-main > .tag {
+  justify-self: start;
+}
+
+.e2e-job-main:hover {
+  background: var(--sunk);
+  text-decoration: none;
+}
+
+.e2e-job-what {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.e2e-job-filter {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.e2e-job-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.e2e-job-error {
+  color: var(--red);
+}
+
+.e2e-job-waits-off {
+  color: var(--amber);
+}
+
+.e2e-job-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.e2e-job-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.e2e-steps-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.e2e-steps-line li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.e2e-steps-line .e2e-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--sunk);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.e2e-steps-line .e2e-step-done {
+  color: var(--ink);
+}
+
+.e2e-steps-line .e2e-step-done .icon {
+  width: 18px;
+  color: var(--green);
+}
+
+.e2e-steps-line .e2e-step-now {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.e2e-steps-line .e2e-step-now .e2e-step-number {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.e2e-job-step-free {
+  margin: 0;
+  font-weight: 600;
+}
+
+.e2e-job-facts dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 24px;
+  margin: 0;
+  padding: 13px 14px;
+}
+
+.e2e-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.e2e-fact dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.e2e-fact dd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- a job's output ---------- */
+
+.e2e-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.e2e-live-off {
+  color: var(--muted);
+}
+
+.e2e-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.e2e-live:not(.e2e-live-off) .e2e-live-dot {
+  animation: e2e-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes e2e-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.e2e-log {
+  height: min(62vh, 640px);
+  min-height: 220px;
+  padding: 8px 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--sunk);
+  font: 12.5px/1.55 var(--mono);
+  overflow: auto;
+}
+
+.e2e-log-line {
+  display: flex;
+  gap: 12px;
+  padding: 0 14px 0 0;
+}
+
+.e2e-log-line:hover {
+  background: var(--surface);
+}
+
+.e2e-log-seq {
+  flex: none;
+  width: 52px;
+  color: var(--muted);
+  opacity: 0.7;
+  text-align: right;
+  user-select: none;
+}
+
+.e2e-log-text {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.e2e-log-cut {
+  padding: 2px 14px 8px 64px;
+  color: var(--muted);
+  font-family: var(--font);
+}
+
+/* ---------- a run's tests, by file ---------- */
+
+.e2e-file {
+  border-bottom: 1px solid var(--line);
+}
+
+.e2e-file:last-child {
+  border-bottom: 0;
+}
+
+.e2e-file-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 9px 14px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.e2e-file-head:hover {
+  color: var(--ink);
+}
+
+.e2e-file-counts {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.e2e-rrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px 7px 34px;
+  border-top: 1px solid var(--line);
+}
+
+.e2e-rrow:hover {
+  background: var(--sunk);
+}
+
+.e2e-rrow-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.e2e-rrow-title {
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.e2e-rrow-title .muted {
+  font-weight: 400;
+}
+
+.e2e-rrow-side {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  flex: none;
+  max-width: 55%;
+}
+
+.e2e-rrow-time {
+  min-width: 52px;
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.e2e-recorded {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 34px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.e2e-recorded-video {
+  padding: 1px 7px 1px 5px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---------- a session: the error ---------- */
+
+.e2e-session .view-head {
+  flex-wrap: wrap;
+}
+
+.e2e-attempt {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.e2e-error {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.e2e-error-also {
+  border-left-color: var(--line-strong);
+}
+
+.e2e-error-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12.5px;
+}
+
+.e2e-error-head strong {
+  color: var(--red);
+}
+
+.e2e-error-also .e2e-error-head strong {
+  color: var(--muted);
+}
+
+.e2e-error-line {
+  margin: 0;
+  font: 13px/1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.e2e-error-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 3px 16px;
+  margin: 0;
+  font: 12.5px/1.5 var(--mono);
+}
+
+.e2e-error-facts > div {
+  display: contents;
+}
+
+.e2e-error-facts dt {
+  color: var(--muted);
+}
+
+.e2e-error-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.e2e-fact-expected {
+  color: var(--green);
+}
+
+.e2e-fact-received {
+  color: var(--red);
+}
+
+.e2e-error-more {
+  margin: 0;
+  color: var(--muted);
+  font: 12.5px/1.5 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- a session: the recording beside the steps ---------- */
+
+.e2e-session-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.e2e-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.e2e-player {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.e2e-player:fullscreen {
+  border: 0;
+  border-radius: 0;
+}
+
+.e2e-video {
+  display: block;
+  width: 100%;
+  max-height: 62vh;
+  aspect-ratio: 16 / 10;
+  background: #0b0d12;
+  object-fit: contain;
+  cursor: pointer;
+}
+
+.e2e-player:fullscreen .e2e-video {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+}
+
+.e2e-player-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--line);
+}
+
+.e2e-timeline {
+  position: relative;
+  height: 18px;
+}
+
+.e2e-timeline-track,
+.e2e-timeline-played {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.e2e-timeline-track {
+  right: 0;
+  background: var(--line-strong);
+}
+
+.e2e-timeline-played {
+  background: var(--accent);
+}
+
+.e2e-marker {
+  position: absolute;
+  top: 4px;
+  width: 2px;
+  height: 11px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--muted);
+  opacity: 0.6;
+}
+
+.e2e-marker-failed {
+  background: var(--red);
+  opacity: 1;
+}
+
+.e2e-marker-now {
+  top: 2px;
+  height: 15px;
+  background: var(--accent);
+  opacity: 1;
+}
+
+.e2e-seek {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.e2e-timeline:has(.e2e-seek:focus-visible) .e2e-timeline-track {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 3px;
+}
+
+.e2e-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.e2e-player-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.e2e-player-button:hover:not(:disabled) {
+  background: var(--sunk);
+  text-decoration: none;
+}
+
+.e2e-player-button:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.e2e-player-button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.e2e-clock {
+  flex: none;
+  color: var(--muted);
+  font: 12.5px var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.e2e-now {
+  flex: 1;
+  min-width: 0;
+}
+
+.e2e-now-step {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.e2e-now-step .mono {
+  color: var(--muted);
+}
+
+.e2e-parts {
+  display: flex;
+  gap: 2px;
+}
+
+.e2e-speed {
+  flex: none;
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.e2e-stage-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 220px;
+  padding: 28px 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+}
+
+.e2e-stage-empty strong {
+  color: var(--ink);
+}
+
+.e2e-stage-empty > .muted {
+  max-width: 460px;
+}
+
+.e2e-not-sent {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 7px;
+  color: var(--amber);
+  font-size: 12.5px;
+}
+
+/* ---------- a session: pictures, from the recording or from the report ---------- */
+
+.e2e-strip-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.e2e-strip-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.e2e-strip {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  padding-bottom: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.e2e-frame,
+.e2e-shot {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 152px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+}
+
+.e2e-frame:hover,
+.e2e-shot:hover:not(:disabled) {
+  border-color: var(--line-strong);
+}
+
+.e2e-frame[aria-current='true'],
+.e2e-shot[aria-current='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.e2e-frame-failed {
+  border-color: var(--red);
+}
+
+.e2e-frame img,
+.e2e-frame-wait,
+.e2e-shot img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: var(--sunk);
+  object-fit: cover;
+  object-position: top left;
+}
+
+.e2e-frame-wait {
+  background: linear-gradient(100deg, var(--sunk) 40%, var(--line) 50%, var(--sunk) 60%);
+  background-size: 200% 100%;
+  animation: e2e-wait 1.4s linear infinite;
+}
+
+@keyframes e2e-wait {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.e2e-frame-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 7px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.e2e-frame-label .mono {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.e2e-frame-label > :first-child {
+  font-weight: 600;
+}
+
+.e2e-shot:disabled {
+  cursor: default;
+}
+
+.e2e-shot > .e2e-not-sent {
+  flex: 1;
+  min-height: 95px;
+  padding: 8px;
+  background: var(--sunk);
+}
+
+.e2e-shot-label {
+  padding: 4px 7px;
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.e2e-stills {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.e2e-still {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.e2e-still-picture {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: #0b0d12;
+  cursor: zoom-in;
+}
+
+.e2e-still-picture img {
+  display: block;
+  width: 100%;
+  max-height: 62vh;
+  object-fit: contain;
+}
+
+.e2e-still .e2e-stage-empty {
+  border: 0;
+  border-radius: 0;
+}
+
+.e2e-still figcaption {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 7px 11px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+}
+
+.e2e-enlarged {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+  border: 1px solid var(--line);
+}
+
+/* ---------- a session: the steps ---------- */
+
+.e2e-steps {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.e2e-keys {
+  font-size: 12px;
+}
+
+.e2e-step-list {
+  position: relative;
+  max-height: min(74vh, 760px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.e2e-step {
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+}
+
+.e2e-step:last-child {
+  border-bottom: 0;
+}
+
+.e2e-step[aria-current='step'] {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.e2e-step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding-right: 8px;
+}
+
+.e2e-step-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0 7px 9px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.e2e-step-main:hover .e2e-step-label {
+  text-decoration: underline;
+}
+
+.e2e-step-list .e2e-step-number {
+  flex: none;
+  width: 20px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.e2e-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.e2e-step-what {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.e2e-step-api {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.e2e-step-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  font-size: 11.5px;
+}
+
+.e2e-step-clock {
+  color: var(--accent);
+}
+
+.e2e-step-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.e2e-step-more:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.e2e-step-details {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 2px 12px 11px 40px;
+  font-size: 12.5px;
+}
+
+.e2e-step-said {
+  margin: 0;
+}
+
+.e2e-step-part {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.e2e-step-part-head {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.e2e-step-part ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 12px/1.55 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.e2e-event-failed,
+.e2e-log-error {
+  color: var(--red);
+}
+
+.e2e-log-warning,
+.e2e-log-warn {
+  color: var(--amber);
+}
+
+.e2e-step-location {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.e2e-changes,
+.e2e-screen-text {
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--sunk);
+  font: 12px/1.5 var(--mono);
+  overflow-x: auto;
+}
+
+.e2e-step[aria-current='step'] .e2e-changes {
+  background: var(--surface);
+}
+
+.e2e-changes > span {
+  display: block;
+}
+
+.e2e-change-added {
+  color: var(--green);
+}
+
+.e2e-change-removed {
+  color: var(--red);
+}
+
+.e2e-screen-text {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.e2e-step-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.e2e-step-cut {
+  padding: 8px 12px;
+  font-size: 12.5px;
+}
+
+/* ---------- a session: what else was left ---------- */
+
+.e2e-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.e2e-section-foot {
+  display: flex;
+  gap: 12px;
+  font-size: 12.5px;
+}
+
+.e2e-applog,
+.e2e-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.e2e-applog li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font: 12px/1.55 var(--mono);
+}
+
+.e2e-applog-level {
+  flex: none;
+  width: 58px;
+  font-weight: 600;
+}
+
+.e2e-applog-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.e2e-applog .link-button {
+  flex: none;
+  font-family: var(--font);
+}
+
+.e2e-files-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  font-size: 13px;
+}
+
+.e2e-files-list .icon {
+  color: var(--muted);
+}
+
+.e2e-trace {
+  max-width: 900px;
+  overflow-wrap: anywhere;
+}
+
+.e2e-trace-none {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+/* ---------- the settings of a project's tests ---------- */
+
+.e2e-settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.e2e-vars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.e2e-var {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.e2e-secret {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.e2e-secret-name {
+  font-weight: 600;
+}
+
+.e2e-secret-value {
+  flex: 1;
+  min-width: 160px;
+  max-width: 320px;
+}
+
+/* ---------- narrow screens: jobs, runs, sessions ---------- */
+
+@media (max-width: 1100px) {
+  .e2e-session-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .e2e-step-list {
+    max-height: 56vh;
+  }
+
+  .e2e-job-main {
+    grid-template-columns: 150px minmax(0, 1fr) auto;
+  }
+
+  .e2e-job-note {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 760px) {
+  .e2e-job {
+    flex-wrap: wrap;
+    padding-right: 0;
+  }
+
+  .e2e-job-main {
+    grid-template-columns: minmax(0, 1fr);
+    flex-basis: 100%;
+    padding-right: 14px;
+  }
+
+  .e2e-job-note,
+  .e2e-job-who {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .e2e-job-actions {
+    padding: 0 14px 9px;
+  }
+
+  .e2e-rrow {
+    flex-wrap: wrap;
+    padding-left: 14px;
+  }
+
+  .e2e-rrow-main {
+    flex-basis: calc(100% - 30px);
+  }
+
+  .e2e-rrow-side {
+    justify-content: flex-start;
+    max-width: none;
+    padding-left: 28px;
+  }
+
+  .e2e-run-tests {
+    justify-content: flex-start;
+  }
+
+  .e2e-run-tests-why {
+    text-align: left;
+  }
+
+  .e2e-settings-row {
+    flex-direction: column;
+  }
+
+  .e2e-var {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .e2e-var > :nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .e2e-player-controls {
+    flex-wrap: wrap;
+  }
+
+  .e2e-now {
+    order: 9;
+    flex-basis: 100%;
+  }
+
+  .e2e-step-details {
+    padding-left: 14px;
+  }
+
+  .e2e-frame,
+  .e2e-shot {
+    width: 128px;
+  }
+}

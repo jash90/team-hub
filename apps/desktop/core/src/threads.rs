@@ -32,6 +32,12 @@ pub trait Host: Send + Sync + 'static {
     fn hub_tools(&self, thread: &Thread) -> Vec<HubTool>;
     /// Answers a tool call the agent made: a read of the server, a proposal, a question.
     fn call_tool(&self, thread: &Thread, tool: &str, input: &Value) -> Result<Value, String>;
+    /// The model provider's key for this thread's helper, where each thread works with the
+    /// key of the person it works for (a shared runner). An error when it should have one
+    /// and has none: the thread then does not start.
+    fn model_key(&self, _thread: &Thread) -> Result<Option<Secret>, String> {
+        Ok(None)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -295,6 +301,7 @@ impl Inner {
     async fn launch(self: &Arc<Self>, thread_id: i64) -> CoreResult<()> {
         let inner = Arc::clone(self);
         let start = tokio::task::spawn_blocking(move || inner.prepare(thread_id)).await??;
+        let own_key = self.host.model_key(&self.store.thread(thread_id)?).map_err(CoreError::not_possible)?;
         let mut command = Command::new(&self.config.program);
 
         command.args(&self.config.arguments).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
@@ -315,7 +322,7 @@ impl Inner {
 
                 command.env("HOME", &unattended.helper_home);
 
-                if let Some(key) = &unattended.model_key {
+                if let Some(key) = own_key.as_ref().or(unattended.model_key.as_ref()) {
                     command.env(policy::MODEL_KEY_VARIABLE, key.expose());
                 }
 

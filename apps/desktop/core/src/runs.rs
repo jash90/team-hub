@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use crate::git::Committed;
 use crate::model::{EventKind, ThreadKind, ThreadState};
+use crate::secrets::Secret;
 
 macro_rules! open_enum {
     ($name:ident { $($variant:ident => $text:literal),+ $(,)? }) => {
@@ -133,6 +134,11 @@ pub struct AgentRun {
     pub runner_id: Option<String>,
     #[serde(default)]
     pub runner_name: Option<String>,
+    /// The runner the run was sent to by name; none: any runner that fits (docs/runners.md).
+    #[serde(default)]
+    pub on_runner: Option<String>,
+    #[serde(default)]
+    pub on_runner_name: Option<String>,
     #[serde(default)]
     pub model: Option<String>,
     #[serde(default)]
@@ -210,6 +216,26 @@ pub struct AgentRunDetail {
     pub proposals: Vec<RunProposal>,
 }
 
+/// The keys of the person a piece of work is done for, as a shared runner gets them with
+/// the work it claims (docs/runners.md). Held in memory for that work only.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkKeys {
+    #[serde(default)]
+    pub anthropic_api_key: Option<Secret>,
+    #[serde(default)]
+    pub github_token: Option<Secret>,
+}
+
+/// The answer to a claim: the run, and for a shared runner its requester's keys.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct ClaimedRun {
+    #[serde(flatten)]
+    pub detail: AgentRunDetail,
+    #[serde(default)]
+    pub credentials: Option<WorkKeys>,
+}
+
 /// `POST /issues/{key}/runs`.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -225,6 +251,9 @@ pub struct NewRun {
     /// runner of the same person can take it first.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub runner_id: Option<String>,
+    /// Another runner to send the run to: it stays queued for that runner alone.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_runner: Option<String>,
 }
 
 /// `PATCH /runs/{id}`: only what changed is sent.

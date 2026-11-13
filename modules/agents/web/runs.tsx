@@ -10,6 +10,7 @@ import type { AgentRunEvent } from '@/bindings/AgentRunEvent.ts';
 import type { AgentRunKind } from '@/bindings/AgentRunKind.ts';
 import type { AgentRunState } from '@/bindings/AgentRunState.ts';
 import type { AgentRunner } from '@/bindings/AgentRunner.ts';
+import type { PersonalKeyState } from '@/bindings/PersonalKeyState.ts';
 import type { AgentSettings } from '@/bindings/AgentSettings.ts';
 import type { JsonValue } from '@/bindings/serde_json/JsonValue.ts';
 import { Icon } from '@/components/icon.tsx';
@@ -878,6 +879,10 @@ export function StartDialog({ issueKey, projectKey, preset, repo, onClose, onSta
   // Who can be named: one's own (connected or not: the run waits), and services that are there.
   const nameable = fits.filter((runner) => runner.userId === user.id || (!runner.interactive && runner.online));
   const chosen = nameable.find((runner) => runner.id === onRunner) ?? null;
+  // The team's runner works with the requester's own model key.
+  const keys = useRemote(() => (inCode ? api.get<PersonalKeyState[]>('/api/me/keys') : Promise.resolve([] as PersonalKeyState[])), [inCode]);
+  const hasModelKey = keys.data?.some((key) => key.name === 'anthropic_api_key' && key.set) ?? true;
+  const needsKey = chosen !== null && chosen.shared && !hasModelKey;
   const needsInstructions = preset.kind === 'custom' && !instructions.trim();
 
   function start(): void {
@@ -902,7 +907,7 @@ export function StartDialog({ issueKey, projectKey, preset, repo, onClose, onSta
       footer={
         <>
           <Button onClick={onClose}>{t('Cancel')}</Button>
-          <Button variant="primary" icon="play" disabled={busy || needsInstructions} onClick={start}>
+          <Button variant="primary" icon="play" disabled={busy || needsInstructions || needsKey} onClick={start}>
             {t('Start')}
           </Button>
         </>
@@ -950,6 +955,13 @@ export function StartDialog({ issueKey, projectKey, preset, repo, onClose, onSta
                 )}
               </>
             )}
+            {needsKey && (
+              <p className="agents-hold">
+                <Icon name="alert" size={14} />
+                {t('{name} is the team’s runner and works with your own model key, which you have not stored yet.', { name: chosen.name })}{' '}
+                <Link href="/settings/keys">{t('Add it in Settings → My keys')}</Link>
+              </p>
+            )}
             {chosen && !chosen.online && (
               <p className="agents-hold">
                 <Icon name="alert" size={14} />
@@ -988,7 +1000,7 @@ export function RunnerLine({ runner, owner }: { runner: AgentRunner; owner: stri
     <div className="agents-runner">
       <span className={runner.online ? 'agents-dot agents-dot-on' : 'agents-dot'} title={runner.online ? t('online') : t('offline')} />
       <strong>{runner.name}</strong>
-      <span className="agents-runner-kind">{runner.interactive ? t('computer') : t('service')}</span>
+      <span className="agents-runner-kind">{runner.shared ? t('shared service') : runner.interactive ? t('computer') : t('service')}</span>
       <span className="muted">
         {owner} · {runner.kinds.map((kind) => t(kind)).join(', ')} · {runner.projects === null ? t('any project') : runner.projects.join(', ')}
         {runner.pinnedOnly && ` · ${t('only what is sent to it')}`}

@@ -15,6 +15,7 @@ use http_body_util::BodyExt;
 use hub_app::access::project_access;
 use hub_app::services::issues::{create_issue, issue_access, issue_detail, update_issue};
 use hub_app::services::overview::dashboard;
+use hub_app::services::personal_keys;
 use hub_app::services::projects::{create_project, set_member, NewProject};
 use hub_app::services::search::search;
 use hub_app::services::sprints::{create_sprint, SprintInput};
@@ -1027,6 +1028,62 @@ async fn a_run_sent_to_one_runner_by_name_waits_for_it_and_a_computer_takes_such
     world.app.write(Actor::system("test"), |tx| runs::requeue_stale(tx, later)).unwrap();
     let again = world.run(id).await;
     assert_eq!((&again["run"]["state"], &again["run"]["onRunner"], &again["run"]["runnerId"]), (&json!("queued"), &json!("laptop"), &Value::Null));
+}
+
+/// Stores one of a person's own keys, as the core's route would.
+fn store_key(world: &World, user: &AuthUser, name: &str, value: &str) {
+    let app = world.app.clone();
+    let in_the_browser = AuthUser { via_token: false, ..user.clone() };
+
+    assert!(app.db.write(|tx| personal_keys::set(&app, tx, user, name, value)).is_err(), "not with an API token");
+    app.db.write(|tx| personal_keys::set(&app, tx, &in_the_browser, name, value)).expect("the key is stored");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_teams_runner_takes_anyones_run_and_works_on_it_with_the_requesters_own_keys() {
+    let world = world();
+    let (piotr, piotr_token) = person(&world.app, "Piotr Member", "piotr@example.com", Role::Member);
+    let shared = json!({ "runnerId": "cloud-1", "name": "Cloud runner 1", "kinds": ["implement"], "version": "1", "interactive": false, "shared": true });
+
+    // Who may run the team's runner.
+    assert_eq!(world.send(&piotr_token, Method::POST, "/runners/heartbeat", Some(shared.clone())).await.0, StatusCode::FORBIDDEN, "not an administrator");
+    let mut at_a_desk = shared.clone();
+    at_a_desk["interactive"] = json!(true);
+    assert_eq!(world.send(&world.token, Method::POST, "/runners/heartbeat", Some(at_a_desk)).await.0, StatusCode::FORBIDDEN, "somebody's computer is nobody's team runner");
+    world.post("/runners/heartbeat", shared).await;
+    let listed = world.send(&piotr_token, Method::GET, "/runners", None).await.1;
+    assert_eq!(listed.as_array().unwrap().iter().find(|runner| runner["id"] == "cloud-1").map(|runner| &runner["shared"]), Some(&json!(true)));
+
+    // Without a model key of their own, a person cannot send a run to it, and one they
+    // leave to the queue is not offered to it.
+    let start = |body: Value| world.send(&piotr_token, Method::POST, "/issues/WEB-1/runs", Some(body));
+    let (status, refused) = start(json!({ "kind": "implement", "onRunner": "cloud-1" })).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{refused}");
+    assert!(refused["error"]["message"].as_str().unwrap().contains("Settings → My keys"), "{refused}");
+    let (_, loose) = start(json!({ "kind": "implement" })).await;
+    assert_eq!(claim(&world, &world.token, "cloud-1", json!(["implement"])).await, Value::Null);
+
+    // With it: the run that was not shared and not the administrator's is taken, and the
+    // answer carries Piotr's keys, not the administrator's.
+    store_key(&world, &piotr, "anthropic_api_key", "sk-ant-piotr-0001");
+    store_key(&world, &world.admin, "anthropic_api_key", "sk-ant-admin-9999");
+    let taken = claim(&world, &world.token, "cloud-1", json!(["implement"])).await;
+    assert_eq!((&taken["run"]["id"], &taken["run"]["runnerName"]), (&loose["id"], &json!("Cloud runner 1")));
+    assert_eq!(taken["credentials"], json!({ "anthropicApiKey": "sk-ant-piotr-0001" }), "no GitHub token stored, so none is sent");
+
+    store_key(&world, &piotr, "github_token", "ghp_piotr");
+    let (status, named) = start(json!({ "kind": "implement", "onRunner": "cloud-1" })).await;
+    assert_eq!(status, StatusCode::OK, "{named}");
+    let taken = claim(&world, &world.token, "cloud-1", json!(["implement"])).await;
+    assert_eq!(taken["credentials"], json!({ "anthropicApiKey": "sk-ant-piotr-0001", "githubToken": "ghp_piotr" }));
+
+    // Nowhere else: not on the run, not in its events, and not for a runner that is not shared.
+    let detail = world.run(named["id"].as_i64().unwrap()).await;
+    assert!(!detail.to_string().contains("sk-ant-") && !detail.to_string().contains("ghp_"), "{detail}");
+    world.post("/runners/heartbeat", json!({ "runnerId": "desk", "name": "Desk", "kinds": ["implement"], "version": "1" })).await;
+    world.post("/issues/WEB-2/runs", json!({ "kind": "implement" })).await;
+    let own = claim(&world, &world.token, "desk", json!(["implement"])).await;
+    assert!(own["run"]["id"].is_i64() && own.get("credentials").is_none(), "{own}");
 }
 
 #[tokio::test(flavor = "multi_thread")]

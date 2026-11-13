@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { api } from '../api.ts';
 import type { ApiToken } from '../bindings/ApiToken.ts';
 import type { ModuleInfo } from '../bindings/ModuleInfo.ts';
+import type { PersonalKeyState } from '../bindings/PersonalKeyState.ts';
 import type { User } from '../bindings/User.ts';
 import { Avatar, Button, Dialog, Field, Picker, SettingsCard, Tabs, Tag, attempt, copyText, toast, useBusy } from '../components/ui.tsx';
 import { currentLanguage, formatDate, setLanguage, t, timeAgo } from '../i18n/index.ts';
@@ -19,6 +20,7 @@ export function SettingsView({ tab }: { tab?: string }) {
   const tabs = [
     { id: 'profile', label: t('Profile') },
     { id: 'tokens', label: t('API tokens') },
+    { id: 'keys', label: t('My keys') },
     ...(admin
       ? [
           { id: 'users', label: t('People') },
@@ -40,6 +42,7 @@ export function SettingsView({ tab }: { tab?: string }) {
       <div className="settings-body">
         {active === 'profile' && <Profile />}
         {active === 'tokens' && <Tokens />}
+        {active === 'keys' && <Keys />}
         {active === 'users' && admin && <People />}
         {active === 'modules' && admin && <Modules />}
         {moduleTabs.find((entry) => entry.id === active)?.render()}
@@ -115,6 +118,78 @@ function Profile() {
         />
       </SettingsCard>
     </>
+  );
+}
+
+/**
+ * The person's own keys (`docs/runners.md`): what a shared runner works with on their runs
+ * and test jobs. A value goes in and never comes back; the page sees only that it is set.
+ */
+function Keys() {
+  const keys = useRemote(() => api.get<PersonalKeyState[]>('/api/me/keys'), []);
+
+  return (
+    <SettingsCard
+      title={t('My keys')}
+      lead={t('A shared runner belongs to the team and has no keys of its own: it works on your agent runs and test jobs with yours, so your runs are billed to you and reach only what you can reach. The keys are stored encrypted, are never shown again, and leave the server only to a shared runner that has taken your work. The desktop app does not need them.')}
+    >
+      {keys.error && <p className="muted">{keys.error}</p>}
+      {keys.data?.length === 0 && <p className="muted">{t('No module that is switched on uses personal keys.')}</p>}
+      {keys.data?.map((key) => (
+        <KeyRow key={key.name} state={key} onChanged={() => void keys.reload()} />
+      ))}
+    </SettingsCard>
+  );
+}
+
+function KeyRow({ state, onChanged }: { state: PersonalKeyState; onChanged: () => void }) {
+  const [value, setValue] = useState('');
+  const [busy, run] = useBusy();
+  const path = `/api/me/keys/${state.name}`;
+
+  return (
+    <div className="key-row">
+      <div className="key-row-head">
+        <strong>{translateServer(state.label)}</strong>
+        {state.set ? (
+          <Tag tone="green">
+            {t('set')} <code>{state.tail}</code>
+          </Tag>
+        ) : (
+          <Tag>{t('not set')}</Tag>
+        )}
+        {state.set && state.updatedAt && <span className="muted">{t('changed {when}', { when: timeAgo(state.updatedAt) })}</span>}
+      </div>
+      <p className="muted">{translateServer(state.hint)}</p>
+      <form
+        className="inline-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void run(() => api.put(path, { value }), t('Key saved')).then(() => {
+            setValue('');
+            onChanged();
+          });
+        }}
+      >
+        <input
+          className="input input-mono"
+          type="password"
+          autoComplete="off"
+          aria-label={translateServer(state.label)}
+          placeholder={state.set ? t('Paste a new value to replace it') : t('Paste the key')}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+        />
+        <Button type="submit" icon="key" disabled={busy || !value.trim()}>
+          {state.set ? t('Replace') : t('Save')}
+        </Button>
+        {state.set && (
+          <Button variant="ghost" icon="trash" disabled={busy} onClick={() => void run(() => api.del(path), t('Key removed')).then(onChanged)}>
+            {t('Remove')}
+          </Button>
+        )}
+      </form>
+    </div>
   );
 }
 

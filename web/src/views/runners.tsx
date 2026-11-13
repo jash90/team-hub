@@ -28,8 +28,9 @@ export function RunnersView() {
     return () => window.clearInterval(timer);
   }, [runners.reload]);
 
-  const mine = runners.data?.filter((runner) => runner.userId === user.id) ?? [];
-  const others = runners.data?.filter((runner) => runner.userId !== user.id) ?? [];
+  const team = runners.data?.filter((runner) => runner.shared) ?? [];
+  const mine = runners.data?.filter((runner) => !runner.shared && runner.userId === user.id) ?? [];
+  const others = runners.data?.filter((runner) => !runner.shared && runner.userId !== user.id) ?? [];
 
   return (
     <div className="view view-narrow">
@@ -47,6 +48,19 @@ export function RunnersView() {
         <Empty icon="layers" title={t('No runner has connected yet')}>
           {t('Open the desktop app and connect it to this server with an API token, or deploy the cloud runner next to the server. Either shows up here as soon as it has said hello.')}
         </Empty>
+      )}
+      {runners.data?.some((runner) => runner.shared) && (
+        <p className="muted runner-note">
+          {t('A shared runner works with your own keys.')} <Link href="/settings/keys">{t('Set them in Settings → My keys')}</Link>
+        </p>
+      )}
+      {team.length > 0 && (
+        <section className="runner-group">
+          <h2>{t('The team’s')}</h2>
+          {team.map((runner) => (
+            <RunnerCard key={runner.id} runner={runner} owner={null} />
+          ))}
+        </section>
       )}
       {mine.length > 0 && (
         <section className="runner-group">
@@ -77,6 +91,7 @@ function RunnerCard({ runner, owner }: { runner: Runner; owner: string | null })
         <Tag tone={runner.interactive ? 'neutral' : 'blue'} title={runner.interactive ? t('The desktop app on a person’s computer; it uses that computer.') : t('A service with nobody at it; what it wants to push is decided here.')}>
           {runner.interactive ? t('computer') : t('service')}
         </Tag>
+        {runner.shared && <Tag tone="green" title={t('The team’s runner: it takes anyone’s work and carries it out with that person’s own keys (Settings → My keys).')}>{t('shared')}</Tag>}
         <span className="filter-spacer" />
         <span className="muted">
           {[owner, runner.version ? `v${runner.version}` : null, runner.online ? t('connected') : t('last heard from {when}', { when: timeAgo(runner.lastSeenAt) })].filter(Boolean).join(' · ')}

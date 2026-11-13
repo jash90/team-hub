@@ -4,8 +4,8 @@
 use axum::Router;
 use chrono::{DateTime, Utc};
 use hub_core::query::{Clause, QueryFieldInfo};
+use hub_core::runners::{PersonalKey, Runner};
 use hub_core::schedule::{ScheduledTask, TaskKind, TaskStarted};
-use hub_core::runners::Runner;
 use hub_core::{IssueRow, QuickHit};
 use rusqlite::types::Value;
 use rusqlite::Connection;
@@ -130,6 +130,13 @@ pub trait Module: Send + Sync + 'static {
     /// The core makes one list of what the modules say.
     fn runners(&self, _connection: &Connection, _viewer: &AuthUser, _now: DateTime<Utc>) -> ApiResult<Vec<Runner>> {
         Ok(Vec::new())
+    }
+
+    /// Keys a person stores for themselves and this module uses on their behalf, such as
+    /// their own model key (`docs/runners.md` → Shared runners). The core keeps the values
+    /// (`services::personal_keys`); a key two modules name is listed once.
+    fn personal_keys(&self) -> Vec<PersonalKey> {
+        Vec::new()
     }
 
     /// Background work; called once the application is up.

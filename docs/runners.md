@@ -36,6 +36,7 @@ are online. Modules contribute what they know (`Module::runners`); the core merg
 type Runner = {
   id: string; name: string; userId: number;
   interactive: boolean;         // somebody's computer (true) or a service (false)
+  shared: boolean;              // a service that works for everyone, with each person's own keys
   online: boolean; lastSeenAt: string; version: string | null;
   work: RunnerWork[];           // one entry per module that knows it
 };
@@ -67,6 +68,49 @@ offered to nobody else; without it, any runner that fits takes it, as before.
 
 This is how a person chooses whose resources are used: "this computer" in the desktop app
 pins to the app's own id; "Cloud runner" pins to the service; "any" leaves it to the queue.
+
+## Shared runners and people's own keys
+
+A cloud runner is the team's, not one person's: it carries out work for anyone, and it has
+no model key and no GitHub token of its own. Each person stores **their own** in team-hub,
+and a shared runner works on a person's run or job with that person's keys.
+
+**A person's keys** (Settings → My keys; `GET /api/me/keys`, `PUT` / `DELETE
+/api/me/keys/{name}`). Modules say which keys exist (`Module::personal_keys`); today:
+
+| Name | Used for |
+|---|---|
+| `anthropic_api_key` | The model, for that person's agent runs on a shared runner. Their runs are billed to them |
+| `github_token` | Cloning, fetching and pushing for that person's runs and test jobs on a shared runner |
+
+A key is encrypted at rest with the instance key. No route gives it back: a page sees
+whether it is set and its last four characters. It leaves the server in one place only,
+the answer to a shared runner that claims that person's work. Keys are set and removed in
+a signed-in browser session, not with an API token.
+
+**A shared runner** is one that says `shared: true` when it announces itself (heartbeat,
+and the test-job claim) and is not `interactive`. The server accepts that only from an
+instance administrator's token: whoever operates the instance operates its runners.
+For such a runner:
+
+- It is offered anyone's queued runs and jobs in the projects it works for, not only its
+  owner's and the ones marked as shared, and it can be named in `onRunner` by anyone who
+  may start that work.
+- An agent run is offered to it only when its requester has an `anthropic_api_key`.
+  Naming it in `onRunner` without one is refused (409) with where to set the key.
+- The claim's answer carries `credentials: { anthropicApiKey?: string, githubToken?: string }`
+  of the requester (for a scheduled task: of the person the task runs as). The runner
+  uses them for that run or job only: the model key in that one helper process's
+  environment, the token for that run's git commands. It writes neither to disk.
+- A repository's clone is shared between people on the runner. Before each use the runner
+  fetches with the requester's token, and the work fails with the reason when that token
+  cannot read the repository, so a clone made with one person's token is never a way for
+  another to read a repository they have no access to.
+
+`Runner.shared` says so in the list, and the pages show it.
+
+Not built: a runner identity of its own. A shared runner signs in with an administrator's
+API token, so that token should be one made for it and for nothing else.
 
 ## What the desktop app does with this
 

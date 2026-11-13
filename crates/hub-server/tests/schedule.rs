@@ -50,11 +50,21 @@ struct ProbeModule(Arc<Probe>);
 
 impl Module for ProbeModule {
     fn meta(&self) -> ModuleMeta {
-        ModuleMeta { id: "probe", name: "Probe", description: "Task kinds for the schedule's tests.", version: "0", depends_on: &[], default_enabled: true }
+        ModuleMeta {
+            id: "probe",
+            name: "Probe",
+            description: "Task kinds for the schedule's tests.",
+            version: "0",
+            depends_on: &[],
+            default_enabled: true,
+        }
     }
 
     fn task_kinds(&self) -> Vec<TaskKind> {
-        let options = vec![TaskOption { value: "fast".to_string(), label: "Fast".to_string() }, TaskOption { value: "slow".to_string(), label: "Slow".to_string() }];
+        let options = vec![
+            TaskOption { value: "fast".to_string(), label: "Fast".to_string() },
+            TaskOption { value: "slow".to_string(), label: "Slow".to_string() },
+        ];
 
         vec![
             // Answers at once: done with `say`, or failed with `fail` when that is set.
@@ -88,7 +98,9 @@ impl Module for ProbeModule {
         match task.kind.as_str() {
             "probe.now" => Some(match task.config.get("fail").and_then(Value::as_str).filter(|reason| !reason.is_empty()) {
                 Some(reason) => Err(ApiError::conflict(reason)),
-                None => Ok(TaskStarted::Done { summary: task.config["say"].as_str().unwrap_or("").to_string(), link: Some("/somewhere".to_string()) }),
+                None => {
+                    Ok(TaskStarted::Done { summary: task.config["say"].as_str().unwrap_or("").to_string(), link: Some("/somewhere".to_string()) })
+                }
             }),
             "probe.later" => Some(Ok(TaskStarted::Running { summary: "Handed on".to_string() })),
             "probe.panic" => panic!("the probe was told to"),
@@ -187,7 +199,10 @@ async fn the_kinds_are_those_of_the_modules_that_are_on() {
 
     assert_eq!(ids, ["probe.now", "probe.later", "probe.panic"], "a kind that is not named after its module is left out");
     assert_eq!(kinds[0]["module"], "probe");
-    assert_eq!(kinds[0]["fields"][0], json!({ "name": "say", "label": "Say", "required": true, "type": "text", "options": [], "default": "all good" }));
+    assert_eq!(
+        kinds[0]["fields"][0],
+        json!({ "name": "say", "label": "Say", "required": true, "type": "text", "options": [], "default": "all good" })
+    );
     assert_eq!(kinds[0]["fields"][3]["options"][1], json!({ "value": "slow", "label": "Slow" }));
 
     scene.admin.put("/api/admin/modules/probe", json!({ "enabled": false })).await;
@@ -223,7 +238,10 @@ async fn a_task_is_made_changed_and_deleted() {
     );
 
     let changed = scene.admin.patch(&format!("/api/tasks/{id}"), json!({ "name": "Evening check", "slot": "afternoon", "enabled": false })).await;
-    assert_eq!((changed["name"].as_str(), changed["slot"].as_str(), changed["enabled"].as_bool()), (Some("Evening check"), Some("afternoon"), Some(false)));
+    assert_eq!(
+        (changed["name"].as_str(), changed["slot"].as_str(), changed["enabled"].as_bool()),
+        (Some("Evening check"), Some("afternoon"), Some(false))
+    );
     assert_eq!(changed["config"]["say"], "hello", "what was not sent stays");
 
     let changed = scene.admin.patch(&format!("/api/tasks/{id}"), json!({ "config": { "say": "bye", "speed": "slow", "times": 7 } })).await;
@@ -252,7 +270,10 @@ async fn what_a_task_holds_is_checked_when_it_is_saved() {
     let with = |config: Value| json!({ "kind": "probe.now", "name": "Check", "slot": "on_demand", "config": config });
 
     for (body, message) in [
-        (json!({ "kind": "nobody.knows", "name": "Check", "slot": "on_demand" }), "That kind of task is not available in this project; its module may be switched off"),
+        (
+            json!({ "kind": "nobody.knows", "name": "Check", "slot": "on_demand" }),
+            "That kind of task is not available in this project; its module may be switched off",
+        ),
         (json!({ "kind": "probe.now", "name": "  ", "slot": "on_demand" }), "The task needs a name"),
         (with(json!({ "say": "" })), "\"Say\" is required"),
         (with(json!({ "say": 5 })), "\"Say\" has to be text"),
@@ -331,7 +352,11 @@ async fn who_may_do_what_with_tasks() {
     assert_eq!(outsider.refused(Method::PATCH, &format!("/api/tasks/{secret}"), rename.clone()).await, StatusCode::NOT_FOUND);
     assert_eq!(outsider.refused(Method::DELETE, &format!("/api/tasks/{secret}"), None).await, StatusCode::NOT_FOUND);
     assert_eq!(outsider.refused(Method::POST, &format!("/api/tasks/{secret}/run"), Some(json!({}))).await, StatusCode::NOT_FOUND);
-    assert_eq!(lead.refused(Method::POST, &format!("/api/tasks/{secret}/run"), Some(json!({}))).await, StatusCode::NOT_FOUND, "an administrator of another project is outside too");
+    assert_eq!(
+        lead.refused(Method::POST, &format!("/api/tasks/{secret}/run"), Some(json!({}))).await,
+        StatusCode::NOT_FOUND,
+        "an administrator of another project is outside too"
+    );
 
     // And nobody without a session gets anywhere.
     let mut nobody = Client::new(scene.admin.router.clone());
@@ -398,7 +423,8 @@ async fn a_failed_attempt_keeps_the_last_good_result() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_task_that_never_worked_fails_with_no_result() {
     let mut scene = scene().await;
-    let id = make(&mut scene.admin, "WEB", json!({ "kind": "probe.now", "name": "Check", "slot": "on_demand", "config": { "fail": "No luck" } })).await;
+    let id =
+        make(&mut scene.admin, "WEB", json!({ "kind": "probe.now", "name": "Check", "slot": "on_demand", "config": { "fail": "No luck" } })).await;
 
     assert_eq!(run(&mut scene, id).await, "failed");
 
@@ -477,7 +503,8 @@ async fn a_group_starts_its_enabled_tasks_in_the_order_they_were_made() {
     let first = make(&mut scene.admin, "WEB", now_task("First", "afternoon")).await;
     let off = make(&mut scene.admin, "WEB", now_task("Switched off", "afternoon")).await;
     make(&mut scene.admin, "WEB", now_task("Morning's", "morning")).await;
-    let second = make(&mut scene.admin, "WEB", json!({ "kind": "probe.now", "name": "Second", "slot": "afternoon", "config": { "fail": "Not today" } })).await;
+    let second =
+        make(&mut scene.admin, "WEB", json!({ "kind": "probe.now", "name": "Second", "slot": "afternoon", "config": { "fail": "Not today" } })).await;
     let third = make(&mut scene.admin, "WEB", now_task("Third", "afternoon")).await;
     scene.admin.patch(&format!("/api/tasks/{off}"), json!({ "enabled": false })).await;
 
@@ -539,7 +566,10 @@ async fn a_slot_runs_when_its_time_has_passed_and_once_a_day() {
     assert_eq!(scene.probe.names(), ["Morning", "Afternoon", "Morning"]);
 
     // The journal names the schedule, not a person, for what it started.
-    let by_schedule = scene.app.read(|connection| Ok(connection.query_row("SELECT count(*) FROM event WHERE kind = 'task.updated' AND actor_label = 'Schedule'", [], |row| row.get::<_, i64>(0))?));
+    let by_schedule = scene.app.read(|connection| {
+        Ok(connection
+            .query_row("SELECT count(*) FROM event WHERE kind = 'task.updated' AND actor_label = 'Schedule'", [], |row| row.get::<_, i64>(0))?)
+    });
     assert_eq!(by_schedule.unwrap(), 6, "three runs, each marked running and then done");
 }
 
@@ -624,7 +654,11 @@ async fn every_project_has_its_own_slots() {
 
     // A project made after the slot's time waits for tomorrow, like a task added after it.
     scene.admin.post("/api/projects", json!({ "key": "NEW", "name": "New" })).await;
-    assert_eq!(tick_at(&ticker, &clock, "2026-11-13T11:00:00Z"), [("NEW".to_string(), TaskSlot::Morning)], "its slot is remembered as run, with nothing in it");
+    assert_eq!(
+        tick_at(&ticker, &clock, "2026-11-13T11:00:00Z"),
+        [("NEW".to_string(), TaskSlot::Morning)],
+        "its slot is remembered as run, with nothing in it"
+    );
     make(&mut scene.admin, "NEW", now_task("New's", "morning")).await;
     make(&mut scene.admin, "WEB", now_task("Web's late one", "morning")).await;
     assert_eq!(tick_at(&ticker, &clock, "2026-11-13T11:01:00Z"), []);
@@ -654,7 +688,10 @@ async fn a_slot_leaves_alone_what_is_switched_off_or_still_running() {
     *clock.lock().unwrap() = at("2026-11-12T15:59:00Z");
     ticker.tick().unwrap();
     assert_eq!(task(&mut scene.admin, "WEB", long).await["state"], "running");
-    scene.app.write(Actor::system("Probe"), |tx| schedule::finish(tx, long, Ok(Outcome { summary: "Done at last".to_string(), link: None }))).unwrap();
+    scene
+        .app
+        .write(Actor::system("Probe"), |tx| schedule::finish(tx, long, Ok(Outcome { summary: "Done at last".to_string(), link: None })))
+        .unwrap();
 
     // ...and the next morning it starts again. This time nothing reports back.
     scene.probe.forget();
@@ -714,7 +751,10 @@ async fn a_task_cut_off_by_the_server_stopping_is_failed_when_it_comes_back() {
         .db
         .write(|tx| {
             tx.execute("UPDATE scheduled_task SET state = 'running', last_started_at = '2026-11-13T09:00:00.000Z' WHERE id = ?1", [cut_off])?;
-            tx.execute("UPDATE scheduled_task SET state = 'running', last_started_at = '2026-11-13T09:00:00.000Z', progress = 'Handed on' WHERE id = ?1", [handed_on])?;
+            tx.execute(
+                "UPDATE scheduled_task SET state = 'running', last_started_at = '2026-11-13T09:00:00.000Z', progress = 'Handed on' WHERE id = ?1",
+                [handed_on],
+            )?;
 
             Ok(())
         })
@@ -751,8 +791,15 @@ async fn a_task_of_a_module_that_is_off_is_shown_and_never_run() {
     assert_eq!(answer["error"]["message"], "This task cannot run: the module it belongs to is switched off");
     assert_eq!(scene.admin.post("/api/projects/WEB/tasks/run", json!({ "slot": "morning" })).await, json!([]));
     assert_eq!(scene.admin.refused(Method::POST, "/api/projects/WEB/tasks", Some(now_task("Another", "morning"))).await, StatusCode::BAD_REQUEST);
-    assert_eq!(scene.admin.refused(Method::PATCH, &format!("/api/tasks/{web}"), Some(json!({ "config": { "say": "x" } }))).await, StatusCode::BAD_REQUEST);
-    assert_eq!(scene.admin.patch(&format!("/api/tasks/{web}"), json!({ "enabled": false })).await["enabled"], false, "it can still be switched off, renamed, deleted");
+    assert_eq!(
+        scene.admin.refused(Method::PATCH, &format!("/api/tasks/{web}"), Some(json!({ "config": { "say": "x" } }))).await,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        scene.admin.patch(&format!("/api/tasks/{web}"), json!({ "enabled": false })).await["enabled"],
+        false,
+        "it can still be switched off, renamed, deleted"
+    );
     scene.admin.patch(&format!("/api/tasks/{web}"), json!({ "enabled": true })).await;
 
     tick_at(&ticker, &clock, "2026-11-12T10:00:00Z");
@@ -794,7 +841,10 @@ async fn a_task_never_runs_as_somebody_who_is_gone() {
     scene.admin.put(&format!("/api/projects/SEC/members/{ola_id}"), json!({ "role": null })).await;
     assert_eq!(run(&mut scene, id).await, "failed");
     let failed = task(&mut scene.admin, "SEC", id).await;
-    assert_eq!(failed["lastError"], "Ola Lis can no longer see this project, and the task runs with their permissions; save the task again to run it as yourself");
+    assert_eq!(
+        failed["lastError"],
+        "Ola Lis can no longer see this project, and the task runs with their permissions; save the task again to run it as yourself"
+    );
     assert_eq!(failed["result"], good);
 
     // She is deactivated: the same from the slot.
@@ -804,7 +854,10 @@ async fn a_task_never_runs_as_somebody_who_is_gone() {
     tick_at(&ticker, &clock, "2026-11-13T10:00:00Z");
     let failed = task(&mut scene.admin, "SEC", id).await;
     assert_eq!(failed["state"], "failed");
-    assert_eq!(failed["lastError"], "Ola Lis has been deactivated, and the task runs with their permissions; save the task again to run it as yourself");
+    assert_eq!(
+        failed["lastError"],
+        "Ola Lis has been deactivated, and the task runs with their permissions; save the task again to run it as yourself"
+    );
     assert_eq!(scene.probe.names(), Vec::<String>::new(), "the module was not asked either time");
 
     // Changing its name does not change whose it is; saving its settings does.
@@ -843,7 +896,10 @@ async fn administrators_set_the_times_and_the_zone() {
 
     assert_eq!(scene.admin.get("/api/schedule").await, defaults, "nothing that was refused was kept");
 
-    let saved = scene.admin.put("/api/admin/schedule", json!({ "morning": "8:30", "afternoon": "17:15", "timezone": " America/New_York ", "weekdaysOnly": false })).await;
+    let saved = scene
+        .admin
+        .put("/api/admin/schedule", json!({ "morning": "8:30", "afternoon": "17:15", "timezone": " America/New_York ", "weekdaysOnly": false }))
+        .await;
     assert_eq!(saved, json!({ "morning": "08:30", "afternoon": "17:15", "timezone": "America/New_York", "weekdaysOnly": false }));
     assert_eq!(member.get("/api/schedule").await, saved);
 }
@@ -863,7 +919,12 @@ async fn every_change_to_a_task_is_announced_with_its_project() {
             hub_app::db::query_all(connection, "SELECT project_id, payload FROM event WHERE kind = 'task.updated' ORDER BY id", [], |row| {
                 let payload: Value = serde_json::from_str(&row.get::<_, String>(1)?).unwrap_or_default();
 
-                Ok((row.get(0)?, payload["taskId"].as_i64().unwrap_or(0), payload["state"].as_str().unwrap_or("").to_string(), payload["change"].clone()))
+                Ok((
+                    row.get(0)?,
+                    payload["taskId"].as_i64().unwrap_or(0),
+                    payload["state"].as_str().unwrap_or("").to_string(),
+                    payload["change"].clone(),
+                ))
             })
         })
         .unwrap();

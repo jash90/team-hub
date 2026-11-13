@@ -72,6 +72,9 @@ into `web/src/bindings/`, so the interface cannot drift from the server.
 - **Writes are serial.** One writing connection; `App::write` runs a transaction on behalf
   of an actor (a person, or a system such as "GitHub") and collects events.
 - **Calls to other systems never run on the pool**; they block, so they get a thread.
+- **The schedule has a thread of its own.** Once a minute it asks which slots are due and
+  starts their tasks; a task started from its button gets a thread too. What a module does
+  to start a task is its own business, so it never happens on the pool.
 
 ## Events
 
@@ -103,7 +106,7 @@ needs no new table.
 ## Modules
 
 See [modules.md](modules.md). A module adds tables, routes, webhooks, query-language fields,
-badges on cards, a panel on the issue page, a section of "My work", tools for AI agents and
-its own screens, and can be switched off at runtime: for the whole instance, or for one
+badges on cards, a panel on the issue page, a section of "My work", tools for AI agents,
+kinds of task for [the schedule](schedule.md) and its own screens, and can be switched off at runtime: for the whole instance, or for one
 project (the `project_module_off` table lists what is off where; the host then leaves the
 module's badges and panel out of that project's issues, and the interface its navigation).

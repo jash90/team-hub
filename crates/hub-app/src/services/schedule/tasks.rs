@@ -222,7 +222,16 @@ pub fn create(app: &App, tx: &Tx, user: &AuthUser, access: &ProjectAccess, new: 
 
     tx.execute(
         "INSERT INTO scheduled_task (project_id, kind, name, config, slot, enabled, run_as, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        (access.id, &kind.id, clean_name(&new.name)?, Value::Object(config).to_string(), new.slot.as_str(), new.enabled.unwrap_or(true), user.id, &tx.now),
+        (
+            access.id,
+            &kind.id,
+            clean_name(&new.name)?,
+            Value::Object(config).to_string(),
+            new.slot.as_str(),
+            new.enabled.unwrap_or(true),
+            user.id,
+            &tx.now,
+        ),
     )?;
     let id = tx.last_insert_rowid();
     announce(tx, id, Some("created"))?;

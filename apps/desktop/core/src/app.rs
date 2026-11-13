@@ -30,7 +30,7 @@ use crate::protocol::{self, HubTool};
 use crate::push_guard;
 use crate::repos::Repos;
 use crate::runs::{
-    AgentRun, AgentRunDetail, NewRun, RunChanges, RunEventKind, RunKind, RunPatch, RunProposal, RunProposalState, RunState, RUNNER_KINDS,
+    AgentRun, AgentRunDetail, NewRun, RunChanges, RunEventKind, RunKind, RunPatch, RunProposal, RunProposalState, RunState, WorkKeys, RUNNER_KINDS,
 };
 use crate::secrets::{self, CacheKey, Keychain, Secret};
 use crate::store::{self, Store, ThreadSeed};
@@ -40,6 +40,7 @@ const HEARTBEAT_EVERY: Duration = Duration::from_secs(30);
 const MAX_CLAIMS_PER_TICK: usize = 20;
 const MAX_SUBTASKS: usize = 20;
 const RECORDED: &str = "A person will decide; do not wait for the decision.";
+const LOST_KEYS: &str = "The runner restarted and no longer holds your keys; start the run again.";
 
 /// How the core is opened. Tests and the command line replace the keychain and the helper.
 pub struct OpenOptions {
@@ -97,6 +98,10 @@ struct RunnerState {
 
 /// What a runner nobody sits at keeps beside the rest.
 struct HeadlessState {
+    /// The team's runner: every run comes with its requester's keys, held here in memory
+    /// for as long as the run lives and written nowhere.
+    shared: bool,
+    keys: Mutex<HashMap<i64, WorkKeys>>,
     kinds: Vec<RunKind>,
     projects: Option<Vec<String>>,
     repos: Repos,
@@ -151,6 +156,12 @@ impl Host for Bridge {
         let core = self.0.upgrade().ok_or("The app is closing")?;
 
         core.agent_tool(thread, tool, input).map_err(|error| error.to_string())
+    }
+
+    fn model_key(&self, thread: &Thread) -> Result<Option<Secret>, String> {
+        let core = self.0.upgrade().ok_or("The app is closing")?;
+
+        core.model_key_of(thread).map_err(|error| error.to_string())
     }
 }
 
@@ -795,6 +806,7 @@ impl Core {
             repo: Some(repo.to_string()),
             shared: false,
             runner_id: self.identity().ok().map(|identity| identity.id),
+            on_runner: None,
         };
         let run = self.seen(client.create_run(key, &new));
 
@@ -1437,6 +1449,8 @@ impl Core {
                 projects: headless.projects.clone(),
                 version,
                 interactive: false,
+                pinned_only: false,
+                shared: headless.shared,
             });
         }
 
@@ -1452,6 +1466,8 @@ impl Core {
             projects: Some(projects),
             version,
             interactive: true,
+            pinned_only: false,
+            shared: false,
         })
     }
 
@@ -1481,6 +1497,12 @@ impl Core {
                 runner.runs_api = Some(false);
                 runner.error = Some("This server has no agent runs API; threads work locally and are not shown on the web.".to_string());
             }
+            // Only an administrator's token may run the team's runner. Asked again with the next heartbeat.
+            Err(CoreError::Api { status: 403, message, .. }) if self.headless.as_ref().is_some_and(|headless| headless.shared) => {
+                runner.error = Some(format!(
+                    "The server does not take this runner as a shared one: {message}. Give it an administrator's API token (TEAM_HUB_TOKEN), or set RUNNER_SHARED=0 and keys of its own. Trying again."
+                ));
+            }
             Err(error) => runner.error = Some(error.to_string()),
         }
     }
@@ -1496,6 +1518,12 @@ impl Core {
         // The server names the runner on a run from its last heartbeat.
         self.heartbeat(&client);
 
+        // A shared runner the server has not taken as one asks for nothing: what it would be
+        // given is meant for a runner that gets people's keys.
+        if identity.shared && lock(&self.runner).error.is_some() {
+            return 0;
+        }
+
         while taken < MAX_CLAIMS_PER_TICK && self.runs_api() {
             let waiting_for_own = !lock(&self.runner).attach.is_empty();
             let preparing = self.headless.as_ref().map_or(0, |headless| lock(&headless.preparing).len());
@@ -1509,8 +1537,14 @@ impl Core {
             }
 
             match self.seen(client.claim(&identity)) {
-                Ok(Some(detail)) => {
+                Ok(Some(claimed)) => {
                     taken += 1;
+
+                    let detail = claimed.detail;
+
+                    if let (Some(headless), Some(keys)) = (&self.headless, claimed.credentials) {
+                        lock(&headless.keys).insert(detail.run.id, keys);
+                    }
 
                     if let Err(error) = self.adopt(&client, &detail) {
                         self.refuse_run(&client, detail.run.id, &error);
@@ -1546,8 +1580,12 @@ impl Core {
     /// Ends a claimed run that could not be started here, with the reason for the person.
     fn refuse_run(&self, client: &HubClient, run_id: i64, error: &CoreError) {
         let who = if self.headless.is_some() { "The runner" } else { "The desktop runner" };
-        let patch = RunPatch { state: Some(RunState::Failed), summary: Some(format!("{who} could not start this run: {error}")), ..Default::default() };
-        let _ = client.patch_run(run_id, &patch);
+
+        self.end_failed(client, run_id, format!("{who} could not start this run: {error}"));
+    }
+
+    fn end_failed(&self, client: &HubClient, run_id: i64, summary: String) {
+        let _ = client.patch_run(run_id, &RunPatch { state: Some(RunState::Failed), summary: Some(summary), ..Default::default() });
     }
 
     /// Turns a claimed run into a thread, or ties it to the thread it was created for.
@@ -1573,7 +1611,12 @@ impl Core {
             let (client, detail) = (client.clone(), detail.clone());
 
             lock(&headless.preparing).insert(run.id);
-            std::thread::spawn(move || core.adopt_with_clone(&client, &detail, &project_key));
+
+            // On the runtime's own blocking threads, because a thread is started from there.
+            match tokio::runtime::Handle::try_current() {
+                Ok(runtime) => drop(runtime.spawn_blocking(move || core.adopt_with_clone(&client, &detail, &project_key))),
+                Err(_) => core.adopt_with_clone(&client, &detail, &project_key),
+            }
 
             return Ok(());
         }
@@ -1594,7 +1637,8 @@ impl Core {
                     "the run names no repository. A cloud runner works in the repository a run names as owner/name: connect one to the project and start the run again",
                 )
             })?;
-            let path = headless.repos.ensure(name)?;
+            let token = self.github_token_of(run.id)?;
+            let path = headless.repos.ensure(name, token.as_ref())?;
 
             self.store.add_repo(project_key, Some(&name.to_lowercase()), &path.to_string_lossy())
         };
@@ -1865,6 +1909,7 @@ impl Core {
             self.claim_runs();
             to_stop.extend(self.poll_runs(&client));
             self.report_unreported();
+            self.forget_keys();
 
             // Mentions and assignments are news for a person; a headless runner has none.
             if self.headless.is_none() {
@@ -1913,14 +1958,44 @@ impl Core {
         self.headless.as_ref().map(|headless| &headless.repos).ok_or_else(|| CoreError::not_possible("Only a headless runner clones repositories by itself"))
     }
 
-    /// The projects a headless runner was told to work for; none: all the person can edit.
-    pub fn runner_projects(&self) -> Option<Vec<String>> {
-        self.headless.as_ref().and_then(|headless| headless.projects.clone())
+    /// How this runner announces itself when it asks for a test job: the same id and name
+    /// as for agent runs (docs/runners.md).
+    pub fn job_identity(&self) -> CoreResult<RunnerIdentity> {
+        self.identity()
     }
 
     /// Poked when the server announces a change to a test job.
     pub fn jobs_wake(&self) -> Arc<Notify> {
         Arc::clone(&self.jobs_wake)
+    }
+
+    /// The model key a thread's helper gets, on a shared runner: the one its run came with.
+    fn model_key_of(&self, thread: &Thread) -> CoreResult<Option<Secret>> {
+        let Some(headless) = self.headless.as_ref().filter(|headless| headless.shared) else { return Ok(None) };
+        let keys = lock(&headless.keys);
+        let held = thread.run_id.and_then(|run_id| keys.get(&run_id)).ok_or_else(|| CoreError::not_possible(LOST_KEYS))?;
+
+        held.anthropic_api_key.clone().map(Some).ok_or_else(|| {
+            CoreError::not_possible("This run came without a model key. Store your Anthropic API key in team-hub under Settings → My keys and start it again.")
+        })
+    }
+
+    /// The GitHub token for a run's git commands: on a shared runner the one the run came
+    /// with (none: the person stored none, and only what is public can be read); else the
+    /// runner's own, which `Repos` holds.
+    fn github_token_of(&self, run_id: i64) -> CoreResult<Option<Secret>> {
+        let Some(headless) = self.headless.as_ref().filter(|headless| headless.shared) else { return Ok(None) };
+
+        lock(&headless.keys).get(&run_id).map(|keys| keys.github_token.clone()).ok_or_else(|| CoreError::not_possible(LOST_KEYS))
+    }
+
+    /// Forgets the keys of runs that are over: nothing of theirs is left to do here.
+    fn forget_keys(&self) {
+        let Some(headless) = &self.headless else { return };
+        let mut live: HashSet<i64> = self.store.threads_with_live_runs().unwrap_or_default().iter().filter_map(|thread| thread.run_id).collect();
+
+        live.extend(lock(&headless.preparing).iter().copied());
+        lock(&headless.keys).retain(|run_id, _| live.contains(run_id));
     }
 
     /// Whether the server is told nothing about this thread for now: the runner is stopping,
@@ -2036,8 +2111,10 @@ impl Core {
             return Err(CoreError::not_possible("The approved proposal does not name the commit this runner showed, so nothing was pushed."));
         }
 
+        let token = thread.run_id.map(|run_id| self.github_token_of(run_id)).transpose()?.flatten();
+
         // The server's branch as it is now, so that what is read and judged is what would be sent.
-        self.clones()?.fetch(Path::new(&thread.repo_path))?;
+        self.clones()?.fetch(Path::new(&thread.repo_path), token.as_ref())?;
 
         let (read, branch) = self.push_read(thread, Some(shown))?;
 
@@ -2055,7 +2132,7 @@ impl Core {
             )));
         }
 
-        self.clones()?.push(Path::new(&thread.repo_path), &branch, &read.commit)?;
+        self.clones()?.push(Path::new(&thread.repo_path), &branch, &read.commit, token.as_ref())?;
         self.say_pushed(thread.id, &branch, &read)?;
 
         Ok(json!({ "commit": read.commit }))
@@ -2126,6 +2203,13 @@ impl Core {
             });
 
             match detail {
+                // The keys the run came with went with the process that held them.
+                Some(detail) if still_ours && !detail.run.cancel_requested && headless.shared => {
+                    let _ = self.store.add_event(thread_id, EventKind::Error, LOST_KEYS, &Value::Null, false);
+                    let _ = self.store.move_thread(thread_id, &[ThreadState::Stopped], ThreadState::Failed);
+
+                    self.end_failed(client, detail.run.id, LOST_KEYS.to_string());
+                }
                 Some(detail) if still_ours && !detail.run.cancel_requested => {
                     let _ = self.runtime().resume(thread_id, None, true);
                 }
@@ -2153,9 +2237,13 @@ impl Core {
             for run in runs.iter().filter(|run| run.runner_id.as_deref() == Some(runner_id.as_str()) && run.state == RunState::Claimed) {
                 let known = self.store.thread_of_run(run.id).ok().flatten().is_some() || lock(&headless.preparing).contains(&run.id);
 
-                if let (false, Ok(detail)) = (known, client.run(run.id)) {
-                    if let Err(error) = self.adopt(client, &detail) {
-                        self.refuse_run(client, run.id, &error);
+                match (known, headless.shared, client.run(run.id)) {
+                    (true, _, _) | (_, _, Err(_)) => {}
+                    (false, true, Ok(_)) => self.end_failed(client, run.id, LOST_KEYS.to_string()),
+                    (false, false, Ok(detail)) => {
+                        if let Err(error) = self.adopt(client, &detail) {
+                            self.refuse_run(client, run.id, &error);
+                        }
                     }
                 }
             }
@@ -2238,9 +2326,11 @@ impl Desktop {
         };
         let is_headless = options.headless.is_some();
         let headless = options.headless.map(|headless| HeadlessState {
+            shared: headless.shared,
+            keys: Mutex::new(HashMap::new()),
             kinds: headless.kinds,
             projects: headless.projects,
-            repos: Repos::new(headless.folders.repos, &headless.git_base, headless.github_token),
+            repos: Repos::new(headless.folders.repos, &headless.git_base, headless.github_token, headless.shared),
             preparing: Mutex::new(HashSet::new()),
             changes_sent: Mutex::new(HashMap::new()),
             unreported: Mutex::new(Vec::new()),

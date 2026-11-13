@@ -109,10 +109,19 @@ fn acting_person(connection: &Connection, row: &TaskRow, module_id: &'static str
         )));
     }
 
-    let actor = AuthUser { id: person.id, name: person.name.clone(), email: person.email.clone(), role: person.role, via_token: false, through: vec![module_id] };
+    let actor = AuthUser {
+        id: person.id,
+        name: person.name.clone(),
+        email: person.email.clone(),
+        role: person.role,
+        via_token: false,
+        through: vec![module_id],
+    };
 
     project_access_by_id(connection, &actor, row.project_id).map_err(|_| {
-        ApiError::forbidden(format!("{name} can no longer see this project, and the task runs with their permissions; save the task again to run it as yourself"))
+        ApiError::forbidden(format!(
+            "{name} can no longer see this project, and the task runs with their permissions; save the task again to run it as yourself"
+        ))
     })?;
 
     Ok(actor)

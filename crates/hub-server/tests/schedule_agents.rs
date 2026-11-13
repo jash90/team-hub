@@ -27,7 +27,9 @@ async fn scene() -> Scene {
     admin.post("/api/projects", json!({ "key": "WEB", "name": "Web" })).await;
     admin.post("/api/projects", json!({ "key": "API", "name": "Api" })).await;
 
-    for summary in ["Login fails on Safari", "Login page is slow", "Login with a passkey", "Login remembers me", "Login error is unclear", "Checkout total"] {
+    for summary in
+        ["Login fails on Safari", "Login page is slow", "Login with a passkey", "Login remembers me", "Login error is unclear", "Checkout total"]
+    {
         admin.post("/api/issues", json!({ "projectKey": "WEB", "summary": summary })).await;
     }
 
@@ -90,10 +92,14 @@ async fn the_kind_comes_with_its_form() {
     let mut scene = scene().await;
     let kinds = scene.admin.get("/api/task-kinds").await;
     let kind = kinds.as_array().unwrap().iter().find(|kind| kind["id"] == "agents.run").expect("the kind").clone();
-    let fields: Vec<(&str, &str)> = kind["fields"].as_array().unwrap().iter().map(|field| (field["name"].as_str().unwrap(), field["type"].as_str().unwrap())).collect();
+    let fields: Vec<(&str, &str)> =
+        kind["fields"].as_array().unwrap().iter().map(|field| (field["name"].as_str().unwrap(), field["type"].as_str().unwrap())).collect();
 
     assert_eq!(kind["module"], "agents");
-    assert_eq!(fields, [("query", "query"), ("limit", "number"), ("kind", "select"), ("instructions", "textarea"), ("repo", "text"), ("shared", "boolean")]);
+    assert_eq!(
+        fields,
+        [("query", "query"), ("limit", "number"), ("kind", "select"), ("instructions", "textarea"), ("repo", "text"), ("shared", "boolean")]
+    );
     assert_eq!(kind["fields"][0]["required"], true);
     assert_eq!(kind["fields"][1]["default"], 5);
 
@@ -114,7 +120,10 @@ async fn a_run_is_started_on_each_issue_the_query_finds_in_the_project() {
     assert_eq!(task["result"]["link"], "/agents");
 
     // The issue of the other project matches the words too, and is not the task's business.
-    assert_eq!(runs(&mut scene).await, [pair("WEB-1", "triage"), pair("WEB-2", "triage"), pair("WEB-3", "triage"), pair("WEB-4", "triage"), pair("WEB-5", "triage")]);
+    assert_eq!(
+        runs(&mut scene).await,
+        [pair("WEB-1", "triage"), pair("WEB-2", "triage"), pair("WEB-3", "triage"), pair("WEB-4", "triage"), pair("WEB-5", "triage")]
+    );
 
     let first = &scene.admin.get("/api/m/agents/issues/WEB-1/runs").await[0];
     assert_eq!(first["state"], "queued");
@@ -154,10 +163,16 @@ async fn the_limit_is_respected_and_unfinished_runs_are_not_doubled() {
     assert_eq!(runs(&mut scene).await.len(), 2);
 
     // A wider limit starts the rest and says how many it passed over.
-    scene.admin.patch(&format!("/api/tasks/{id}"), json!({ "config": { "query": "summary ~ login ORDER BY key", "kind": "triage", "limit": 4 } })).await;
+    scene
+        .admin
+        .patch(&format!("/api/tasks/{id}"), json!({ "config": { "query": "summary ~ login ORDER BY key", "kind": "triage", "limit": 4 } }))
+        .await;
     assert_eq!(run(&mut scene, id).await["result"]["summary"], "Started 2 runs: WEB-3, WEB-4; skipped 2 with an unfinished run");
 
-    scene.admin.patch(&format!("/api/tasks/{id}"), json!({ "config": { "query": "summary ~ login ORDER BY key", "kind": "triage", "limit": 20 } })).await;
+    scene
+        .admin
+        .patch(&format!("/api/tasks/{id}"), json!({ "config": { "query": "summary ~ login ORDER BY key", "kind": "triage", "limit": 20 } }))
+        .await;
     assert_eq!(run(&mut scene, id).await["result"]["summary"], "Started 1 run: WEB-5; skipped 4 with an unfinished run");
     assert_eq!(runs(&mut scene).await.len(), 5);
 
@@ -165,7 +180,9 @@ async fn the_limit_is_respected_and_unfinished_runs_are_not_doubled() {
     let other = make(&mut scene, run_task("key = WEB-1", json!({ "kind": "summarize" }))).await;
     assert_eq!(run(&mut scene, other).await["result"]["summary"], "Started 1 run: WEB-1");
 
-    let first = scene.admin.get("/api/m/agents/issues/WEB-1/runs").await.as_array().unwrap().iter().find(|run| run["kind"] == "triage").unwrap()["id"].clone();
+    let first = scene.admin.get("/api/m/agents/issues/WEB-1/runs").await.as_array().unwrap().iter().find(|run| run["kind"] == "triage").unwrap()
+        ["id"]
+        .clone();
     scene.admin.post(&format!("/api/m/agents/runs/{first}/cancel"), json!({})).await;
     let again = make(&mut scene, run_task("key = WEB-1", json!({}))).await;
     assert_eq!(run(&mut scene, again).await["result"]["summary"], "Started 1 run: WEB-1");
@@ -180,7 +197,8 @@ async fn settings_that_cannot_be_carried_out_fail_the_attempt_and_keep_the_resul
     assert_eq!(good["summary"], "Started 1 run: WEB-6");
 
     // The schedule checks a query when it is saved...
-    let (status, answer) = scene.admin.send(Method::PATCH, &format!("/api/tasks/{id}"), Some(json!({ "config": { "query": "status = ", "kind": "triage" } }))).await;
+    let (status, answer) =
+        scene.admin.send(Method::PATCH, &format!("/api/tasks/{id}"), Some(json!({ "config": { "query": "status = ", "kind": "triage" } }))).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(answer["error"]["message"], "\"Query\": Expected a value");
 

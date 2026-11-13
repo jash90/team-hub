@@ -8,12 +8,12 @@ use ts_rs::TS;
 pub type Id = i64;
 
 macro_rules! string_enum {
-    ($(#[$meta:meta])* $name:ident { $($variant:ident => $text:literal),+ $(,)? }) => {
+    ($(#[$meta:meta])* $name:ident { $($(#[$on_variant:meta])* $variant:ident => $text:literal),+ $(,)? }) => {
         $(#[$meta])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
         #[ts(export)]
         pub enum $name {
-            $(#[serde(rename = $text)] $variant),+
+            $($(#[$on_variant])* #[serde(rename = $text)] $variant),+
         }
 
         impl $name {

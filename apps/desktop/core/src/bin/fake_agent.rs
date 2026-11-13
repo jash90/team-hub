@@ -8,7 +8,8 @@
 //! `[fake:hang]` ignores `stop` · `[fake:slow]` works until stopped · `[fake:fail]` reports a
 //! failure · `[fake:error]` reports an error · `[fake:write-tool]` tries a tool that changes
 //! the tracker · `[fake:subtasks]` proposes subtasks and a status · `[fake:risky]` commits a
-//! CI file and something that looks like a token · `[fake:analyse]` changes nothing.
+//! CI file and something that looks like a token · `[fake:analyse]` changes nothing ·
+//! `[fake:environment]` and `[fake:permissions]` say what the thread was started with.
 //! Without a marker it implements: a commit, then proposals to comment, push and open a PR.
 
 use std::io::{BufRead, Write};
@@ -255,6 +256,26 @@ fn work(agent: &mut Agent, start: &StartThread) -> Option<()> {
 
             say(&format!("In my environment: {}", seen.join(", ")));
             result(true, "Looked at the environment.");
+        }
+        "environment" => {
+            // Names only, and where the helper's home is: what a headless runner hands on.
+            let mut names: Vec<String> = std::env::vars_os().map(|(name, _)| name.to_string_lossy().into_owned()).collect();
+
+            names.sort();
+            say(&format!("Variables: {}", names.join(" ")));
+            say(&format!("HOME={}", std::env::var("HOME").unwrap_or_default()));
+            // Which key it is, without repeating it: what an agent says is kept.
+            let key = std::env::var("ANTHROPIC_API_KEY").unwrap_or_default();
+
+            say(&format!("Model key: {} characters, ending in {}", key.len(), key.chars().rev().take(8).collect::<String>().chars().rev().collect::<String>()));
+            result(true, "Listed the environment.");
+        }
+        "permissions" => {
+            let closed = start.sandbox.as_ref().map_or_else(|| "no sandbox".to_string(), |sandbox| sandbox.unreadable.join(" | "));
+
+            say(&format!("Allowed: {}", start.allowed_tools.join(" | ")));
+            say(&format!("Closed to the shell: {closed}"));
+            result(true, "Listed what this thread may use.");
         }
         "analyse" => {
             agent.ask(protocol::PROPOSE_COMMENT, json!({ "body": format!("Analysis of {key}: the change belongs in one module.") }))?.ok();

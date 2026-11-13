@@ -1,33 +1,36 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState } from 'react';
 
 import { api } from '@/api.ts';
 import type { E2eBadge } from '@/bindings/E2eBadge.ts';
 import type { E2eDashboard } from '@/bindings/E2eDashboard.ts';
-import type { E2eHistoryPoint } from '@/bindings/E2eHistoryPoint.ts';
 import type { E2eIssuePanel } from '@/bindings/E2eIssuePanel.ts';
 import type { E2eIssueRef } from '@/bindings/E2eIssueRef.ts';
 import type { E2eIssueState } from '@/bindings/E2eIssueState.ts';
 import type { E2eIssueTest } from '@/bindings/E2eIssueTest.ts';
 import type { E2eProjectTests } from '@/bindings/E2eProjectTests.ts';
-import type { E2eRun } from '@/bindings/E2eRun.ts';
-import type { E2eRunDetail } from '@/bindings/E2eRunDetail.ts';
-import type { E2eRunResult } from '@/bindings/E2eRunResult.ts';
-import type { E2eRunStatus } from '@/bindings/E2eRunStatus.ts';
-import type { E2eStatus } from '@/bindings/E2eStatus.ts';
 import type { E2eTest } from '@/bindings/E2eTest.ts';
 import type { Issue } from '@/bindings/Issue.ts';
 import type { IssueRow } from '@/bindings/IssueRow.ts';
 import type { Project } from '@/bindings/Project.ts';
 import { Icon, type IconName } from '@/components/icon.tsx';
-import { IssueKey, openIssue } from '@/components/issue-bits.tsx';
-import { Button, ConfirmDialog, Dialog, Empty, ErrorNote, Field, Menu, type MenuItem, SettingsCard, Spinner, Tabs, Tag, attempt, copyText, toast, useBusy } from '@/components/ui.tsx';
+import { IssueKey } from '@/components/issue-bits.tsx';
+import { Button, Empty, ErrorNote, Field, Menu, SettingsCard, Spinner, Tabs, Tag, attempt, copyText } from '@/components/ui.tsx';
 import { formatDateTime, t, timeAgo } from '@/i18n/index.ts';
+import { lazyView } from '@/lazy.tsx';
 import type { WebModule } from '@/modules.ts';
-import { Link, setParam, useSearchParams } from '@/router.tsx';
-import { useProject, useRemote, useStored, type LiveEvent } from '@/session.tsx';
+import { Link, useSearchParams } from '@/router.tsx';
+import { useProject, useStored } from '@/session.tsx';
 
+import { Actions, Message, failureOfTest, testMenu, type Acting } from './actions.tsx';
+import { JobView, JobsPanel, RunTestsButton, useJobs, useTestSettings } from './jobs.tsx';
 import { polish } from './pl.ts';
+import { RunView } from './run.tsx';
+import { TestSettings } from './settings.tsx';
+import { BASE, Counts, History, IssueChips, Origin, RunLine, RunStatusTag, RunSummary, STATE_TEXT, StatusMark, duration, runPath, useTests } from './shared.tsx';
 import './styles.css';
+
+/** The session of one result: the player, the filmstrip and the steps are fetched when one is opened. */
+const SessionView = lazyView(() => import('./session.tsx').then((module) => module.SessionView));
 
 // ---------- marks on cards and rows ----------
 
@@ -274,6 +277,8 @@ function RunList({ data }: { data: E2eProjectTests }) {
 function TestsView() {
   const project = useProject();
   const tests = useTests(project);
+  const jobs = useJobs(project);
+  const settings = useTestSettings(project);
   const params = useSearchParams();
   const runId = Number(params.get('run') ?? '') || null;
   const [tab, setTab] = useStored(`e2e-tab:${project.key}`, 'tests');
@@ -288,10 +293,15 @@ function TestsView() {
           <h1>{t('Tests')}</h1>
           <p className="muted">{t('End-to-end test runs of this project, and whether the behaviour each issue describes actually works.')}</p>
         </div>
+        <div className="view-head-side">
+          <RunTestsButton project={project} settings={settings.data} />
+        </div>
       </header>
 
       {tests.error && !data && <ErrorNote message={tests.error} />}
       {!data && !tests.error && <Spinner />}
+
+      {runId === null && jobs.data && <JobsPanel project={project} jobs={jobs.data} />}
 
       {runId !== null ? (
         <RunView runId={runId} project={project} data={data} act={setActing} />
@@ -299,7 +309,7 @@ function TestsView() {
         data &&
         (data.latestRun === null ? (
           <Empty icon="check" title={t('No test run has arrived yet')}>
-            {t('Add the team-hub reporter to your e2e config, or post the report from CI.')}{' '}
+            {t('Start a job with “Run tests”, add the team-hub reporter to your e2e config, or post the report from CI.')}{' '}
             <Link href={`/p/${project.key}/settings/e2e`}>{t('How to send results')}</Link>
           </Empty>
         ) : (
@@ -385,6 +395,7 @@ describe('${project.key}-12 billing', { tags: ['@${project.key}-31'] }, () => { 
 
   return (
     <div className="settings-body">
+      <TestSettings project={project} />
       <SettingsCard
         title={t('Send test results')}
         lead={t('Runs of the e2e testing framework arrive here as reports. Each needs an API token of somebody who may edit this project: make one in Settings → API tokens and keep it in your CI secrets as TEAM_HUB_TOKEN.')}
@@ -460,7 +471,11 @@ function DashboardPart({ data }: { data: unknown }) {
 const e2eModule: WebModule = {
   id: 'e2e',
   projectNav: (projectKey) => [{ id: 'tests', label: () => t('Tests'), icon: 'check', path: `/p/${projectKey}/tests` }],
-  routes: [{ pattern: '/p/:key/tests', render: () => <TestsView /> }],
+  routes: [
+    { pattern: '/p/:key/tests', render: () => <TestsView /> },
+    { pattern: '/p/:key/tests/jobs/:id', render: (params) => <JobView id={Number(params.id)} /> },
+    { pattern: '/p/:key/tests/results/:id', render: (params) => <SessionView id={Number(params.id)} /> },
+  ],
   badges: Badges,
   issuePanel: IssuePanel,
   dashboard: DashboardPart,

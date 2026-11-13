@@ -157,6 +157,9 @@ pub async fn headless(env: &RunnerEnv, adjust: impl FnOnce(&mut OpenOptions, &mu
         (SandboxState::Unavailable, false) => "Agent threads work without a shell: there is no working sandbox here and RUNNER_ALLOW_SHELL is off.",
     });
 
+    // The first round at once: what was interrupted goes on without waiting for a poll.
+    let _ = desktop.tick(true).await;
+
     desktop.start_background();
 
     let (stop, stopped) = watch::channel(false);

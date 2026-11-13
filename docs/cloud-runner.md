@@ -18,9 +18,10 @@ the model provider.
 | Variable | Meaning |
 |---|---|
 | `TEAM_HUB_URL` | The server, e.g. `http://team-hub.railway.internal:8080` or the public address |
-| `TEAM_HUB_TOKEN` | An API token of the person the runner acts as (Settings → API tokens) |
-| `GITHUB_TOKEN` | Clones, fetches and pushes over HTTPS. Never given to an agent or to a test job |
-| `ANTHROPIC_API_KEY` | For agent runs; without it the runner takes test jobs only |
+| `TEAM_HUB_TOKEN` | An API token the runner signs in with (Settings → API tokens). For a shared runner: an administrator's, made for the runner alone |
+| `RUNNER_SHARED` | `1` (the default when no key below is set): the runner is the team's and works with each person's own keys (`docs/runners.md` → Shared runners). `0`: it is its owner's and uses the two keys below |
+| `GITHUB_TOKEN` | Only for a runner that is not shared: clones, fetches and pushes over HTTPS. Never given to an agent or to a test job |
+| `ANTHROPIC_API_KEY` | Only for a runner that is not shared: the model key for agent runs; without it such a runner takes test jobs only |
 | `RUNNER_NAME` | Shown on runs and jobs; default `Cloud runner` |
 | `RUNNER_KINDS` | Agent run kinds it takes, comma-separated; default `implement,review,custom` |
 | `RUNNER_PROJECTS` | Project keys it works for, comma-separated; default: every project the person can edit |
@@ -35,10 +36,12 @@ else, so a half-configured service stays up and readable instead of crash-loopin
 ## Repositories
 
 A run or a job names its repository as `owner/name`. The runner keeps one clone per
-repository under `RUNNER_DATA_DIR/repos/<owner>/<name>` (cloned on first use with
-`GITHUB_TOKEN`, fetched before each use) and maps it to the project by itself. The token is
-passed to git for that one command and is in no git config, no remote address and no child
-process's environment.
+repository under `RUNNER_DATA_DIR/repos/<owner>/<name>` (cloned on first use, fetched before
+each use) and maps it to the project by itself. The token is the one that came with the
+claimed work (a shared runner: the requester's own) or `GITHUB_TOKEN` (a runner that is not
+shared). It is passed to git for that one command and is in no git config, no remote
+address, no file and no child process's environment. When the fetch fails with the
+requester's token the work fails with the reason: an older clone is not used instead.
 
 ## What leaves the machine
 

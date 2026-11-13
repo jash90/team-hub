@@ -74,6 +74,9 @@ pub struct Headless {
     pub allow_shell: bool,
     pub model_key: Option<Secret>,
     pub github_token: Option<Secret>,
+    /// The team's runner: it holds no keys of its own and is given each person's with their
+    /// work (docs/runners.md § Shared runners).
+    pub shared: bool,
     /// Where `owner/name` is cloned from.
     pub git_base: String,
     pub folders: Folders,
@@ -87,7 +90,7 @@ impl Headless {
             server_url: Some(self.server_url.clone()),
             runner_id: saved.runner_id.strip_prefix("desktop-").map_or(saved.runner_id.clone(), |id| format!("runner-{id}")),
             runner_name: self.name.clone(),
-            runner_enabled: self.model_key.is_some() && !self.kinds.is_empty(),
+            runner_enabled: (self.shared || self.model_key.is_some()) && !self.kinds.is_empty(),
             max_running: self.max_running,
             allow_unsandboxed_shell: self.allow_shell,
             ..saved
@@ -108,6 +111,8 @@ pub struct RunnerEnv {
     pub max_running: u32,
     pub test_jobs: bool,
     pub allow_shell: bool,
+    /// The team's runner, working with each person's own keys; else its owner's, with its own.
+    pub shared: bool,
     pub data_dir: PathBuf,
     pub git_base: String,
     pub job_user: String,
@@ -177,11 +182,22 @@ impl RunnerEnv {
             None => 2,
         };
 
+        let (github_token, model_key) = (secret(GITHUB_TOKEN_VARIABLE), secret(MODEL_KEY_VARIABLE));
+        // Shared unless it was given keys of its own, or told otherwise.
+        let shared = text("RUNNER_SHARED").map_or(github_token.is_none() && model_key.is_none(), |value| switched_on(&value));
+
+        if shared && (github_token.is_some() || model_key.is_some()) {
+            remarks.push(format!(
+                "RUNNER_SHARED=1: {GITHUB_TOKEN_VARIABLE} and {MODEL_KEY_VARIABLE} are not used; a shared runner works with each person's own keys"
+            ));
+        }
+
         Self {
             url,
             token: secret(TOKEN_VARIABLE),
-            github_token: secret(GITHUB_TOKEN_VARIABLE),
-            model_key: secret(MODEL_KEY_VARIABLE),
+            github_token: github_token.filter(|_| !shared),
+            model_key: model_key.filter(|_| !shared),
+            shared,
             name: text("RUNNER_NAME").unwrap_or_else(|| DEFAULT_NAME.to_string()),
             kinds,
             projects,
@@ -204,11 +220,15 @@ impl RunnerEnv {
     pub fn limits(&self) -> Vec<String> {
         let mut limits = Vec::new();
 
-        if self.model_key.is_none() {
+        if self.shared {
+            limits.push(format!(
+                "A shared runner: it works with the keys each person stores in team-hub (Settings → My keys), and {TOKEN_VARIABLE} has to be an administrator's"
+            ));
+        } else if self.model_key.is_none() {
             limits.push(format!("{MODEL_KEY_VARIABLE} is not set: this runner takes test jobs only, no agent runs"));
         }
 
-        if self.github_token.is_none() {
+        if !self.shared && self.github_token.is_none() {
             limits.push(format!("{GITHUB_TOKEN_VARIABLE} is not set: only public repositories can be cloned, and nothing can be pushed"));
         }
 
@@ -238,12 +258,13 @@ impl RunnerEnv {
         options.headless = Some(Headless {
             server_url: url,
             name: self.name.clone(),
-            kinds: if self.model_key.is_some() { self.kinds.clone() } else { Vec::new() },
+            kinds: if self.shared || self.model_key.is_some() { self.kinds.clone() } else { Vec::new() },
             projects: self.projects.clone(),
             max_running: self.max_running,
             allow_shell: self.allow_shell,
             model_key: self.model_key.clone(),
             github_token: self.github_token.clone(),
+            shared: self.shared,
             git_base: self.git_base.clone(),
             folders: self.folders(),
         });
@@ -315,7 +336,7 @@ mod tests {
         assert_eq!((empty.name.as_str(), empty.max_running, empty.test_jobs, empty.allow_shell), ("Cloud runner", 2, true, false));
         assert_eq!(empty.kinds, RUNNER_KINDS.to_vec());
         assert_eq!((empty.projects.clone(), empty.data_dir.clone()), (None, PathBuf::from("/data")));
-        assert_eq!((empty.git_base.as_str(), empty.job_user.as_str()), ("https://github.com", "job"));
+        assert_eq!((empty.git_base.as_str(), empty.job_user.as_str(), empty.shared), ("https://github.com", "job", true));
         assert_eq!(env(&[("TEAM_HUB_URL", "https://hub.example.com/")]).missing(), vec!["TEAM_HUB_TOKEN"]);
     }
 
@@ -365,8 +386,31 @@ mod tests {
     }
 
     #[test]
+    fn a_runner_is_shared_unless_it_is_given_keys_of_its_own_or_told_otherwise() {
+        let base = [("TEAM_HUB_URL", "https://hub.example.com"), ("TEAM_HUB_TOKEN", "th_abc")];
+        let with = |more: &[(&'static str, &'static str)]| env(&[&base[..], more].concat());
+
+        // Nothing of its own: shared, and it takes agent runs without a key in its environment.
+        let shared = with(&[]);
+        let headless = shared.open_options().unwrap().headless.unwrap();
+
+        assert!(shared.shared && headless.shared && headless.model_key.is_none());
+        assert_eq!(headless.kinds, RUNNER_KINDS.to_vec());
+        assert!(headless.settings(config::default_settings()).runner_enabled);
+
+        // Either key makes it its owner's; RUNNER_SHARED says it outright, both ways.
+        assert!(!with(&[("GITHUB_TOKEN", "ghp_x")]).shared && !with(&[("ANTHROPIC_API_KEY", "sk-ant-x")]).shared);
+        assert!(!with(&[("RUNNER_SHARED", "0")]).shared);
+
+        let told = with(&[("RUNNER_SHARED", "1"), ("GITHUB_TOKEN", "ghp_x"), ("ANTHROPIC_API_KEY", "sk-ant-x")]);
+
+        assert!(told.shared && told.github_token.is_none() && told.model_key.is_none());
+        assert_eq!(told.remarks.len(), 1);
+    }
+
+    #[test]
     fn without_a_model_key_the_runner_takes_no_agent_runs() {
-        let jobs_only = env(&[("TEAM_HUB_URL", "https://hub.example.com"), ("TEAM_HUB_TOKEN", "th_abc")]);
+        let jobs_only = env(&[("TEAM_HUB_URL", "https://hub.example.com"), ("TEAM_HUB_TOKEN", "th_abc"), ("RUNNER_SHARED", "0")]);
         let headless = jobs_only.open_options().unwrap().headless.unwrap();
 
         assert!(headless.kinds.is_empty());

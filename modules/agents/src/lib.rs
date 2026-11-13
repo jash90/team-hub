@@ -124,6 +124,21 @@ impl Module for AgentsModule {
     }
 
     /// What the schedule can run: see `scheduled`.
+    fn personal_keys(&self) -> Vec<hub_core::runners::PersonalKey> {
+        vec![
+            hub_core::runners::PersonalKey {
+                name: runs::MODEL_KEY.into(),
+                label: "Anthropic API key".into(),
+                hint: "The model key for your agent runs on a shared runner; those runs are billed to it. The desktop app does not use it: it works with your own Claude sign-in.".into(),
+            },
+            hub_core::runners::PersonalKey {
+                name: runs::GITHUB_KEY.into(),
+                label: "GitHub token".into(),
+                hint: "Used to clone repositories for your test jobs and agent runs on a shared runner. A fine-grained token with read access to contents is enough for tests; pushing needs write access.".into(),
+            },
+        ]
+    }
+
     fn runners(&self, connection: &Connection, viewer: &AuthUser, now: chrono::DateTime<chrono::Utc>) -> ApiResult<Vec<hub_core::runners::Runner>> {
         runs::known(connection, viewer, now)
     }

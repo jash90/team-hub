@@ -133,11 +133,19 @@ async fn heartbeat(State(app): State<App>, user: AuthUser, Json(beat): Json<Hear
     Ok(Json(json!({ "ok": true })))
 }
 
-async fn claim(State(app): State<App>, user: AuthUser, Json(wanted): Json<Claim>) -> Reply<Option<AgentRunDetail>> {
+/// The claimed run as `AgentRunDetail`, and for a shared runner `credentials`: the
+/// requester's own keys (`docs/runners.md`). `null` when nothing is queued for the caller.
+async fn claim(State(app): State<App>, user: AuthUser, Json(wanted): Json<Claim>) -> Reply<Value> {
     app.run(move |app| {
-        app.write(agent(), |tx| match runs::claim(tx, &user, &wanted)? {
-            Some(id) => Ok(Some(runs::detail(tx, id)?)),
-            None => Ok(None),
+        app.write(agent(), |tx| {
+            let Some(id) = runs::claim(tx, &user, &wanted)? else { return Ok(Value::Null) };
+            let mut claimed = serde_json::to_value(runs::detail(tx, id)?).map_err(|error| hub_app::ApiError::internal(error.to_string()))?;
+
+            if let Some(credentials) = runs::credentials(app, tx, id)? {
+                claimed["credentials"] = credentials;
+            }
+
+            Ok(claimed)
         })
     })
     .await

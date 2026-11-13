@@ -188,4 +188,8 @@ CREATE TABLE e2e_runner (
 ALTER TABLE e2e_job ADD COLUMN on_runner TEXT;
 ALTER TABLE e2e_job ADD COLUMN on_runner_name TEXT;
 "#,
+// A runner the whole team shares (`docs/runners.md` → "Shared runners and people's own keys").
+r#"
+ALTER TABLE e2e_runner ADD COLUMN shared INTEGER NOT NULL DEFAULT 0;
+"#,
 ];

@@ -24,6 +24,8 @@ pub struct Presence {
     pub interactive: bool,
     /// It takes only jobs sent to it by name.
     pub pinned_only: bool,
+    /// The team's runner: it works on anyone's jobs with that person's own keys.
+    pub shared: bool,
     pub version: String,
 }
 
@@ -34,11 +36,12 @@ struct Known {
     projects: Option<Vec<String>>,
     interactive: bool,
     pinned_only: bool,
+    shared: bool,
     version: String,
     last_seen_at: String,
 }
 
-const COLUMNS: &str = "id, user_id, name, projects, interactive, pinned_only, version, last_seen_at";
+const COLUMNS: &str = "id, user_id, name, projects, interactive, pinned_only, version, last_seen_at, shared";
 
 fn map_known(row: &Row) -> rusqlite::Result<Known> {
     let projects: Option<String> = row.get(3)?;
@@ -52,6 +55,7 @@ fn map_known(row: &Row) -> rusqlite::Result<Known> {
         pinned_only: row.get(5)?,
         version: row.get(6)?,
         last_seen_at: row.get(7)?,
+        shared: row.get(8)?,
     })
 }
 
@@ -64,15 +68,20 @@ fn works_for(projects: Option<&[String]>, key: &str) -> bool {
 }
 
 /// Notes that a runner is there, with what it now says about itself. An id belongs to the
-/// person whose token first used it.
+/// person whose token first used it. Only a service an instance administrator runs can be
+/// the team's shared runner: it is handed other people's keys.
 pub fn seen(tx: &Tx, user: &AuthUser, presence: &Presence) -> ApiResult<()> {
+    if presence.shared && (presence.interactive || !user.is_admin()) {
+        return Err(ApiError::forbidden("Only an administrator's runner can be shared"));
+    }
+
     if by_id(tx, &presence.id)?.is_some_and(|known| known.user_id != user.id) {
         return Err(ApiError::conflict("That runner id belongs to somebody else's runner"));
     }
 
     tx.execute(
-        "INSERT INTO e2e_runner (id, user_id, name, projects, interactive, pinned_only, version, last_seen_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-         ON CONFLICT (id) DO UPDATE SET name = ?3, projects = ?4, interactive = ?5, pinned_only = ?6, version = ?7, last_seen_at = ?8",
+        "INSERT INTO e2e_runner (id, user_id, name, projects, interactive, pinned_only, version, last_seen_at, shared) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+         ON CONFLICT (id) DO UPDATE SET name = ?3, projects = ?4, interactive = ?5, pinned_only = ?6, version = ?7, last_seen_at = ?8, shared = ?9",
         rusqlite::params![
             presence.id,
             user.id,
@@ -82,6 +91,7 @@ pub fn seen(tx: &Tx, user: &AuthUser, presence: &Presence) -> ApiResult<()> {
             presence.pinned_only,
             presence.version,
             &tx.now,
+            presence.shared,
         ],
     )?;
 
@@ -153,6 +163,7 @@ pub fn known(connection: &Connection, viewer: &AuthUser, now: DateTime<Utc>) -> 
                 name: runner.name,
                 user_id: runner.user_id,
                 interactive: runner.interactive,
+                shared: runner.shared,
                 online,
                 last_seen_at: runner.last_seen_at,
                 version: Some(runner.version).filter(|version| !version.is_empty()),

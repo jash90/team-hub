@@ -22,14 +22,17 @@ string_enum!(
 );
 string_enum!(
     /// What a field of a kind's form holds. `query` is text in the tracker's query language.
-    TaskFieldType { Text => "text", Textarea => "textarea", Query => "query", Select => "select", Boolean => "boolean", Number => "number" }
-);
-
-impl Default for TaskFieldType {
-    fn default() -> Self {
-        Self::Text
+    #[derive(Default)]
+    TaskFieldType {
+        #[default]
+        Text => "text",
+        Textarea => "textarea",
+        Query => "query",
+        Select => "select",
+        Boolean => "boolean",
+        Number => "number",
     }
-}
+);
 
 /// The last attempt that worked. A later failure leaves it as it is.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -291,7 +294,10 @@ mod tests {
             assert_eq!(due_for(&settings, TaskSlot::Afternoon, local("Europe/Warsaw", date), Some(day("2026-11-13"))), None, "{date}");
         }
 
-        assert_eq!(due_for(&settings, TaskSlot::Morning, local("Europe/Warsaw", "2026-11-16 10:00"), Some(day("2026-11-13"))), Some(day("2026-11-16")));
+        assert_eq!(
+            due_for(&settings, TaskSlot::Morning, local("Europe/Warsaw", "2026-11-16 10:00"), Some(day("2026-11-13"))),
+            Some(day("2026-11-16"))
+        );
     }
 
     #[test]
@@ -299,7 +305,10 @@ mod tests {
         let settings = every_day("Europe/Warsaw");
 
         assert_eq!(due_for(&settings, TaskSlot::Morning, local("Europe/Warsaw", "2026-11-14 12:00"), None), Some(day("2026-11-14")));
-        assert_eq!(due_for(&settings, TaskSlot::Afternoon, local("Europe/Warsaw", "2026-11-15 18:00"), Some(day("2026-11-14"))), Some(day("2026-11-15")));
+        assert_eq!(
+            due_for(&settings, TaskSlot::Afternoon, local("Europe/Warsaw", "2026-11-15 18:00"), Some(day("2026-11-14"))),
+            Some(day("2026-11-15"))
+        );
     }
 
     #[test]
@@ -348,8 +357,16 @@ mod tests {
         // 02:30 does not exist in Warsaw on 29 March 2026.
         let settings = ScheduleSettings { morning: "02:30".to_string(), ..every_day("Europe/Warsaw") };
 
-        assert_eq!(due_for(&settings, TaskSlot::Morning, utc("2026-03-29T00:59:00Z"), Some(day("2026-03-28"))), None, "01:59, a minute before the jump");
-        assert_eq!(due_for(&settings, TaskSlot::Morning, utc("2026-03-29T01:00:00Z"), Some(day("2026-03-28"))), Some(day("2026-03-29")), "03:00, right after");
+        assert_eq!(
+            due_for(&settings, TaskSlot::Morning, utc("2026-03-29T00:59:00Z"), Some(day("2026-03-28"))),
+            None,
+            "01:59, a minute before the jump"
+        );
+        assert_eq!(
+            due_for(&settings, TaskSlot::Morning, utc("2026-03-29T01:00:00Z"), Some(day("2026-03-28"))),
+            Some(day("2026-03-29")),
+            "03:00, right after"
+        );
     }
 
     #[test]
@@ -375,7 +392,11 @@ mod tests {
         let back = local("Europe/Warsaw", "2026-11-13 12:00");
 
         assert_eq!(due_for(&settings, TaskSlot::Morning, back, Some(day("2026-11-09"))), Some(day("2026-11-13")), "one run, for today");
-        assert_eq!(due_for(&settings, TaskSlot::Afternoon, back, Some(day("2026-11-09"))), None, "the afternoons missed are gone, and today's is not due yet");
+        assert_eq!(
+            due_for(&settings, TaskSlot::Afternoon, back, Some(day("2026-11-09"))),
+            None,
+            "the afternoons missed are gone, and today's is not due yet"
+        );
     }
 
     #[test]
@@ -408,10 +429,20 @@ mod tests {
 
     #[test]
     fn a_field_reads_and_writes_the_contracts_shape() {
-        let field = TaskField { name: "limit".to_string(), label: "Limit".to_string(), kind: TaskFieldType::Number, default: Some(serde_json::json!(5)), ..TaskField::default() };
+        let field = TaskField {
+            name: "limit".to_string(),
+            label: "Limit".to_string(),
+            kind: TaskFieldType::Number,
+            default: Some(serde_json::json!(5)),
+            ..TaskField::default()
+        };
         let json = serde_json::to_value(&field).expect("json");
 
         assert_eq!(json, serde_json::json!({ "name": "limit", "label": "Limit", "required": false, "type": "number", "options": [], "default": 5 }));
-        assert_eq!(serde_json::from_value::<TaskField>(serde_json::json!({ "name": "limit", "label": "Limit", "type": "number", "default": 5 })).expect("a field"), field);
+        assert_eq!(
+            serde_json::from_value::<TaskField>(serde_json::json!({ "name": "limit", "label": "Limit", "type": "number", "default": 5 }))
+                .expect("a field"),
+            field
+        );
     }
 }

@@ -83,7 +83,7 @@ pub fn kinds() -> Vec<TaskKind> {
             },
             TaskField {
                 name: "repo".to_string(),
-                label: "Repository".to_string(),
+                label: "Code repository".to_string(),
                 hint: Some("For work in code, as owner/name.".to_string()),
                 kind: TaskFieldType::Text,
                 ..TaskField::default()
@@ -264,7 +264,13 @@ pub fn seed_demo(app: &App) -> ApiResult<()> {
 
     for demo in DEMO {
         let config = json!({ "query": demo.query, "kind": demo.kind.as_str(), "instructions": demo.instructions, "limit": 3 });
-        let new = NewTask { kind: RUN_KIND.to_string(), name: demo.name.to_string(), config: config.as_object().cloned().unwrap_or_default(), slot: demo.slot, enabled: None };
+        let new = NewTask {
+            kind: RUN_KIND.to_string(),
+            name: demo.name.to_string(),
+            config: config.as_object().cloned().unwrap_or_default(),
+            slot: demo.slot,
+            enabled: None,
+        };
         let task = app.write(admin.actor(), |tx| schedule::create(app, tx, &admin, &project_access(tx, &admin, &key)?, &new))?;
 
         if let Some(days) = demo.ran {

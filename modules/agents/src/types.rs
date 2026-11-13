@@ -288,6 +288,8 @@ pub struct AgentRunner {
     pub interactive: bool,
     /// Takes only runs sent to it by name.
     pub pinned_only: bool,
+    /// The team's: it takes anyone's runs and works on each with its requester's own keys.
+    pub shared: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]

@@ -8,6 +8,10 @@ the knowledge base instead of bolted onto them.
   release notes, comments with mentions, attachments, links, time tracking, watchers and
   notifications, a query language (`project = WEB AND status = "In Review" AND pr = open`),
   saved filters, bulk changes, an activity feed, and live updates in every open browser.
+- **The schedule**: recurring work of a project, run every morning, every afternoon or on
+  demand (an agent that triages yesterday's new issues, say). It catches up after downtime
+  instead of losing a run, and a failed attempt keeps the last good result on show. What
+  can be scheduled comes from the modules; see [docs/schedule.md](docs/schedule.md).
 - **Code** (module `github`): branches, commits and pull requests appear on the issue they
   mention; a branch starts the issue, a pull request puts it in review, the last merge
   finishes it; commit messages can comment, log time and move issues; and *drift* shows

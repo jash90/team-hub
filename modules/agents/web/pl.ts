@@ -265,4 +265,7 @@ export const polish: Record<string, string> = {
   breakdown: 'podział',
   triage: 'triage',
   summarize: 'podsumowanie',
+  '{name} is the team’s runner and works with your own model key, which you have not stored yet.': '„{name}” to runner zespołu i pracuje na Twoim własnym kluczu modelu, którego jeszcze nie zapisałeś.',
+  'Add it in Settings → My keys': 'Dodaj go w Ustawienia → Moje klucze',
+  'shared service': 'wspólna usługa',
 };

@@ -21,4 +21,8 @@ interactive: boolean,
 /**
  * Takes only runs sent to it by name.
  */
-pinnedOnly: boolean, };
+pinnedOnly: boolean, 
+/**
+ * The team's: it takes anyone's runs and works on each with its requester's own keys.
+ */
+shared: boolean, };

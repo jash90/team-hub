@@ -32,6 +32,13 @@ impl Secret {
     }
 }
 
+impl<'de> serde::Deserialize<'de> for Secret {
+    /// Read from an answer of the server; never written back out.
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        String::deserialize(deserializer).map(Self)
+    }
+}
+
 impl std::fmt::Debug for Secret {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str("Secret(***)")

@@ -202,6 +202,16 @@ impl Module for E2eModule {
         runners::known(connection, viewer, now)
     }
 
+    /// The key a person's test jobs are cloned with on a shared runner. The agents module
+    /// names the same key in the same words; the core lists it once.
+    fn personal_keys(&self) -> Vec<hub_core::runners::PersonalKey> {
+        vec![hub_core::runners::PersonalKey {
+            name: jobs::GITHUB_TOKEN_KEY.into(),
+            label: "GitHub token".into(),
+            hint: "Used to clone repositories for your test jobs and agent runs on a shared runner. A fine-grained token with read access to contents is enough for tests; pushing needs write access.".into(),
+        }]
+    }
+
     /// Jobs whose runner went quiet are failed here when nobody is looking at them, and
     /// files no run names any more are removed.
     fn start(&self, app: &App) {

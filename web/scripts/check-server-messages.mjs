@@ -15,7 +15,8 @@
 //  - ROOTS, FIELD_ROOTS and CALL_ROOTS below name the places a text is handed to: the message
 //    of an `ApiError` or a `QueryError`, the text of a notification, the text of an agent
 //    run's event, the lines of import reports and of the webhook log, what a module says
-//    about itself;
+//    about itself, the form of a task kind and what a scheduled task says it did
+//    (`TaskStarted::Done { summary: … }`);
 //  - a function that passes one of its own parameters on to such a place becomes such a place
 //    itself (`ApiError::bad_request(message)`, `notify_watchers(.., text, ..)`,
 //    `tell_requester(.., text)`, `requeue(.., why)`), also when the parameter is only a part
@@ -58,6 +59,12 @@ const FIELD_ROOTS = [
   { struct: 'Ingested', field: 'outcome', assigned: true, what: 'webhook log' },
   { struct: 'ModuleMeta', field: 'name', what: 'module' },
   { struct: 'ModuleMeta', field: 'description', what: 'module' },
+  { struct: 'TaskKind', field: 'name', what: 'task kind' },
+  { struct: 'TaskKind', field: 'description', what: 'task kind' },
+  { struct: 'TaskField', field: 'label', what: 'task kind' },
+  { struct: 'TaskField', field: 'hint', what: 'task kind' },
+  { struct: 'TaskOption', field: 'label', what: 'task kind' },
+  { struct: 'Done', field: 'summary', what: 'task result' },
 ];
 /** And for texts handed to something that is not a function of ours: a list, an enum variant. */
 const CALL_ROOTS = [

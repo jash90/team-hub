@@ -10,6 +10,7 @@ use axum::{Json, Router};
 use chrono::{DateTime, SecondsFormat, Utc};
 use hub_app::access::{project_access, project_access_by_id};
 use hub_app::db::{query_all, query_one};
+use hub_app::services::personal_keys;
 use hub_app::{Actor, ApiError, ApiResult, App, AuthUser, Tx};
 use hub_core::Id;
 use rusqlite::{Connection, Row};
@@ -343,6 +344,9 @@ struct Claim {
     /// Take only jobs sent to this runner by name.
     #[serde(default)]
     pinned_only: bool,
+    /// The team's runner (`docs/runners.md`): it works on anyone's job with that person's keys.
+    #[serde(default)]
+    shared: bool,
 }
 
 /// What a runner is handed with a job: how to run the suite, secret values included. The
@@ -354,10 +358,25 @@ struct RunnerSettings {
     secrets: std::collections::BTreeMap<String, String>,
 }
 
+/// The person's key a job on a shared runner is cloned with (`docs/runners.md`).
+pub const GITHUB_TOKEN_KEY: &str = "github_token";
+
+/// The keys of the person who asked for the job, for the shared runner that claimed it and
+/// for that job only. They are read when the claim is answered and kept nowhere else.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Credentials {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    github_token: Option<String>,
+}
+
 #[derive(Serialize)]
 struct Claimed {
     job: E2eJob,
     settings: RunnerSettings,
+    /// Only for a shared runner: a runner of one's own works with what it has.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    credentials: Option<Credentials>,
 }
 
 /// The job this runner takes next, in a project its person may edit (and that it names,
@@ -389,6 +408,7 @@ async fn claim_job(State(app): State<App>, user: AuthUser, Json(claim): Json<Cla
             projects: claim.projects.clone(),
             interactive: claim.interactive.unwrap_or(true),
             pinned_only: claim.pinned_only,
+            shared: claim.shared,
             version: tidy(claim.version.as_deref(), 100).unwrap_or_default(),
         };
 
@@ -407,7 +427,13 @@ async fn claim_job(State(app): State<App>, user: AuthUser, Json(claim): Json<Cla
             let secrets = settings::secret_values(app, tx, project_id)?;
             settings.secret_names = secrets.keys().cloned().collect();
 
-            Ok(Some(Claimed { job: job_by_id(tx, id)?, settings: RunnerSettings { settings, secrets } }))
+            let job = job_by_id(tx, id)?;
+            let credentials = match runner.shared {
+                true => Some(Credentials { github_token: personal_keys::reveal(app, tx, job.requested_by, GITHUB_TOKEN_KEY)? }),
+                false => None,
+            };
+
+            Ok(Some(Claimed { job, settings: RunnerSettings { settings, secrets }, credentials }))
         })
     })
     .await
@@ -508,6 +534,26 @@ fn announce_log(tx: &Tx, job_id: Id) -> ApiResult<bool> {
     Ok(true)
 }
 
+/// A line of a terminal's output as a page shows it: without colours, cursor moves and other
+/// control sequences, and no longer than a line may be.
+fn plain(line: &str) -> String {
+    let mut text = String::new();
+    let mut characters = line.chars().peekable();
+
+    while let Some(character) = characters.next() {
+        if character == '\u{1b}' {
+            // `ESC [ … letter` is a control sequence; any other escape is two characters.
+            if characters.next() == Some('[') {
+                while characters.next().is_some_and(|next| !('@'..='~').contains(&next)) {}
+            }
+        } else if !character.is_control() || character == '\t' {
+            text.push(character);
+        }
+    }
+
+    text.chars().take(MAX_LINE_CHARS).collect()
+}
+
 /// Adds lines to a job's log and drops the ones that fall out of what is kept.
 fn add_lines(tx: &Tx, job_id: Id, lines: &[String]) -> ApiResult<i64> {
     let mut seq: i64 = tx.query_row("SELECT log_seq FROM e2e_job WHERE id = ?1", [job_id], |row| row.get(0))?;
@@ -515,9 +561,7 @@ fn add_lines(tx: &Tx, job_id: Id, lines: &[String]) -> ApiResult<i64> {
 
     for line in lines {
         seq += 1;
-        // A terminal's colours and cursor moves mean nothing on a page.
-        let text: String = line.chars().filter(|character| !character.is_control() || *character == '\t').take(MAX_LINE_CHARS).collect();
-        insert.execute((job_id, seq, text))?;
+        insert.execute((job_id, seq, plain(line)))?;
     }
 
     tx.execute("UPDATE e2e_job SET log_seq = ?1 WHERE id = ?2", (seq, job_id))?;
@@ -627,4 +671,16 @@ pub fn heard_for_run(tx: &Tx, run_id: Id) -> ApiResult<()> {
 /// The job that produced a run, when one did.
 pub fn job_of_run(connection: &Connection, run_id: Id) -> ApiResult<Option<Id>> {
     query_one(connection, "SELECT id FROM e2e_job WHERE run_id = ?1 ORDER BY id DESC LIMIT 1", [run_id], |row| row.get(0))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_log_line_loses_what_only_a_terminal_understands() {
+        assert_eq!(plain("\u{1b}[32m✓\u{1b}[0m \u{1b}[1;90mtests/cart.e2e.ts\u{1b}[39m\r"), "✓ tests/cart.e2e.ts");
+        assert_eq!(plain("\u{1b}[2K\u{1b}[1Gprogress\t50%\u{7}"), "progress\t50%");
+        assert_eq!(plain(&"x".repeat(MAX_LINE_CHARS + 10)).chars().count(), MAX_LINE_CHARS);
+    }
 }

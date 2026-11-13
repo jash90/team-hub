@@ -130,17 +130,26 @@ pub struct HubState {
     /// Names of the tools called through the MCP endpoint.
     pub tool_calls: Vec<String>,
     pub requests: usize,
-    next_id: i64,
-    live: broadcast::Sender<String>,
+    /// The token is not an administrator's: a runner that says it is shared is refused.
+    pub refuses_shared: bool,
+    /// The keys the requester stored (Settings → My keys), handed to a shared runner with a
+    /// claim: `{ anthropicApiKey?, githubToken? }`, or null.
+    pub person_keys: Value,
+    /// What headless runners uploaded as their runs' changes: run id → the body.
+    pub changes: BTreeMap<i64, Value>,
+    /// Test jobs and what runners sent for them (docs/e2e-jobs.md).
+    pub e2e: cloud::E2eState,
+    pub(crate) next_id: i64,
+    pub(crate) live: broadcast::Sender<String>,
 }
 
 #[derive(Clone)]
 pub struct FakeHub {
     pub url: String,
-    state: Arc<Mutex<HubState>>,
+    pub(crate) state: Arc<Mutex<HubState>>,
 }
 
-type Shared = State<Arc<Mutex<HubState>>>;
+pub(crate) type Shared = State<Arc<Mutex<HubState>>>;
 
 fn user() -> User {
     User {
@@ -236,17 +245,17 @@ fn issue(number: i64, summary: &str, type_id: i64, description: &str) -> Issue {
     }
 }
 
-fn error(status: StatusCode, message: &str) -> Response {
+pub(crate) fn error(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "error": { "code": status.as_u16().to_string(), "message": message } }))).into_response()
 }
 
 impl HubState {
-    fn id(&mut self) -> i64 {
+    pub(crate) fn id(&mut self) -> i64 {
         self.next_id += 1;
         self.next_id
     }
 
-    fn authorised(&mut self, headers: &HeaderMap) -> Result<(), Box<Response>> {
+    pub(crate) fn authorised(&mut self, headers: &HeaderMap) -> Result<(), Box<Response>> {
         self.requests += 1;
 
         let sent = headers.get("authorization").and_then(|value| value.to_str().ok()).unwrap_or_default();
@@ -258,7 +267,7 @@ impl HubState {
         }
     }
 
-    fn runs_api(&mut self, headers: &HeaderMap) -> Result<(), Box<Response>> {
+    pub(crate) fn runs_api(&mut self, headers: &HeaderMap) -> Result<(), Box<Response>> {
         self.authorised(headers)?;
 
         if self.runs_api {
@@ -268,18 +277,27 @@ impl HubState {
         }
     }
 
-    fn announce(&self, kind: &str, payload: Value) {
+    pub(crate) fn announce(&self, kind: &str, payload: Value) {
         let _ = self
             .live
             .send(json!({ "id": 1, "at": NOW, "actorId": 1, "kind": kind, "projectId": 1, "issueId": null, "payload": payload }).to_string());
     }
 
-    fn run_index(&self, id: i64) -> Option<usize> {
+    /// Whether the run is held by a runner that said `interactive: false`.
+    pub(crate) fn held_headless(&self, run_id: i64) -> bool {
+        let runner = self.run_index(run_id).map(|index| self.runs[index]["runnerId"].clone()).unwrap_or(Value::Null);
+
+        self.runners.iter().any(|known| known["runnerId"] == runner && known["interactive"] == false)
+    }
+
+    pub(crate) fn run_index(&self, id: i64) -> Option<usize> {
         self.runs.iter().position(|run| run["id"] == id)
     }
 
-    fn detail(&self, id: i64) -> Value {
+    pub(crate) fn detail(&self, id: i64) -> Value {
         let mut run = self.runs[self.run_index(id).unwrap()].clone();
+
+        run["hasChanges"] = json!(self.changes.contains_key(&id));
         let proposals: Vec<Value> = self.proposals.iter().filter(|proposal| proposal["runId"] == id).cloned().collect();
 
         run["pendingProposals"] = json!(proposals.iter().filter(|proposal| proposal["state"] == "pending").count());
@@ -362,13 +380,13 @@ impl HubState {
     }
 }
 
-fn lock(state: &Arc<Mutex<HubState>>) -> MutexGuard<'_, HubState> {
+pub(crate) fn lock(state: &Arc<Mutex<HubState>>) -> MutexGuard<'_, HubState> {
     state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 macro_rules! guard {
     ($state:expr, $headers:expr) => {{
-        let mut state = lock(&$state);
+        let mut state = $crate::support::lock(&$state);
 
         if let Err(refused) = state.authorised(&$headers) {
             return *refused;
@@ -377,7 +395,7 @@ macro_rules! guard {
         state
     }};
     (runs $state:expr, $headers:expr) => {{
-        let mut state = lock(&$state);
+        let mut state = $crate::support::lock(&$state);
 
         if let Err(refused) = state.runs_api(&$headers) {
             return *refused;
@@ -386,6 +404,8 @@ macro_rules! guard {
         state
     }};
 }
+
+pub mod cloud;
 
 async fn bootstrap(State(state): Shared, headers: HeaderMap) -> Response {
     let mut state = lock(&state);
@@ -584,6 +604,10 @@ async fn mcp(State(state): Shared, headers: HeaderMap, Json(body): Json<Value>) 
 async fn heartbeat(State(state): Shared, headers: HeaderMap, Json(body): Json<Value>) -> Response {
     let mut state = guard!(runs state, headers);
 
+    if body["shared"] == true && state.refuses_shared {
+        return error(StatusCode::FORBIDDEN, "Only an administrator's token can run a shared runner");
+    }
+
     state.runners.retain(|runner| runner["runnerId"] != body["runnerId"]);
     state.runners.push(body);
 
@@ -633,8 +657,14 @@ async fn claim(State(state): Shared, headers: HeaderMap, Json(body): Json<Value>
     state.runs[index]["runnerName"] = name;
 
     let id = state.runs[index]["id"].as_i64().unwrap();
+    let mut answer = state.detail(id);
 
-    Json(state.detail(id)).into_response()
+    // A shared runner gets the requester's own keys with the run, and only it does.
+    if state.runners.iter().any(|runner| runner["runnerId"] == body["runnerId"] && runner["shared"] == true) && !state.person_keys.is_null() {
+        answer["credentials"] = state.person_keys.clone();
+    }
+
+    Json(answer).into_response()
 }
 
 async fn list_runs(State(state): Shared, headers: HeaderMap) -> Response {
@@ -652,7 +682,7 @@ async fn get_run(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<
     }
 }
 
-fn finished(run: &Value) -> bool {
+pub(crate) fn finished(run: &Value) -> bool {
     matches!(run["state"].as_str(), Some("succeeded" | "failed" | "cancelled"))
 }
 
@@ -743,6 +773,8 @@ async fn add_proposal(State(state): Shared, headers: HeaderMap, UrlPath(id): Url
     let mut proposal = json!({
         "id": proposal_id, "runId": id, "kind": body["kind"], "payload": body["payload"], "state": "pending",
         "decidedBy": null, "decidedAt": null, "note": null, "result": null, "preview": null,
+        // Whether a person opening this proposal would find the run's changes beside it.
+        "changesWereThere": state.changes.contains_key(&id),
     });
     let key = state.runs[index]["issueKey"].as_str().unwrap().to_string();
 
@@ -771,6 +803,10 @@ async fn settle(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i
 
     if state.proposals[index]["state"] != "pending" {
         return error(StatusCode::CONFLICT, "Already decided");
+    }
+
+    if state.held_headless(state.proposals[index]["runId"].as_i64().unwrap()) {
+        return error(StatusCode::CONFLICT, "This run is held by a headless runner: its pushes and pull requests are decided on the web");
     }
 
     let approved = body["approve"] == true;
@@ -821,11 +857,23 @@ async fn decide(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i
 
     let proposal = state.proposals[index].clone();
 
+    let run_id = proposal["runId"].as_i64().unwrap();
+
     if proposal["kind"] == "push" || proposal["kind"] == "pull_request" {
-        return error(StatusCode::CONFLICT, "This is decided in the runner's app, where the changes can be looked at first");
+        if !state.held_headless(run_id) {
+            return error(StatusCode::CONFLICT, "This is decided in the runner's app, where the changes can be looked at first");
+        }
+
+        // Approving applies nothing here: approved with no result means the runner carries it out.
+        state.proposals[index]["state"] = json!(if body["approve"] == true { "approved" } else { "rejected" });
+        state.proposals[index]["note"] = body["note"].clone();
+        state.proposals[index]["decidedBy"] = json!(1);
+        state.proposals[index]["decidedAt"] = json!(NOW);
+        state.writes.push(("POST".into(), format!("/proposals/{id}/decide"), body));
+
+        return Json(state.detail(run_id)).into_response();
     }
 
-    let run_id = proposal["runId"].as_i64().unwrap();
     let run = state.run_index(run_id).unwrap();
     let key = state.runs[run]["issueKey"].as_str().unwrap().to_string();
 
@@ -881,6 +929,10 @@ impl FakeHub {
             writes: Vec::new(),
             tool_calls: Vec::new(),
             requests: 0,
+            refuses_shared: false,
+            person_keys: Value::Null,
+            changes: BTreeMap::new(),
+            e2e: cloud::E2eState::default(),
             next_id: 100,
             live,
         }));
@@ -896,7 +948,9 @@ impl FakeHub {
             .route("/runs/{id}/cancel", post(cancel_run))
             .route("/runs/{id}/answer", post(answer_run))
             .route("/proposals/{id}/decide", post(decide))
-            .route("/proposals/{id}/settle", post(settle));
+            .route("/proposals/{id}/settle", post(settle))
+            .route("/runs/{id}/changes", axum::routing::put(cloud::put_changes).get(cloud::get_changes))
+            .route("/proposals/{id}/result", post(cloud::report_result));
         let api = Router::new()
             .route("/bootstrap", get(bootstrap))
             .route("/dashboard", get(dashboard))
@@ -909,6 +963,7 @@ impl FakeHub {
             .route("/notifications", get(notifications))
             .route("/stream", get(stream))
             .route("/m/github/issues/{key}/pull-request", post(open_pull_request))
+            .nest("/m/e2e", cloud::e2e_routes())
             .nest("/m/agents", agents);
         let app = Router::new().nest("/api", api).with_state(Arc::clone(&state));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

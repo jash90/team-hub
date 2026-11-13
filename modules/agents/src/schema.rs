@@ -90,4 +90,7 @@ ALTER TABLE agent_run ADD COLUMN on_runner_name TEXT;
 
 -- A runner that takes only what is sent to it by name.
 ALTER TABLE agent_runner ADD COLUMN pinned_only INTEGER NOT NULL DEFAULT 0;
+
+-- A service that works for everyone, on each person's run with that person's own keys.
+ALTER TABLE agent_runner ADD COLUMN shared INTEGER NOT NULL DEFAULT 0;
 "#];

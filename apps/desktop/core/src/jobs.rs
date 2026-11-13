@@ -26,6 +26,8 @@ use crate::error::{CoreError, CoreResult};
 use crate::git;
 use crate::headless::Folders;
 use crate::runner::say;
+use crate::runs::WorkKeys;
+use crate::secrets::Secret;
 use crate::threads::kill_group;
 
 /// The server cuts a log line here; the runner does not send more.
@@ -109,6 +111,9 @@ impl std::fmt::Debug for JobSettings {
 pub struct ClaimedJob {
     pub job: TestJob,
     pub settings: JobSettings,
+    /// For a shared runner: the keys of the person the job runs for.
+    #[serde(default)]
+    pub credentials: Option<WorkKeys>,
 }
 
 /// `PATCH /jobs/{id}`: only what is set is sent.
@@ -182,11 +187,20 @@ pub struct JobOptions {
     pub look_every: Duration,
     /// How often the queue is looked at when nothing announces a job.
     pub idle_every: Duration,
+    /// How long one of a job's `timeoutMinutes` lasts. A minute; a test makes it shorter.
+    pub minute: Duration,
 }
 
 impl JobOptions {
     pub fn new(folders: Folders, user: JobUser) -> Self {
-        Self { folders, user, log_every: Duration::from_secs(1), look_every: Duration::from_secs(3), idle_every: Duration::from_secs(10) }
+        Self {
+            folders,
+            user,
+            log_every: Duration::from_secs(1),
+            look_every: Duration::from_secs(3),
+            idle_every: Duration::from_secs(10),
+            minute: Duration::from_secs(60),
+        }
     }
 }
 
@@ -468,7 +482,8 @@ impl JobRunner {
                         last_problem = problem;
                     }
 
-                    if error.is_not_found() {
+                    // So is one that refuses this runner (a shared runner without an administrator's token).
+                    if error.is_not_found() || matches!(error, CoreError::Api { status: 403, .. }) {
                         Duration::from_secs(60).max(self.options.idle_every)
                     } else {
                         self.options.idle_every
@@ -487,10 +502,11 @@ impl JobRunner {
     /// Takes the oldest queued job, if there is one, and carries it out to its end. Says
     /// whether there was one.
     pub async fn run_next(&self, stop: &mut watch::Receiver<bool>) -> CoreResult<bool> {
-        let settings = self.core.settings();
-        let projects = self.core.runner_projects();
-        let claimed = self.api(move |client| client.claim_job(&settings.runner_id, &settings.runner_name, projects.as_deref())).await?;
-        let Some(ClaimedJob { job, settings }) = claimed else { return Ok(false) };
+        let identity = self.core.job_identity()?;
+        let claimed = self.api(move |client| client.claim_job(&identity)).await?;
+        let Some(ClaimedJob { job, settings, credentials }) = claimed else { return Ok(false) };
+        // Held for this job only, and dropped with it.
+        let token = credentials.and_then(|keys| keys.github_token);
         let folder = self.options.folders.jobs.join(job.id.to_string());
         let mut session = Session {
             id: job.id,
@@ -498,14 +514,14 @@ impl JobRunner {
             env: BTreeMap::new(),
             masked: settings.secrets.values().filter(|value| value.len() >= 4).cloned().collect(),
             timeout_minutes: settings.timeout_minutes.clamp(1, MAX_TIMEOUT_MINUTES),
-            deadline: Instant::now() + Duration::from_secs(settings.timeout_minutes.clamp(1, MAX_TIMEOUT_MINUTES) * 60),
+            deadline: Instant::now() + self.options.minute * settings.timeout_minutes.clamp(1, MAX_TIMEOUT_MINUTES) as u32,
             waiting: Vec::new(),
             groups: Vec::new(),
         };
 
         say(&format!("Test job {} for {}: {} at {}", job.id, job.project_key, job.repo, job.reference));
 
-        let outcome = self.carry_out(&job, &settings, &folder, &mut session, stop).await;
+        let outcome = self.carry_out(&job, &settings, token, &folder, &mut session, stop).await;
         let error = outcome.as_ref().err().map(Failure::text);
 
         if let Some(error) = &error {
@@ -574,6 +590,7 @@ impl JobRunner {
         &self,
         job: &TestJob,
         settings: &JobSettings,
+        token: Option<Secret>,
         folder: &Path,
         session: &mut Session,
         stop: &mut watch::Receiver<bool>,
@@ -590,7 +607,7 @@ impl JobRunner {
         let (core, wanted, place) = (Arc::clone(&self.core), job.clone(), folder.to_path_buf());
         let source = folder.join("src");
         let home = folder.join("home");
-        let checked_out = tokio::task::spawn_blocking(move || check_out(&core, &wanted, &place)).await;
+        let checked_out = tokio::task::spawn_blocking(move || check_out(&core, &wanted, token.as_ref(), &place)).await;
         let commit = match checked_out {
             Ok(Ok(commit)) => commit,
             Ok(Err(error)) => return Err(Failure::because(format!("{} could not be checked out at {}: {error}", job.repo, job.reference))),
@@ -843,8 +860,8 @@ async fn forward(output: impl AsyncRead + Unpin, lines: mpsc::UnboundedSender<St
 
 /// Clones or fetches the job's repository and checks its ref out under `folder/src`. The
 /// commit that was checked out.
-fn check_out(core: &Core, job: &TestJob, folder: &Path) -> CoreResult<String> {
-    let clone = core.clones()?.ensure(&job.repo)?;
+fn check_out(core: &Core, job: &TestJob, token: Option<&Secret>, folder: &Path) -> CoreResult<String> {
+    let clone = core.clones()?.ensure(&job.repo, token)?;
     let commit = git::resolve_commit(&clone, &job.reference)?;
     let asked_by_name = !commit.starts_with(job.reference.trim());
 

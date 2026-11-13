@@ -15,7 +15,7 @@ use ureq::Agent;
 use crate::error::{CoreError, CoreResult};
 use crate::protocol::HubTool;
 use crate::jobs::{ClaimedJob, JobPatch, TestJob};
-use crate::runs::{AgentRun, AgentRunDetail, NewRun, RunChanges, RunEventKind, RunKind, RunPatch, RunProposal};
+use crate::runs::{AgentRun, AgentRunDetail, ClaimedRun, NewRun, RunChanges, RunEventKind, RunKind, RunPatch, RunProposal};
 use crate::secrets::Secret;
 
 const TIMEOUT: Duration = Duration::from_secs(30);
@@ -50,6 +50,10 @@ pub struct RunnerIdentity {
     pub version: String,
     /// False for a runner nobody sits at: its pushes and pull requests are decided on the web.
     pub interactive: bool,
+    /// True: it takes only work that was sent to it by name (docs/runners.md).
+    pub pinned_only: bool,
+    /// True: the team's runner, which works with each person's own keys.
+    pub shared: bool,
 }
 
 impl RunnerIdentity {
@@ -64,6 +68,28 @@ impl RunnerIdentity {
 
         if !self.interactive {
             body["interactive"] = json!(false);
+        }
+
+        if self.pinned_only {
+            body["pinnedOnly"] = json!(true);
+        }
+
+        if self.shared {
+            body["shared"] = json!(true);
+        }
+
+        body
+    }
+
+    /// What a claim for a test job carries: every claim also says the runner is there.
+    fn job_claim(&self) -> Value {
+        let mut body = json!({
+            "runnerId": self.id, "runnerName": self.name, "interactive": self.interactive, "version": self.version, "pinnedOnly": self.pinned_only,
+            "shared": self.shared,
+        });
+
+        if let Some(projects) = &self.projects {
+            body["projects"] = json!(projects);
         }
 
         body
@@ -246,7 +272,7 @@ impl HubClient {
     }
 
     /// The oldest queued run this runner may take, now claimed by it.
-    pub fn claim(&self, runner: &RunnerIdentity) -> CoreResult<Option<AgentRunDetail>> {
+    pub fn claim(&self, runner: &RunnerIdentity) -> CoreResult<Option<ClaimedRun>> {
         let mut body = json!({ "runnerId": runner.id, "kinds": runner.kinds });
 
         if let Some(projects) = &runner.projects {
@@ -325,14 +351,8 @@ impl HubClient {
 
     /// The oldest queued job this person may run, now claimed, with the project's settings
     /// and the values of its secrets.
-    pub fn claim_job(&self, runner_id: &str, runner_name: &str, projects: Option<&[String]>) -> CoreResult<Option<ClaimedJob>> {
-        let mut body = json!({ "runnerId": runner_id, "runnerName": runner_name });
-
-        if let Some(projects) = projects {
-            body["projects"] = json!(projects);
-        }
-
-        self.post(&format!("{E2E}/jobs/claim"), &body)
+    pub fn claim_job(&self, runner: &RunnerIdentity) -> CoreResult<Option<ClaimedJob>> {
+        self.post(&format!("{E2E}/jobs/claim"), &runner.job_claim())
     }
 
     pub fn patch_job(&self, id: i64, patch: &JobPatch) -> CoreResult<TestJob> {

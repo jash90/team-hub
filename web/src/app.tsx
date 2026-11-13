@@ -24,6 +24,7 @@ import {
   ProjectsView,
   ReleasesView,
   RunnersView,
+  ScheduleView,
   SearchView,
   SettingsView,
   preloadViews,
@@ -159,6 +160,7 @@ const CORE: (Route & { view: { preload: () => Promise<void> } })[] = [
   { pattern: '/p/:key/backlog', view: BacklogView, render: inProject(<BacklogView />) },
   { pattern: '/p/:key/issues', view: SearchView, render: inProject(<SearchView scoped />) },
   { pattern: '/p/:key/releases', view: ReleasesView, render: inProject(<ReleasesView />) },
+  { pattern: '/p/:key/schedule', view: ScheduleView, render: inProject(<ScheduleView />) },
   { pattern: '/p/:key/settings/:tab?', view: ProjectSettingsView, render: (found) => <ProjectScope projectKey={found.key.toUpperCase()}><ProjectSettingsView tab={found.tab} /></ProjectScope> },
 ];
 
@@ -297,6 +299,7 @@ function Shell() {
         { id: 'backlog', label: () => t('Backlog'), icon: 'list', path: `/p/${project.key}/backlog` },
         { id: 'issues', label: () => t('Issues'), icon: 'filter', path: `/p/${project.key}/issues` },
         { id: 'releases', label: () => t('Releases'), icon: 'rocket', path: `/p/${project.key}/releases` },
+        { id: 'schedule', label: () => t('Schedule'), icon: 'clock', path: `/p/${project.key}/schedule` },
         ...projectModules.flatMap((module) => module.projectNav?.(project.key) ?? []),
         { id: 'settings', label: () => t('Project settings'), icon: 'settings', path: `/p/${project.key}/settings` },
       ]

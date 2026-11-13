@@ -116,11 +116,13 @@ type TaskCardProps = {
   project: Project;
   now: Date;
   onEdit: () => void;
+  /** The task was started: the server's answer is the task, now running. */
+  onStarted: (started: ScheduledTask[]) => void;
   onChanged: () => Promise<void>;
 };
 
 /** One task of the schedule: what it is, how its last run went, and the buttons for it. */
-export function TaskCard({ task, kind, project, now, onEdit, onChanged }: TaskCardProps) {
+export function TaskCard({ task, kind, project, now, onEdit, onStarted, onChanged }: TaskCardProps) {
   const { boot, userById } = useSession();
   const [busy, run] = useBusy();
   const [deleting, setDeleting] = useState(false);
@@ -153,11 +155,10 @@ export function TaskCard({ task, kind, project, now, onEdit, onChanged }: TaskCa
         )}
       </header>
       <p className="task-what" title={line.text}>
-        <Tag>{kind ? translateServer(kind.name) : task.kind}</Tag>
-        <span className="task-settings muted">{line.parts}</span>
+        <Tag>{kind ? translateServer(kind.name) : task.kind}</Tag> <span className="task-settings muted">{line.parts}</span>
       </p>
       {!task.kindAvailable && (
-        <p className="note task-stale">
+        <p className="note task-off-note">
           <Icon name="info" />
           <span>{unavailableReason(task, project, boot.modules)}</span>
         </p>
@@ -170,7 +171,7 @@ export function TaskCard({ task, kind, project, now, onEdit, onChanged }: TaskCa
             size="sm"
             icon="play"
             disabled={busy || task.state === 'running' || !task.kindAvailable}
-            onClick={() => void run(() => api.post(`/api/tasks/${task.id}/run`)).then(onChanged)}
+            onClick={() => void run(() => api.post<ScheduledTask>(`/api/tasks/${task.id}/run`)).then((started) => started && onStarted([started]))}
           >
             {t('Run now')}
           </Button>

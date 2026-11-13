@@ -9,4 +9,8 @@ id: string, name: string, userId: number,
 /**
  * Somebody's computer with the person at it (true), or a service (false).
  */
-interactive: boolean, online: boolean, lastSeenAt: string, version: string | null, work: Array<RunnerWork>, };
+interactive: boolean, 
+/**
+ * A service that works for everyone, on each person's work with that person's own keys.
+ */
+shared: boolean, online: boolean, lastSeenAt: string, version: string | null, work: Array<RunnerWork>, };

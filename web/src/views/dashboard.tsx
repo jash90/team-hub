@@ -58,13 +58,24 @@ const EVENT_TEXT: Record<string, string> = {
   'page.updated': 'edited page',
 };
 
+/** What people did to a scheduled task; its runs are announced the same way and are not news. */
+const TASK_TEXT: Record<string, string> = {
+  created: 'added to the schedule:',
+  changed: 'changed in the schedule:',
+  deleted: 'removed from the schedule:',
+};
+
+function eventText(item: ActivityItem): string | undefined {
+  return item.kind === 'task.updated' ? TASK_TEXT[String((item.payload as Record<string, unknown> | null)?.change ?? '')] : EVENT_TEXT[item.kind];
+}
+
 export function ActivityFeed({ items }: { items: ActivityItem[] }) {
   const { userById } = useSession();
 
   return (
     <div className="feed">
       {items
-        .filter((item) => EVENT_TEXT[item.kind])
+        .filter((item) => eventText(item))
         .map((item) => {
           const person = userById(item.actorId);
           const payload = item.payload as Record<string, string | number | null>;
@@ -73,7 +84,7 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
             <div key={item.id} className="feed-row">
               <Avatar user={person} size={22} label={person?.name ?? item.actorLabel ?? undefined} />
               <span className="feed-text">
-                <strong>{person?.name ?? item.actorLabel ?? t('Someone')}</strong> {t(EVENT_TEXT[item.kind])}{' '}
+                <strong>{person?.name ?? item.actorLabel ?? t('Someone')}</strong> {t(eventText(item) ?? '')}{' '}
                 {item.kind === 'github.pr' && (
                   <>
                     <a href={String(payload.url ?? '#')} target="_blank" rel="noreferrer">

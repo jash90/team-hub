@@ -505,6 +505,59 @@ async fn a_job_can_be_sent_to_one_runner_and_is_offered_to_no_other() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_shared_runner_works_on_anyones_job_with_that_persons_own_token() {
+    let Hub { app, admin, dev, runner, .. } = hub().await;
+    // People store their own keys in a browser session, not with an API token.
+    let store = |who: &Client, value: &str| {
+        let in_person = hub_app::AuthUser { via_token: false, ..who.user.clone() };
+
+        app.db.write(|tx| hub_app::services::personal_keys::set(&app, tx, &in_person, "github_token", value)).unwrap();
+    };
+    store(&dev, "github_pat_darias-own");
+    store(&admin, "github_pat_the-administrators");
+
+    // Only whoever operates the instance operates its shared runners, and a person's computer is never one.
+    let shared = json!({ "runnerId": "cloud-shared", "runnerName": "Team runner", "interactive": false, "shared": true });
+    assert_eq!(
+        runner.refused(Method::POST, "/jobs/claim", Some(shared.clone())).await,
+        (StatusCode::FORBIDDEN, "Only an administrator's runner can be shared".to_string())
+    );
+    let at_a_desk = json!({ "runnerId": "adas-laptop", "shared": true });
+    assert_eq!(admin.refused(Method::POST, "/jobs/claim", Some(at_a_desk)).await.0, StatusCode::FORBIDDEN);
+    // The refused runners were not taken note of.
+    assert!(app.read(|connection| E2eModule.runners(connection, &admin.user.through("e2e"), chrono::Utc::now())).unwrap().is_empty());
+
+    // The shared runner takes Daria's job, and is handed Daria's token for it: not its operator's.
+    let darias = dev.post("/projects/WEB/jobs", json!({})).await;
+    let claimed = admin.post("/jobs/claim", shared.clone()).await;
+    assert_eq!(claimed["job"]["id"], darias["id"]);
+    assert_eq!(claimed["credentials"], json!({ "githubToken": "github_pat_darias-own" }));
+    // It is in the claim's answer and nowhere else: not on the job as anybody reads it later.
+    assert!(!admin.get(&format!("/jobs/{}", darias["id"])).await.to_string().contains("github_pat"));
+    assert!(!admin.get("/projects/WEB/jobs").await.to_string().contains("github_pat"));
+
+    // Somebody without a stored token: the credentials are there, and empty.
+    runner.post("/projects/WEB/jobs", json!({})).await;
+    assert_eq!(admin.post("/jobs/claim", shared.clone()).await["credentials"], json!({}));
+
+    // A shared runner can be named by anyone who may start jobs, and shows as shared in the list.
+    let named = dev.post("/projects/WEB/jobs", json!({ "onRunner": "cloud-shared" })).await;
+    assert_eq!(named["onRunnerName"], "Team runner");
+    let listed = app.read(|connection| E2eModule.runners(connection, &dev.user.through("e2e"), chrono::Utc::now())).unwrap();
+    assert_eq!(listed.iter().map(|runner| (runner.id.as_str(), runner.shared, runner.interactive)).collect::<Vec<_>>(), vec![("cloud-shared", true, false)]);
+
+    // A runner that is not shared works with what it has: no credentials at all, even its owner's.
+    admin.post("/projects/WEB/jobs", json!({})).await;
+    let own = admin.post("/jobs/claim", json!({ "runnerId": "adas-own-runner", "interactive": false })).await;
+    assert!(own["job"]["id"].is_i64());
+    assert!(own.get("credentials").is_none(), "{own}");
+
+    // The key is declared, so it shows under "My keys" whichever modules are on.
+    let keys = E2eModule.personal_keys();
+    assert_eq!(keys.iter().map(|key| (key.name.as_str(), key.label.as_str())).collect::<Vec<_>>(), vec![("github_token", "GitHub token")]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn the_list_of_runners_shows_who_is_connected_and_what_they_carry_out() {
     let Hub { app, admin, dev, runner, viewer } = hub().await;
     project(&app, &admin, "SEC", true);
@@ -565,8 +618,8 @@ async fn the_log_keeps_its_newest_lines_and_is_read_in_increments() {
     let detail = viewer.get(&path).await;
     assert_eq!(detail["logTruncated"], false);
     assert_eq!(detail["log"][0], json!({ "seq": 1, "text": "cloning acme/shop" }));
-    // Terminal control characters are dropped; a line is cut at 2000 characters.
-    assert_eq!(detail["log"][1]["text"], "[32m✓[0m done");
+    // Terminal colours are dropped; a line is cut at 2000 characters.
+    assert_eq!(detail["log"][1]["text"], "✓ done");
     assert_eq!(detail["log"][2]["text"].as_str().map(|text| text.chars().count()), Some(2000));
 
     // 2500 more lines, in batches as a runner sends them.

@@ -44,10 +44,38 @@ pub struct Runner {
     pub user_id: Id,
     /// Somebody's computer with the person at it (true), or a service (false).
     pub interactive: bool,
+    /// A service that works for everyone, on each person's work with that person's own keys.
+    pub shared: bool,
     pub online: bool,
     pub last_seen_at: String,
     pub version: Option<String>,
     pub work: Vec<RunnerWork>,
+}
+
+/// A key a person stores for themselves (`docs/runners.md` → Shared runners): a module says
+/// that it exists, the core keeps it. Two modules may name the same key.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PersonalKey {
+    /// Lower-case letters and underscores, e.g. "github_token".
+    pub name: String,
+    pub label: String,
+    pub hint: String,
+}
+
+/// A person's key as a page may see it: never the value.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PersonalKeyState {
+    pub name: String,
+    pub label: String,
+    pub hint: String,
+    pub set: bool,
+    /// The last four characters of the stored value, behind an ellipsis.
+    pub tail: Option<String>,
+    pub updated_at: Option<String>,
 }
 
 /// One entry per runner from what the modules reported, each of which describes a runner
@@ -62,6 +90,7 @@ pub fn merge(reported: Vec<Runner>) -> Vec<Runner> {
                 if runner.last_seen_at > known.last_seen_at {
                     known.name = std::mem::take(&mut runner.name);
                     known.interactive = runner.interactive;
+                    known.shared = runner.shared;
                     known.last_seen_at = std::mem::take(&mut runner.last_seen_at);
                     known.version = runner.version.take().or(known.version.take());
                 }
@@ -88,6 +117,7 @@ mod tests {
             name: name.into(),
             user_id: 1,
             interactive: true,
+            shared: false,
             online,
             last_seen_at: seen.into(),
             version: None,

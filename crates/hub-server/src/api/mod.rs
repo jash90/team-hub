@@ -7,6 +7,7 @@ mod boards;
 mod comments;
 mod filters;
 mod issues;
+mod keys;
 mod links;
 mod notifications;
 mod overview;
@@ -47,6 +48,7 @@ pub fn router() -> Router<App> {
         .merge(overview::routes())
         .merge(notifications::routes())
         .merge(runners::routes())
+        .merge(keys::routes())
         .merge(tasks::routes())
         .merge(stream::routes())
         .merge(admin::routes())

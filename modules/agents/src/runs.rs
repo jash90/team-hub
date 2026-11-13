@@ -6,7 +6,8 @@ use hub_app::access::{project_access_by_id, visible_projects, ProjectAccess};
 use hub_app::db::{placeholders, query_all, query_one};
 use hub_app::services::issues::issue_access;
 use hub_app::services::notifications::notify;
-use hub_app::{ApiError, ApiResult, AuthUser, Tx};
+use hub_app::services::personal_keys;
+use hub_app::{ApiError, ApiResult, App, AuthUser, Tx};
 use hub_core::text::truncate;
 use hub_core::Id;
 use rusqlite::types::Value as SqlValue;
@@ -592,7 +593,15 @@ pub struct Heartbeat {
     /// Take only the runs sent to this runner by name.
     #[serde(default)]
     pub pinned_only: bool,
+    /// The team's runner: it works on each run with its requester's own keys
+    /// (`docs/runners.md`). Only an administrator's runner with nobody at it can be.
+    #[serde(default)]
+    pub shared: bool,
 }
+
+/// The model key a person stores for their runs on a shared runner, and their GitHub token.
+pub const MODEL_KEY: &str = "anthropic_api_key";
+pub const GITHUB_KEY: &str = "github_token";
 
 fn yes() -> bool {
     true
@@ -618,11 +627,15 @@ pub fn heartbeat(tx: &Tx, user: &AuthUser, beat: &Heartbeat) -> ApiResult<()> {
         return Err(ApiError::conflict("That runner id belongs to somebody else's runner"));
     }
 
+    if beat.shared && (beat.interactive || !user.is_admin()) {
+        return Err(ApiError::forbidden("Only an administrator's runner with nobody at it can be shared"));
+    }
+
     let kinds: Vec<&str> = beat.kinds.iter().map(|kind| kind.as_str()).collect();
 
     tx.execute(
-        "INSERT INTO agent_runner (id, name, user_id, kinds, projects, version, last_seen_at, interactive, pinned_only) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-         ON CONFLICT (id) DO UPDATE SET name = ?2, kinds = ?4, projects = ?5, version = ?6, last_seen_at = ?7, interactive = ?8, pinned_only = ?9",
+        "INSERT INTO agent_runner (id, name, user_id, kinds, projects, version, last_seen_at, interactive, pinned_only, shared) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+         ON CONFLICT (id) DO UPDATE SET name = ?2, kinds = ?4, projects = ?5, version = ?6, last_seen_at = ?7, interactive = ?8, pinned_only = ?9, shared = ?10",
         (
             id,
             name,
@@ -633,6 +646,7 @@ pub fn heartbeat(tx: &Tx, user: &AuthUser, beat: &Heartbeat) -> ApiResult<()> {
             &tx.now,
             beat.interactive,
             beat.pinned_only,
+            beat.shared,
         ),
     )?;
 
@@ -643,16 +657,20 @@ pub fn heartbeat(tx: &Tx, user: &AuthUser, beat: &Heartbeat) -> ApiResult<()> {
 /// Somebody's computer takes such work from its owner only; a service from anyone who may
 /// start the run.
 fn pinnable(tx: &Tx, user: &AuthUser, runner: &str, kind: AgentRunKind, project_key: &str) -> ApiResult<String> {
-    let found: Option<(Id, String, String, Option<String>, bool)> =
-        query_one(tx, "SELECT user_id, name, kinds, projects, interactive FROM agent_runner WHERE id = ?1", [runner], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+    let found: Option<(Id, String, String, Option<String>, bool, bool)> =
+        query_one(tx, "SELECT user_id, name, kinds, projects, interactive, shared FROM agent_runner WHERE id = ?1", [runner], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?))
         })?;
-    let Some((owner, name, kinds, projects, interactive)) = found else {
+    let Some((owner, name, kinds, projects, interactive, shared)) = found else {
         return Err(ApiError::bad_request("That runner has not connected to this server"));
     };
 
     if interactive && owner != user.id {
         return Err(ApiError::forbidden("That runner is somebody's computer; only its owner sends work to it by name"));
+    }
+
+    if shared && !personal_keys::has(tx, user.id, MODEL_KEY)? {
+        return Err(ApiError::conflict("A shared runner works with your own model key; add your Anthropic API key in Settings → My keys first"));
     }
 
     let kinds: Vec<String> = serde_json::from_str(&kinds).unwrap_or_default();
@@ -703,19 +721,27 @@ pub fn claim(tx: &Tx, user: &AuthUser, wanted: &Claim) -> ApiResult<Option<Id>> 
 
     tx.execute("UPDATE agent_runner SET last_seen_at = ?1 WHERE id = ?2", (&tx.now, runner))?;
 
-    let pinned_only: bool = query_one(tx, "SELECT pinned_only FROM agent_runner WHERE id = ?1", [runner], |row| row.get(0))?.unwrap_or(false);
+    let (pinned_only, shared): (bool, bool) =
+        query_one(tx, "SELECT pinned_only, shared FROM agent_runner WHERE id = ?1", [runner], |row| Ok((row.get(0)?, row.get(1)?)))?.unwrap_or((false, false));
     let (visible, mut params) = visible_projects(user, "r.project_id");
-    let mut conditions = vec![
-        visible,
-        "r.state = 'queued'".to_string(),
-        // Sent to this runner by name; or to nobody, and then its requester's or shared.
-        if pinned_only { "r.on_runner = ?" } else { "(r.on_runner = ? OR (r.on_runner IS NULL AND (r.requested_by = ? OR r.shared = 1)))" }.to_string(),
-        format!("r.kind IN ({})", placeholders(wanted.kinds.len())),
-    ];
+    // Sent to this runner by name; or to nobody, and then its requester's own or one marked
+    // as shared. The team's runner takes anyone's.
+    let offered = match (pinned_only, shared) {
+        (true, _) => "r.on_runner = ?",
+        (false, true) => "(r.on_runner = ? OR r.on_runner IS NULL)",
+        (false, false) => "(r.on_runner = ? OR (r.on_runner IS NULL AND (r.requested_by = ? OR r.shared = 1)))",
+    };
+    let mut conditions = vec![visible, "r.state = 'queued'".to_string(), offered.to_string(), format!("r.kind IN ({})", placeholders(wanted.kinds.len()))];
     params.push(SqlValue::Text(runner.to_string()));
 
-    if !pinned_only {
+    if !pinned_only && !shared {
         params.push(SqlValue::Integer(user.id));
+    }
+
+    if shared {
+        // It has no model key of its own: a run whose requester has stored none waits for
+        // another runner, or for the key.
+        conditions.push(personal_keys::stored_condition("r.requested_by", MODEL_KEY));
     }
 
     params.extend(wanted.kinds.iter().map(|kind| SqlValue::Text(kind.as_str().to_string())));
@@ -736,6 +762,30 @@ pub fn claim(tx: &Tx, user: &AuthUser, wanted: &Claim) -> ApiResult<Option<Id>> 
     hold(tx, row.run.id, runner, &name, Some(user.id))?;
 
     Ok(Some(row.run.id))
+}
+
+/// The requester's own keys, for the shared runner that has just claimed their run: none
+/// for any other runner. This is the one place they leave the server.
+pub fn credentials(app: &App, tx: &Tx, id: Id) -> ApiResult<Option<Value>> {
+    let row = load(tx, id)?;
+    let shared: bool = match row.run.runner_id.as_deref() {
+        Some(runner) => query_one(tx, "SELECT shared FROM agent_runner WHERE id = ?1", [runner], |row| row.get(0))?.unwrap_or(false),
+        None => false,
+    };
+
+    if !shared {
+        return Ok(None);
+    }
+
+    let mut keys = serde_json::Map::new();
+
+    for (field, name) in [("anthropicApiKey", MODEL_KEY), ("githubToken", GITHUB_KEY)] {
+        if let Some(value) = personal_keys::reveal(app, tx, row.run.requested_by, name)? {
+            keys.insert(field.to_string(), Value::String(value));
+        }
+    }
+
+    Ok(Some(Value::Object(keys)))
 }
 
 /// Marks a queued run as taken by a runner.
@@ -780,6 +830,7 @@ pub fn known(connection: &Connection, user: &AuthUser, now: DateTime<Utc>) -> Ap
                 name: runner.name,
                 user_id: runner.user_id,
                 interactive: runner.interactive,
+                shared: runner.shared,
                 online: runner.online,
                 last_seen_at: runner.last_seen_at,
                 version: Some(runner.version).filter(|version| !version.is_empty()),
@@ -841,7 +892,7 @@ pub fn runners(connection: &Connection, user: &AuthUser, now: DateTime<Utc>) -> 
     let online_since = iso(now - Duration::seconds(ONLINE_FOR_SECONDS));
     let all = query_all(
         connection,
-        "SELECT id, name, user_id, kinds, projects, version, last_seen_at, interactive, pinned_only FROM agent_runner ORDER BY last_seen_at DESC",
+        "SELECT id, name, user_id, kinds, projects, version, last_seen_at, interactive, pinned_only, shared FROM agent_runner ORDER BY last_seen_at DESC",
         [],
         |row| {
             let kinds: String = row.get(3)?;
@@ -859,6 +910,7 @@ pub fn runners(connection: &Connection, user: &AuthUser, now: DateTime<Utc>) -> 
                 last_seen_at,
                 interactive: row.get(7)?,
                 pinned_only: row.get(8)?,
+                shared: row.get(9)?,
             })
         },
     )?;
