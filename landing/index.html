@@ -55,8 +55,8 @@
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="assets/site.css?v=1" />
-    <script src="assets/site.js?v=1" defer></script>
+    <link rel="stylesheet" href="assets/site.css?v=2" />
+    <script src="assets/site.js?v=2" defer></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to the content</a>
@@ -70,6 +70,7 @@
         <nav class="site-nav" aria-label="Sections">
           <a href="#code">Code</a>
           <a href="#agents">Agents</a>
+          <a href="#runners">Runners</a>
           <a href="#desktop">Desktop app</a>
           <a href="#run">Run it</a>
           <a href="#not-yet">Not yet</a>
@@ -114,11 +115,11 @@
             <dl class="facts">
               <div>
                 <dt>Runs as</dt>
-                <dd>one server binary, one SQLite file</dd>
+                <dd>one server binary; SQLite in one file</dd>
               </div>
               <div>
-                <dt>Needs beside it</dt>
-                <dd>nothing</dd>
+                <dt>Work in code</dt>
+                <dd>on runners: the desktop app, or a cloud runner the team shares</dd>
               </div>
               <div>
                 <dt>Interface</dt>
@@ -126,7 +127,9 @@
               </div>
               <div>
                 <dt>Source</dt>
-                <dd><a href="https://github.com/jash90/team-hub">github.com/jash90/team-hub</a></dd>
+                <dd>
+                  <a href="https://github.com/jash90/team-hub">github.com/jash90/team-hub</a>, MIT
+                </dd>
               </div>
             </dl>
           </div>
@@ -134,8 +137,8 @@
           <figure class="shot hero-shot">
             <a
               class="frame"
-              href="assets/img/board-light-1600.webp"
-              data-dark="assets/img/board-dark-1600.webp"
+              href="assets/img/sprint-board-light-1600.webp"
+              data-dark="assets/img/sprint-board-dark-1600.webp"
             >
               <picture>
                 <!-- On a phone the whole board is too small to read: show one column. -->
@@ -153,16 +156,18 @@
                 />
                 <source
                   media="(prefers-color-scheme: dark)"
-                  srcset="assets/img/board-dark-800.webp 800w, assets/img/board-dark-1600.webp 1600w"
-                  sizes="(min-width: 87em) 1280px, 92vw"
-                />
-                <img
-                  src="assets/img/board-light-1600.webp"
-                  srcset="assets/img/board-light-800.webp 800w, assets/img/board-light-1600.webp 1600w"
+                  srcset="assets/img/sprint-board-dark-800.webp 800w, assets/img/sprint-board-dark-1600.webp 1600w"
                   sizes="(min-width: 87em) 1280px, 92vw"
                   width="1600"
-                  height="800"
-                  alt="The sprint board of a demo web shop project: four columns, To Do, In Progress, In Review and Done, with twelve issue cards. Several cards carry a pull request number with a tick or a cross, a count of passing tests and an orange warning triangle."
+                  height="954"
+                />
+                <img
+                  src="assets/img/sprint-board-light-1600.webp"
+                  srcset="assets/img/sprint-board-light-800.webp 800w, assets/img/sprint-board-light-1600.webp 1600w"
+                  sizes="(min-width: 87em) 1280px, 92vw"
+                  width="1600"
+                  height="954"
+                  alt="The sprint board of a demo web shop project: issue cards in columns by status. On several cards, next to the issue key, sit a pull request number with a tick or a cross, a count of passing tests and an orange warning triangle. A narrow screen shows the In Review column only."
                   fetchpriority="high"
                   decoding="async"
                 />
@@ -170,9 +175,9 @@
             </a>
             <figcaption>
               The sprint board. Next to an issue’s key sit its pull request with the state of the
-              checks, the result of its tests, an agent run that waits for a person, and a triangle
-              where status and code disagree. The interface comes in English and Polish; most
-              screenshots on this page show the Polish one, with a demo project.
+              checks, the count of its passing tests, and a triangle where status and code
+              disagree. The interface comes in English and Polish; most screenshots on this page
+              show the Polish one, with a demo project.
             </figcaption>
           </figure>
 
@@ -350,7 +355,7 @@
               <h3>Tests that know which issue they verify</h3>
               <p>
                 Runs of the <a href="https://github.com/e2e-inc/e2e">e2e</a> testing framework
-                arrive through a reporter. A test that carries an issue key in its title or tags is
+                arrive through a reporter, or are started from team-hub. A test that carries an issue key in its title or tags is
                 linked to that issue, so the issue shows whether what it describes actually works.
               </p>
               <p>A failing test on an issue that is marked Done is shown for what it is.</p>
@@ -372,6 +377,42 @@
               <figcaption>
                 Project → Tests: the last run, then each test with the issue it verifies and its
                 recent history. Here a failing test points at an issue marked Done.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry" id="test-jobs">
+            <div class="text">
+              <h3>Start the suite from team-hub, then watch the run</h3>
+              <p>
+                A <em>test job</em> has a runner check the project’s repository out, run its suite
+                with recording on, and send everything back. A run opens as a session a person can
+                watch: the recording with each step tied to its moment, pictures of the steps, the
+                screenshots, the error, the trace.
+              </p>
+              <p class="honest">
+                Recordings were verified with videos made by hand in the framework’s format, not
+                yet with a real recorded run.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/session-en-light-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/session-en-light-1600.webp"
+                  srcset="assets/img/session-en-light-800.webp 800w, assets/img/session-en-light-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="1460"
+                  alt="The session of a failed test, “the backlog lists the sprint and its issues”, which verifies WEB-4, an issue marked Done. At the top the assertion error: expected the text “Finish the sprint now”, received “Complete sprint”. Below it a player with the recording, a time line with a mark for each step, the list of six steps with their times, the last one failed, and a strip of pictures from the recording."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                A failed test as a session: the error, the recording stopped at one of the steps, the
+                steps with their times, and pictures from the recording. The test verifies WEB-4,
+                which is marked Done.
               </figcaption>
             </figure>
           </div>
@@ -425,8 +466,9 @@
               <h3>Who carries a run out</h3>
               <p>
                 The server carries out the runs that need no code, with your own model provider
-                key. Runs that need the repository go to a runner: the desktop app, the
-                <code>hub</code> command line, or anything that speaks
+                key. Runs that need the repository go to a <a href="#runners">runner</a>: the
+                desktop app, the cloud runner, the <code>hub</code> command line, or anything that
+                speaks
                 <a href="https://github.com/jash90/team-hub/blob/main/docs/agent-runs.md"
                   >the run contract</a
                 >.
@@ -444,17 +486,166 @@
         </div>
       </section>
 
+      <section class="chapter" id="runners" aria-labelledby="runners-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">04</span>Runners and schedule</p>
+            <h2 id="runners-title">Where the work runs, and when.</h2>
+            <p class="intro">
+              Agent runs in code and test jobs need a repository on disk. The server never does
+              either. A runner does: the desktop app on somebody’s computer, using that computer,
+              or the cloud runner, a container next to the server that the whole team shares.
+            </p>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>One list</h3>
+              <p>
+                One page lists every runner: what each takes, for which projects, and what it is
+                carrying out now. The desktop app shows the same list.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/runners-pl-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/runners-pl-1600.webp"
+                  srcset="assets/img/runners-pl-800.webp 800w, assets/img/runners-pl-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="1099"
+                  alt="The Runners page in two groups. The team’s: two cloud runners, each marked “service” and “shared”, connected, taking tests and agent runs for any project. Yours: one computer, connected, which takes agent runs for any project and tests only when they are sent to it by name."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Runners: two cloud runners the team shares and one person’s computer, which takes
+                tests only when they are sent to it by name.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Any runner, or one by name</h3>
+              <p>
+                Work can be left to any runner that fits or sent to one by name. It then waits for
+                that runner and is offered to nobody else. A person’s computer takes work by name
+                only from its owner.
+              </p>
+            </div>
+            <figure class="shot small">
+              <a class="frame" href="assets/img/where-pl-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/where-pl-1600.webp"
+                  width="952"
+                  height="684"
+                  alt="The lower part of the dialog that delegates an implementation, headed “Where it should be carried out”, with three choices: any fitting runner, a cloud runner marked “service”, and a computer marked “computer”, which is selected. Below them the buttons Cancel and Start."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Delegating an implementation on the web: any runner that fits, a cloud runner, or
+                your own computer.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry" id="keys">
+            <div class="text">
+              <h3>A shared runner holds no keys</h3>
+              <p>
+                Each person stores their own model key and GitHub token (Settings → My keys), and
+                their work on a shared runner runs with those. A key is encrypted at rest, no
+                route gives it back, and it leaves the server in one place only: the answer to a
+                shared runner that claims that person’s work.
+              </p>
+              <p class="honest">
+                A shared runner signs in with an administrator’s API token; it has no identity of
+                its own with narrower rights. The cloud runner has never run on a real host.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/keys-pl-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/keys-pl-1600.webp"
+                  srcset="assets/img/keys-pl-800.webp 800w, assets/img/keys-pl-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="840"
+                  alt="Settings, the My keys panel. A paragraph says that a shared runner belongs to the team and has no keys of its own. Below it two keys: a GitHub token, not set, with a field to paste one into; and an Anthropic API key, set, shown by its last four characters, with Replace and Remove buttons."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Settings → My keys: a GitHub token that is not set yet, and an Anthropic API key
+                that is set and shown by its last four characters only.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry" id="schedule">
+            <div class="text">
+              <h3>The schedule</h3>
+              <p>
+                Recurring work of a project, run every morning, after work or on demand. It
+                catches up after downtime instead of losing a run, and a failed attempt keeps the
+                last good result on show.
+              </p>
+              <p>
+                What can be scheduled comes from the modules. Today: run an agent on the issues a
+                query finds, and run the project’s test suite.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/schedule-en-light-1600.webp" data-dark="assets/img/schedule-en-dark-1600.webp">
+                <picture>
+                  <source
+                    media="(prefers-color-scheme: dark)"
+                    srcset="assets/img/schedule-en-dark-800.webp 800w, assets/img/schedule-en-dark-1600.webp 1600w"
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1600"
+                    height="1460"
+                  />
+                  <img
+                    src="assets/img/schedule-en-light-1600.webp"
+                    srcset="assets/img/schedule-en-light-800.webp 800w, assets/img/schedule-en-light-1600.webp 1600w"
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1600"
+                    height="1460"
+                    alt="The Schedule page of a project in three groups: Morning with one task, After work with two, On demand with two, each group with its own Run this group now button. A task is a card with a switch, the query it runs an agent on, its last result and a Run now button. One card carries an orange note saying that an older result is shown because the last attempt failed."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
+              </a>
+              <figcaption>
+                A project’s schedule: one task in the morning, two after work, two on demand. The
+                card with the orange note shows an older result, because the latest attempt failed.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
       <section class="band" id="desktop" aria-labelledby="desktop-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">04</span>Desktop app</p>
+            <p class="kicker"><span class="num">05</span>Desktop app</p>
             <h2 id="desktop-title">Nothing leaves your computer without a click.</h2>
             <p class="intro">
               A developer’s cockpit for macOS, Windows and Linux. The issues assigned to you become
               agent threads: an agent works on an issue in your local clone, in a git working tree
               and branch of its own, and whatever should leave your computer (a comment, a status
-              change, a push, a pull request) waits for your click. The same app is a runner for
-              work delegated on the web.
+              change, a push, a pull request) waits for your click. The same app is one of the
+              team’s runners, for agent runs delegated on the web and for test suites, with this
+              computer’s processor, memory and disk.
             </p>
           </div>
 
@@ -476,8 +667,9 @@
                   offline copy of your tracker is encrypted.
                 </li>
                 <li>
-                  A push shows exactly the commits and the diff, pushes exactly the commit you
-                  looked at, and is never forced.
+                  File tools are tied to the working tree. Credential folders
+                  (<code>~/.ssh</code>, <code>~/.aws</code>, <code>~/.config/gh</code>, …) and the
+                  app’s own state cannot be read.
                 </li>
               </ul>
               <p>
@@ -505,37 +697,22 @@
               <figcaption>
                 A thread on an issue. The agent asked one question, got an answer, committed on its
                 branch and proposed a comment, a push and a pull request. None of them has happened
-                yet.
+                yet. This capture and the next come from the app’s own end-to-end check, where a
+                scripted test agent stands in for the model.
               </figcaption>
             </figure>
           </div>
 
           <div class="pair entry">
             <div class="text">
-              <h3>Download</h3>
+              <h3>A push, before it happens</h3>
               <p>
-                Installers for macOS, Windows and Linux go to the repository’s releases page. The
-                first release is being prepared; if the page is still empty, build the app from
-                <code>apps/desktop</code>.
+                A push shows exactly the commits and the diff, pushes exactly the commit you looked
+                at (a commit added since stays), and is never forced.
               </p>
               <p>
-                The builds are not signed yet, so macOS and Windows will warn before the first
-                start. The app needs a team-hub server to connect to. For real agents it uses
-                Claude Code signed in on the same machine, or an Anthropic API key.
-              </p>
-              <div class="actions">
-                <a class="button primary" href="https://github.com/jash90/team-hub/releases/latest"
-                  >Releases on GitHub</a
-                >
-                <a
-                  class="button"
-                  href="https://github.com/jash90/team-hub/blob/main/apps/desktop/README.md#building-and-running"
-                  >Build from source</a
-                >
-              </div>
-              <p class="honest">
-                So far the app has run on Linux only. Its macOS and Windows sandboxes, the tray,
-                notifications and installers are unverified.
+                It is refused until you confirm by name when the diff touches CI or build files,
+                looks like it holds a secret, or adds a binary, a link or an executable.
               </p>
             </div>
             <figure class="shot narrow">
@@ -551,11 +728,192 @@
                 />
               </a>
               <figcaption>
-                The push preview: one commit, its diff, and the remote it goes to. Both desktop
-                screenshots come from the app’s own end-to-end check, where a scripted test agent
-                stands in for the model; that is why the commit is signed “Fake Agent”.
+                The push preview: one commit, its diff, and the remote it goes to. The commit is
+                signed “Fake Agent” because the scripted test agent made it.
               </figcaption>
             </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Also a runner, on this computer</h3>
+              <p>
+                <strong>Runners</strong> shows the same list as the web, with this computer marked.
+                A new thread says where it runs: this computer (the default), another runner, or
+                any that fits.
+              </p>
+              <p>
+                <strong>Tests</strong> starts a project’s suite and follows the job live. By
+                default the app takes only the test jobs sent to this computer by name: running a
+                suite is running a repository’s code on your machine, so it happens when you asked
+                for it.
+              </p>
+              <p class="honest">
+                On Linux with bubblewrap a suite runs inside the sandbox. On macOS and Windows
+                there is no such wrapper yet: a suite runs as you, with a clean environment.
+              </p>
+            </div>
+            <div class="stack">
+              <figure class="shot">
+                <a class="frame" href="assets/img/desktop-runners-en-1600.webp">
+                  <img
+                    class="light-only"
+                    src="assets/img/desktop-runners-en-1600.webp"
+                    width="874"
+                    height="412"
+                    alt="The Runners view of the desktop app with two runners. The first, marked “This computer”, “computer” and “online”, takes test suites for every project its owner may edit, by name only, and agent runs for project WEB. The second, “Cloud runner 1”, marked “shared service” and “online”, takes test suites and agent runs for every project."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </a>
+                <figcaption>
+                  Runners in the desktop app: this computer, which takes test suites by name only, and
+                  a shared cloud runner. A real capture: the app’s real core against a real server.
+                </figcaption>
+              </figure>
+              <figure class="shot">
+                <a class="frame" href="assets/img/desktop-tests-en-1600.webp">
+                  <img
+                    class="light-only"
+                    src="assets/img/desktop-tests-en-1600.webp"
+                    width="874"
+                    height="925"
+                    alt="The Tests view of the desktop app. A form, “Run the suite”, with a branch, an optional filter and Where set to “This computer”, and a note that the suite runs with this computer’s processor and memory while the server only stores what comes back. Below it job #6, finished on this computer, with the end of its log: two tests passed, the report is sent. A button opens the session in the browser."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </a>
+                <figcaption>
+                  Tests: a suite sent to this computer, the finished job, and the end of its log. The
+                  session opens in the browser, where the recording is.
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+
+          <div class="pair entry" id="download">
+            <div class="text">
+              <h3>Download</h3>
+              <p>
+                Installers for macOS, Windows and Linux, and the <code>hub</code> command line
+                alone, are published on the repository’s releases page; 0.1.0 is the first. If the
+                page shows no release yet, it has not been published: build the app from
+                <code>apps/desktop</code>.
+              </p>
+              <p>
+                The installer does not contain the agent runtime. At its first start the app
+                downloads the Claude Agent SDK with your own npm: about 165 MB on macOS and
+                Windows, about 330 MB on Linux. So it needs Node.js 22.18 or newer, with npm.
+              </p>
+              <p>
+                The builds are not signed, so macOS and Windows warn at the first start.
+                <a class="ext" href="https://github.com/jash90/team-hub/blob/main/apps/desktop/RELEASE_NOTES.md"
+                  >The release notes</a
+                >
+                say how to open them and how to check a download against
+                <code>SHA256SUMS</code>.
+              </p>
+              <div class="actions">
+                <a class="button primary" href="https://github.com/jash90/team-hub/releases/latest">Releases on GitHub</a>
+                <a class="button" href="https://github.com/jash90/team-hub/blob/main/apps/desktop/README.md#building-and-running"
+                  >Build from source</a
+                >
+              </div>
+              <p class="honest">
+                Treat 0.1.0 as a preview. The app was written and run on Linux only. The installers
+                were built by GitHub’s machines and none was installed and tried by a person; the
+                macOS and Windows builds have never been run at all.
+              </p>
+            </div>
+            <div>
+              <table class="files">
+                <caption>
+                  Release 0.1.0
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">System</th>
+                    <th scope="col">File</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">macOS 13 or newer, Apple silicon</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-macos-arm64.dmg</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">macOS 13 or newer, Intel</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-macos-x64.dmg</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Windows 10 and 11, 64-bit Intel/AMD</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-windows-x64-setup.exe</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Debian 12 or newer, Ubuntu 22.04 or newer</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-linux-x64.deb</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Fedora</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-linux-x64.rpm</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Other Linux (glibc 2.35 or newer)</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-linux-x64.AppImage</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">The <code>hub</code> command line alone</th>
+                    <td>
+                      <code>hub-0.1.0-macos-arm64.tar.gz</code><br />
+                      <code>hub-0.1.0-macos-x64.tar.gz</code><br />
+                      <code>hub-0.1.0-linux-x64.tar.gz</code><br />
+                      <code>hub-0.1.0-windows-x64.zip</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Checksums of all of the above</th>
+                    <td>
+                      <code>SHA256SUMS</code>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <h4 class="code-title">What it needs besides the installer</h4>
+              <dl class="facts">
+                <div>
+                  <dt>Server</dt>
+                  <dd>the address of a team-hub server and an API token</dd>
+                </div>
+                <div>
+                  <dt>Node.js</dt>
+                  <dd>22.18 or newer, with npm; not included</dd>
+                </div>
+                <div>
+                  <dt>First start</dt>
+                  <dd>the network, once, and about 400 MB of disk</dd>
+                </div>
+                <div>
+                  <dt>git</dt>
+                  <dd>and a local clone of each repository agents should work in</dd>
+                </div>
+                <div>
+                  <dt>Model</dt>
+                  <dd>Claude Code signed in, or an Anthropic API key</dd>
+                </div>
+              </dl>
+            </div>
           </div>
         </div>
       </section>
@@ -563,7 +921,7 @@
       <section class="chapter" id="everyday" aria-labelledby="everyday-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">05</span>Search, reports, plans</p>
+            <p class="kicker"><span class="num">06</span>Search, reports, plans</p>
             <h2 id="everyday-title">A query language, reports and a timeline over the same data.</h2>
           </div>
 
@@ -690,7 +1048,7 @@ drift is not empty                        <span class="c">-- status and code dis
       <section class="chapter" id="modules" aria-labelledby="modules-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">06</span>Modules and import</p>
+            <p class="kicker"><span class="num">07</span>Modules and import</p>
             <h2 id="modules-title">Take what you need. Bring what you have.</h2>
           </div>
 
@@ -719,23 +1077,23 @@ drift is not empty                        <span class="c">-- status and code dis
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="assets/img/modules-1600.webp">
+              <a class="frame" href="assets/img/modules-top-1600.webp">
                 <img
                   class="light-only"
-                  src="assets/img/modules-1600.webp"
-                  srcset="assets/img/modules-800.webp 800w, assets/img/modules-1600.webp 1600w"
+                  src="assets/img/modules-top-1600.webp"
+                  srcset="assets/img/modules-top-800.webp 800w, assets/img/modules-top-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="1013"
-                  alt="Project settings, Modules tab: seven modules, each with a one-line description and a switch, all on. GitHub, Knowledge base, Confluence import, Jira import, Reports, Tests (e2e) and AI agents (MCP)."
+                  height="529"
+                  alt="Project settings, Modules tab, the top of the list: GitHub, Knowledge base and Confluence import, each with a one-line description and a switch that is on."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Project settings → Modules. A module switched off here keeps its data, but its
-                navigation, its panel on issues and its badges on cards disappear from this
-                project.
+                The top of the list in Project settings → Modules. A module switched off here
+                keeps its data, but its navigation, its panel on issues and its badges on cards
+                disappear from this project.
               </figcaption>
             </figure>
           </div>
@@ -781,7 +1139,7 @@ drift is not empty                        <span class="c">-- status and code dis
       <section class="chapter" id="built" aria-labelledby="built-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">07</span>How it is built</p>
+            <p class="kicker"><span class="num">08</span>How it is built</p>
             <h2 id="built-title">One binary, one data directory.</h2>
           </div>
 
@@ -802,10 +1160,12 @@ drift is not empty                        <span class="c">-- status and code dis
               </dd>
             </div>
             <div>
-              <dt>Beside it</dt>
+              <dt>Runners</dt>
               <dd>
-                <strong>Nothing to run.</strong> No database server, no queue, no cache. GitHub,
-                Jira, Confluence and a model provider are things you connect if you use them.
+                Work that needs a repository on disk is not done by the server. Runners do it: the
+                desktop app, or the cloud runner, which is the desktop app’s core run headless in
+                a container. A cloud runner connects outwards only: to the team-hub server, to
+                GitHub, to the model provider.
               </dd>
             </div>
             <div>
@@ -822,9 +1182,10 @@ drift is not empty                        <span class="c">-- status and code dis
             <div>
               <dt>Sign-in</dt>
               <dd>
-                Passwords hashed with Argon2, sign-in attempts rate limited. API tokens are stored
-                hashed and shown once. Tokens of other systems are encrypted at rest with the
-                instance key and never returned by any route.
+                Browser sessions are an HttpOnly cookie plus a CSRF token required on every write.
+                Passwords are hashed with Argon2; sign-in attempts are rate limited. API tokens are
+                stored hashed and shown once. Tokens of other systems are encrypted at rest with
+                the instance key and never returned by any route.
               </dd>
             </div>
             <div>
@@ -835,13 +1196,17 @@ drift is not empty                        <span class="c">-- status and code dis
               </dd>
             </div>
             <div>
+              <dt>Licence</dt>
+              <dd>
+                <strong><a href="https://github.com/jash90/team-hub/blob/main/LICENSE">MIT</a>.</strong> Nothing of Anthropic’s
+                is in the desktop app’s installers; the Claude Agent SDK the app downloads at its
+                first start is Anthropic’s, under Anthropic’s terms.
+              </dd>
+            </div>
+            <div>
               <dt>More</dt>
               <dd>
-                <a
-                  class="ext"
-                  href="https://github.com/jash90/team-hub/blob/main/docs/architecture.md"
-                  >docs/architecture.md</a
-                >
+                <a class="ext" href="https://github.com/jash90/team-hub/blob/main/docs/architecture.md">docs/architecture.md</a>
               </dd>
             </div>
           </dl>
@@ -851,7 +1216,7 @@ drift is not empty                        <span class="c">-- status and code dis
       <section class="chapter" id="run" aria-labelledby="run-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">08</span>Run it</p>
+            <p class="kicker"><span class="num">09</span>Run it</p>
             <h2 id="run-title">Three commands, or one container.</h2>
           </div>
 
@@ -871,6 +1236,12 @@ drift is not empty                        <span class="c">-- status and code dis
                 in front before exposing it. Wherever the address is reachable by others before
                 you have set the instance up, set <code>TEAM_HUB_SETUP_TOKEN</code>: creating the
                 first account then asks for it.
+              </p>
+              <p>
+                Agent runs in code and test jobs also need a <a href="#runners">runner</a>: the
+                desktop app on somebody’s computer, or the cloud runner as a second container
+                (<a class="ext" href="https://github.com/jash90/team-hub/blob/main/docs/cloud-runner.md">docs/cloud-runner.md</a
+                >).
               </p>
               <p>
                 On Railway the repository deploys as it is: a volume at <code>/data</code>, a
@@ -916,7 +1287,7 @@ drift is not empty                        <span class="c">-- status and code dis
       <section class="chapter" id="not-yet" aria-labelledby="not-yet-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">09</span>Not yet</p>
+            <p class="kicker"><span class="num">10</span>Not yet</p>
             <h2 id="not-yet-title">What it does not do yet.</h2>
           </div>
 
@@ -949,6 +1320,14 @@ drift is not empty                        <span class="c">-- status and code dis
                 <li>
                   The desktop app has run on Linux only. Its macOS and Windows sandboxes, the tray,
                   notifications and installers are unverified.
+                </li>
+                <li>
+                  A shared runner signs in with an administrator’s API token: it has no identity of
+                  its own with narrower rights.
+                </li>
+                <li>
+                  Recordings were verified with videos made by hand in the framework’s format, not
+                  with a real recorded run. The cloud runner has never run on a real host.
                 </li>
                 <li>
                   The server writes English. The interface puts its errors, notifications and
@@ -994,6 +1373,8 @@ drift is not empty                        <span class="c">-- status and code dis
                   >The agent run contract</a
                 >
               </li>
+              <li><a class="ext" href="https://github.com/jash90/team-hub/blob/main/docs/runners.md">Runners</a></li>
+              <li><a class="ext" href="https://github.com/jash90/team-hub/blob/main/LICENSE">Licence: MIT</a></li>
               <li><a href="pl/" hreflang="pl" lang="pl">Po polsku</a></li>
             </ul>
             <p>

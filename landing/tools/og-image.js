@@ -36,7 +36,7 @@ const card = (lang, [kicker, claim, fact]) => `<!doctype html>
   .shot { position: absolute; left: 64px; top: 366px; width: 1300px; height: 400px; overflow: hidden;
     border: 1px solid #d9d6cc; border-radius: 14px; box-shadow: 0 24px 60px -24px rgb(23 24 28 / .35); }
   /* The offsets put the board's filter row and first cards in the window. */
-  .shot img { width: 1640px; max-width: none; margin: -138px 0 0 -272px; }
+  .shot img { width: 1376px; max-width: none; margin: -138px 0 0 -8px; }
 </style>
 </head>
 <body>
@@ -47,7 +47,7 @@ const card = (lang, [kicker, claim, fact]) => `<!doctype html>
   </div>
   <h1><span class="claim">${claim}</span><span>${fact}</span></h1>
 </div>
-<div class="shot"><img src="${assets}img/board-light-1600.webp" alt=""></div>
+<div class="shot"><img src="${assets}img/sprint-board-light-1600.webp" alt=""></div>
 </body>
 </html>`;
 

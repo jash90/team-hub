@@ -123,6 +123,7 @@ body {
 h1,
 h2,
 h3,
+h4,
 p,
 ul,
 ol,
@@ -430,6 +431,62 @@ h1 .claim {
   margin-top: clamp(2.5rem, 6vw, 4.5rem);
 }
 
+/* The files of a release: the same look as the fact lists, as a table. */
+.files {
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.files caption {
+  padding-bottom: 0.6rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--ink-3);
+}
+
+.files thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.files th,
+.files td {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+  font-weight: 400;
+}
+
+.files th {
+  width: 45%;
+  padding-right: 1em;
+  color: var(--ink-3);
+}
+
+.files code {
+  padding: 0;
+  background: none;
+  font-size: 1em;
+  color: var(--ink);
+}
+
+.files + .code-title {
+  margin-top: 2.5rem;
+}
+
+.code-title + .facts {
+  margin-top: 0.6rem;
+}
+
 /* ---------- Chapters ---------- */
 .chapter {
   padding-block: var(--chapter);
@@ -557,6 +614,11 @@ h3 {
   max-width: 34em;
 }
 
+/* Two figures for one claim, one under the other. */
+.stack > * + * {
+  margin-top: clamp(1.75rem, 3vw, 2.5rem);
+}
+
 /* The desktop app is a second program, so it gets ground of its own. */
 .band {
   padding-block: var(--chapter);
@@ -642,6 +704,11 @@ main {
 
 .shot.narrow {
   max-width: 50rem;
+}
+
+/* A dialog captured at twice its size: shown at its own size, not stretched to the column. */
+.shot.small {
+  max-width: 30rem;
 }
 
 .shot figcaption {
@@ -1014,6 +1081,21 @@ pre .c {
 
   .facts > div {
     grid-template-columns: 7em minmax(0, 1fr);
+  }
+
+  .files th,
+  .files td {
+    display: block;
+    width: auto;
+  }
+
+  .files th {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .files td {
+    padding-top: 0.15rem;
   }
 }
 

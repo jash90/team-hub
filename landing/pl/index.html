@@ -55,8 +55,8 @@
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="../assets/site.css?v=1" />
-    <script src="../assets/site.js?v=1" defer></script>
+    <link rel="stylesheet" href="../assets/site.css?v=2" />
+    <script src="../assets/site.js?v=2" defer></script>
   </head>
   <body>
     <a class="skip" href="#main">Przejdź do treści</a>
@@ -70,6 +70,7 @@
         <nav class="site-nav" aria-label="Sekcje">
           <a href="#code">Kod</a>
           <a href="#agents">Agenci</a>
+          <a href="#runners">Runnery</a>
           <a href="#desktop">Aplikacja desktopowa</a>
           <a href="#run">Uruchomienie</a>
           <a href="#not-yet">Czego nie ma</a>
@@ -115,11 +116,11 @@
             <dl class="facts">
               <div>
                 <dt>Działa jako</dt>
-                <dd>jeden plik binarny serwera, jeden plik SQLite</dd>
+                <dd>jeden plik binarny serwera; SQLite w&nbsp;jednym pliku</dd>
               </div>
               <div>
-                <dt>Potrzebuje obok</dt>
-                <dd>niczego</dd>
+                <dt>Praca w&nbsp;kodzie</dt>
+                <dd>na runnerach: w&nbsp;aplikacji desktopowej albo na wspólnym runnerze w&nbsp;chmurze</dd>
               </div>
               <div>
                 <dt>Interfejs</dt>
@@ -127,7 +128,9 @@
               </div>
               <div>
                 <dt>Kod źródłowy</dt>
-                <dd><a href="https://github.com/jash90/team-hub">github.com/jash90/team-hub</a></dd>
+                <dd>
+                  <a href="https://github.com/jash90/team-hub">github.com/jash90/team-hub</a>, licencja MIT
+                </dd>
               </div>
             </dl>
           </div>
@@ -135,8 +138,8 @@
           <figure class="shot hero-shot">
             <a
               class="frame"
-              href="../assets/img/board-light-1600.webp"
-              data-dark="../assets/img/board-dark-1600.webp"
+              href="../assets/img/sprint-board-light-1600.webp"
+              data-dark="../assets/img/sprint-board-dark-1600.webp"
             >
               <picture>
                 <!-- On a phone the whole board is too small to read: show one column. -->
@@ -155,31 +158,33 @@
                 <source
                   media="(prefers-color-scheme: dark)"
                   srcset="
-                    ../assets/img/board-dark-800.webp   800w,
-                    ../assets/img/board-dark-1600.webp 1600w
-                  "
-                  sizes="(min-width: 87em) 1280px, 92vw"
-                />
-                <img
-                  src="../assets/img/board-light-1600.webp"
-                  srcset="
-                    ../assets/img/board-light-800.webp   800w,
-                    ../assets/img/board-light-1600.webp 1600w
+                    ../assets/img/sprint-board-dark-800.webp   800w,
+                    ../assets/img/sprint-board-dark-1600.webp 1600w
                   "
                   sizes="(min-width: 87em) 1280px, 92vw"
                   width="1600"
-                  height="800"
-                  alt="Tablica sprintu w&nbsp;przykładowym projekcie sklepu internetowego: cztery kolumny, To Do, In Progress, In Review i&nbsp;Done, a&nbsp;w&nbsp;nich dwanaście kart zadań. Na części kart widać numer pull requesta z&nbsp;ptaszkiem albo krzyżykiem, liczbę zaliczonych testów i&nbsp;pomarańczowy trójkąt ostrzegawczy."
+                  height="954"
+                />
+                <img
+                  src="../assets/img/sprint-board-light-1600.webp"
+                  srcset="
+                    ../assets/img/sprint-board-light-800.webp   800w,
+                    ../assets/img/sprint-board-light-1600.webp 1600w
+                  "
+                  sizes="(min-width: 87em) 1280px, 92vw"
+                  width="1600"
+                  height="954"
+                  alt="Tablica sprintu w&nbsp;przykładowym projekcie sklepu internetowego: karty zadań w&nbsp;kolumnach według statusu. Na części kart obok klucza zadania widać numer pull requesta z&nbsp;ptaszkiem albo krzyżykiem, liczbę zaliczonych testów i&nbsp;pomarańczowy trójkąt ostrzegawczy. Na wąskim ekranie widać tylko kolumnę In Review."
                   fetchpriority="high"
                   decoding="async"
                 />
               </picture>
             </a>
             <figcaption>
-              Tablica sprintu. Obok klucza zadania widać jego pull request ze stanem testów, wynik
-              testów e2e, zlecenie dla agenta, które czeka na człowieka, oraz trójkąt tam, gdzie
-              status nie zgadza się z&nbsp;kodem. Interfejs jest po polsku i&nbsp;po angielsku; zrzuty na tej
-              stronie pokazują projekt przykładowy.
+              Tablica sprintu. Obok klucza zadania widać jego pull request ze stanem testów w&nbsp;CI,
+              liczbę zaliczonych testów e2e oraz trójkąt tam, gdzie status nie zgadza się z&nbsp;kodem.
+              Interfejs jest po polsku i&nbsp;po angielsku; zrzuty na tej stronie pokazują projekt
+              przykładowy.
             </figcaption>
           </figure>
 
@@ -358,7 +363,7 @@
               <p>
                 Przebiegi frameworka testowego
                 <a href="https://github.com/e2e-inc/e2e">e2e</a> trafiają do trackera przez
-                reporter. Test, który ma klucz zadania w&nbsp;tytule albo w&nbsp;tagach, jest z&nbsp;tym zadaniem
+                reporter albo są uruchamiane z&nbsp;samego team-huba. Test, który ma klucz zadania w&nbsp;tytule albo w&nbsp;tagach, jest z&nbsp;tym zadaniem
                 powiązany, więc w&nbsp;zadaniu widać, czy to, co ono opisuje, naprawdę działa.
               </p>
               <p>Niezaliczony test przy zadaniu oznaczonym jako Done też widać.</p>
@@ -381,6 +386,50 @@
                 Projekt → Testy: ostatni przebieg, a&nbsp;pod nim każdy test z&nbsp;zadaniem, które sprawdza,
                 i&nbsp;z&nbsp;wynikami ostatnich przebiegów. Tutaj niezaliczony test wskazuje na zadanie
                 oznaczone jako Done.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry" id="test-jobs">
+            <div class="text">
+              <h3>Testy uruchamiasz z&nbsp;team-huba i&nbsp;oglądasz ich przebieg</h3>
+              <p>
+                <em>Uruchomienie testów</em> zleca runnerowi pobranie repozytorium projektu,
+                wykonanie testów z&nbsp;włączonym nagrywaniem i&nbsp;odesłanie wszystkiego z&nbsp;powrotem. Wynik
+                otwiera się jako sesja do obejrzenia: nagranie, w&nbsp;którym każdy krok jest przypięty
+                do swojej chwili, obrazy z&nbsp;nagrania krok po kroku, zrzuty ekranu, błąd i&nbsp;strona
+                śladu.
+              </p>
+              <p class="honest">
+                Nagrania sprawdzono dotąd na filmach przygotowanych ręcznie w&nbsp;formacie frameworka,
+                jeszcze nie na prawdziwym nagranym przebiegu.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/session-pl-light-1600.webp" data-dark="../assets/img/session-pl-dark-1600.webp">
+                <picture>
+                  <source
+                    media="(prefers-color-scheme: dark)"
+                    srcset="../assets/img/session-pl-dark-800.webp 800w, ../assets/img/session-pl-dark-1600.webp 1600w"
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1600"
+                    height="1460"
+                  />
+                  <img
+                    src="../assets/img/session-pl-light-1600.webp"
+                    srcset="../assets/img/session-pl-light-800.webp 800w, ../assets/img/session-pl-light-1600.webp 1380w"
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1380"
+                    height="2040"
+                    alt="Sesja niezaliczonego testu „the backlog lists the sprint and its issues”, który sprawdza zadanie WEB-4 oznaczone jako Done. U góry błąd asercji: oczekiwano tekstu „Finish the sprint now”, otrzymano „Complete sprint”. Niżej odtwarzacz z nagraniem, oś czasu ze znacznikiem każdego kroku i pasek obrazów z nagrania; w szerszym układzie obok widać listę sześciu kroków z czasami, z których ostatni jest niezaliczony."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
+              </a>
+              <figcaption>
+                Niezaliczony test jako sesja: błąd, nagranie zatrzymane na jednym z&nbsp;kroków i&nbsp;obrazy
+                z&nbsp;nagrania krok po kroku. Test sprawdza zadanie WEB-4 oznaczone jako Done.
               </figcaption>
             </figure>
           </div>
@@ -437,8 +486,9 @@
               <h3>Kto wykonuje zlecenie</h3>
               <p>
                 Zlecenia, które nie wymagają kodu, wykonuje sam serwer, z&nbsp;Twoim kluczem do dostawcy
-                modelu. Te, które wymagają repozytorium, trafiają do runnera: aplikacji
-                desktopowej, polecenia <code>hub</code> albo dowolnego programu, który zna
+                modelu. Te, które wymagają repozytorium, trafiają do
+                <a href="#runners">runnera</a>: aplikacji desktopowej, runnera w&nbsp;chmurze,
+                polecenia <code>hub</code> albo dowolnego programu, który zna
                 <a href="https://github.com/jash90/team-hub/blob/main/docs/agent-runs.md"
                   >kontrakt zleceń</a
                 >.
@@ -456,17 +506,162 @@
         </div>
       </section>
 
+      <section class="chapter" id="runners" aria-labelledby="runners-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">04</span>Runnery i&nbsp;harmonogram</p>
+            <h2 id="runners-title">Gdzie praca się wykonuje i&nbsp;kiedy.</h2>
+            <p class="intro">
+              Zlecenia dla agentów w&nbsp;kodzie i&nbsp;uruchomienia testów potrzebują repozytorium na dysku.
+              Serwer nie wykonuje ani jednych, ani drugich. Robi to runner: aplikacja desktopowa na
+              czyimś komputerze, korzystająca z&nbsp;tego komputera, albo runner w&nbsp;chmurze, czyli
+              kontener obok serwera, wspólny dla całego zespołu.
+            </p>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Jedna lista</h3>
+              <p>
+                Jedna strona pokazuje wszystkie runnery: co każdy przyjmuje, dla których projektów
+                i&nbsp;co właśnie wykonuje. Tę samą listę pokazuje aplikacja desktopowa.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/runners-pl-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/runners-pl-1600.webp"
+                  srcset="../assets/img/runners-pl-800.webp 800w, ../assets/img/runners-pl-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="1099"
+                  alt="Strona Runnery w dwóch grupach. Zespołu: dwa runnery w chmurze, każdy z oznaczeniami „usługa” i „wspólny”, połączone, przyjmują testy i zlecenia dla agentów w dowolnym projekcie. Twoje: jeden komputer, połączony, który zlecenia dla agentów przyjmuje w dowolnym projekcie, a testy tylko wtedy, gdy wysłano je do niego imiennie."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Runnery: dwa wspólne runnery zespołu w&nbsp;chmurze i&nbsp;komputer jednej osoby, który
+                przyjmuje testy tylko wtedy, gdy wysłano je do niego imiennie.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Dowolny runner albo jeden, imiennie</h3>
+              <p>
+                Pracę można zostawić dowolnemu pasującemu runnerowi albo wysłać imiennie do jednego.
+                Wtedy czeka ona na ten runner i&nbsp;nikt inny jej nie dostanie. Czyjś komputer
+                przyjmuje imienną pracę tylko od swojego właściciela.
+              </p>
+            </div>
+            <figure class="shot small">
+              <a class="frame" href="../assets/img/where-pl-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/where-pl-1600.webp"
+                  width="952"
+                  height="684"
+                  alt="Dolna część okna zlecania implementacji, z nagłówkiem „Gdzie ma być wykonane” i trzema możliwościami: dowolny pasujący runner, runner w chmurze z oznaczeniem „usługa” oraz komputer z oznaczeniem „komputer”, który jest wybrany. Pod nimi przyciski Anuluj i Rozpocznij."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Zlecanie implementacji w&nbsp;przeglądarce: dowolny pasujący runner, runner w&nbsp;chmurze
+                albo własny komputer.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry" id="keys">
+            <div class="text">
+              <h3>Wspólny runner nie ma własnych kluczy</h3>
+              <p>
+                Każda osoba zapisuje w&nbsp;team-hubie własny klucz do modelu i&nbsp;własny token GitHuba
+                (Ustawienia → Moje klucze), a&nbsp;jej praca na wspólnym runnerze korzysta właśnie z&nbsp;nich.
+                Klucz jest przechowywany zaszyfrowany, żadna trasa go nie zwraca, a&nbsp;serwer opuszcza
+                w&nbsp;jednym tylko miejscu: w&nbsp;odpowiedzi dla wspólnego runnera, który podjął pracę tej
+                osoby.
+              </p>
+              <p class="honest">
+                Wspólny runner loguje się tokenem API administratora; nie ma własnej tożsamości
+                z&nbsp;węższymi uprawnieniami. Runner w&nbsp;chmurze nie działał dotąd na prawdziwym hoście.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/keys-pl-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/keys-pl-1600.webp"
+                  srcset="../assets/img/keys-pl-800.webp 800w, ../assets/img/keys-pl-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="840"
+                  alt="Ustawienia, panel „Moje klucze”. Akapit wyjaśnia, że wspólny runner należy do zespołu i nie ma własnych kluczy. Niżej dwa klucze: token GitHuba, nieustawiony, z polem do wklejenia, oraz klucz API Anthropic, ustawiony, pokazany czterema ostatnimi znakami, z przyciskami Zastąp i Usuń."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Ustawienia → Moje klucze: token GitHuba jeszcze nieustawiony, klucz API Anthropic
+                ustawiony i&nbsp;pokazany tylko czterema ostatnimi znakami.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry" id="schedule">
+            <div class="text">
+              <h3>Harmonogram</h3>
+              <p>
+                Cykliczna praca w&nbsp;projekcie: co rano, po pracy albo na żądanie. Po przerwie
+                w&nbsp;działaniu harmonogram nadrabia zaległe uruchomienie, zamiast je zgubić,
+                a&nbsp;nieudana próba zostawia na widoku ostatni dobry wynik.
+              </p>
+              <p>
+                To, co można zaplanować, pochodzi z&nbsp;modułów. Dziś są to dwie czynności:
+                uruchomienie agenta na zadaniach, które znajdzie zapytanie, i&nbsp;uruchomienie testów
+                projektu.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/schedule-pl-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/schedule-pl-1600.webp"
+                  srcset="../assets/img/schedule-pl-800.webp 800w, ../assets/img/schedule-pl-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="1491"
+                  alt="Strona Harmonogram w projekcie, w trzech grupach: Rano z jedną czynnością, Po pracy z dwiema, Na żądanie z dwiema; każda grupa ma przycisk „Uruchom tę grupę teraz”. Czynność to karta z przełącznikiem, zapytaniem, na którego wynikach uruchamia agenta, ostatnim wynikiem i przyciskiem „Uruchom teraz”. Na jednej karcie pomarańczowa notatka mówi, że widać starszy wynik, bo ostatnia próba się nie powiodła."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Harmonogram projektu: jedna czynność rano, dwie po pracy, dwie na żądanie. Karta
+                z&nbsp;pomarańczową notatką pokazuje starszy wynik, bo ostatnia próba się nie powiodła.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
       <section class="band" id="desktop" aria-labelledby="desktop-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">04</span>Aplikacja desktopowa</p>
+            <p class="kicker"><span class="num">05</span>Aplikacja desktopowa</p>
             <h2 id="desktop-title">Nic nie opuszcza Twojego komputera bez kliknięcia.</h2>
             <p class="intro">
               Kokpit programisty na macOS, Windows i&nbsp;Linuksa. Zadania przypisane do Ciebie stają
               się wątkami agentów: agent pracuje nad zadaniem w&nbsp;Twoim lokalnym klonie, we własnym
               drzewie roboczym gita i&nbsp;na własnej gałęzi, a&nbsp;wszystko, co miałoby opuścić komputer
               (komentarz, zmiana statusu, wypchnięcie gałęzi, pull request), czeka na Twoje
-              kliknięcie. Ta sama aplikacja jest runnerem dla pracy zleconej w&nbsp;przeglądarce.
+              kliknięcie. Ta sama aplikacja jest jednym z&nbsp;runnerów zespołu: wykonuje zlecenia dla
+              agentów zlecone w&nbsp;przeglądarce oraz testy, na procesorze, pamięci i&nbsp;dysku tego
+              komputera.
             </p>
           </div>
 
@@ -488,8 +683,9 @@
                   a&nbsp;kopia danych trackera do pracy offline jest zaszyfrowana.
                 </li>
                 <li>
-                  Przed wypchnięciem widzisz dokładnie te commity i&nbsp;ten diff, które wyjdą. Wypychany
-                  jest dokładnie commit z&nbsp;podglądu, nigdy z&nbsp;wymuszeniem.
+                  Narzędzia plikowe agenta są przypięte do drzewa roboczego. Folderów
+                  z&nbsp;poświadczeniami (<code>~/.ssh</code>, <code>~/.aws</code>,
+                  <code>~/.config/gh</code>…) ani stanu samej aplikacji agent nie przeczyta.
                 </li>
               </ul>
               <p>
@@ -501,32 +697,22 @@
               </p>
             </div>
             <figure class="shot">
-              <a
-                class="frame"
-                href="../assets/img/desktop-pl-light-1600.webp"
-                data-dark="../assets/img/desktop-pl-dark-1600.webp"
-              >
+              <a class="frame" href="../assets/img/desktop-pl-light-1600.webp" data-dark="../assets/img/desktop-pl-dark-1600.webp">
                 <picture>
                   <source
                     media="(prefers-color-scheme: dark)"
-                    srcset="
-                      ../assets/img/desktop-pl-dark-800.webp   800w,
-                      ../assets/img/desktop-pl-dark-1600.webp 1296w
-                    "
+                    srcset="../assets/img/desktop-pl-dark-800.webp 800w, ../assets/img/desktop-pl-dark-1600.webp 1296w"
                     sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                     width="1296"
                     height="950"
                   />
                   <img
                     src="../assets/img/desktop-pl-light-1600.webp"
-                    srcset="
-                      ../assets/img/desktop-pl-light-800.webp   800w,
-                      ../assets/img/desktop-pl-light-1600.webp 1280w
-                    "
+                    srcset="../assets/img/desktop-pl-light-800.webp 800w, ../assets/img/desktop-pl-light-1600.webp 1280w"
                     sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                     width="1280"
                     height="900"
-                    alt="Aplikacja desktopowa. Po lewej lista rzeczy do decyzji i&nbsp;cztery wątki agentów. Pośrodku wątek zadania „Reset hasła”: agent zadaje pytanie, człowiek odpowiada, agent commituje i&nbsp;proponuje komentarz, wypchnięcie gałęzi oraz pull request; na końcu wiersze o&nbsp;wypchniętej gałęzi i&nbsp;adresie pull requesta."
+                    alt="Aplikacja desktopowa. Po lewej lista rzeczy do decyzji i cztery wątki agentów. Pośrodku wątek zadania „Reset hasła”: agent zadaje pytanie, człowiek odpowiada, agent commituje i proponuje komentarz, wypchnięcie gałęzi oraz pull request; na końcu wiersze o wypchniętej gałęzi i adresie pull requesta."
                     loading="lazy"
                     decoding="async"
                   />
@@ -534,40 +720,26 @@
               </a>
               <figcaption>
                 Wątek zadania. Agent zadał jedno pytanie, dostał odpowiedź, zacommitował na swojej
-                gałęzi i&nbsp;zaproponował komentarz, wypchnięcie gałęzi oraz pull request. Gałąź
-                wyszła z&nbsp;komputera dopiero po zatwierdzeniu.
+                gałęzi i&nbsp;zaproponował komentarz, wypchnięcie gałęzi oraz pull request. Gałąź wyszła
+                z&nbsp;komputera dopiero po zatwierdzeniu. Ten zrzut i&nbsp;następny pochodzą z&nbsp;własnego
+                testu end-to-end aplikacji, w&nbsp;którym model zastępuje skryptowany agent testowy;
+                stąd angielskie wypowiedzi agenta.
               </figcaption>
             </figure>
           </div>
 
           <div class="pair entry">
             <div class="text">
-              <h3>Pobieranie</h3>
+              <h3>Wypchnięcie, zanim do niego dojdzie</h3>
               <p>
-                Instalatory dla macOS, Windows i&nbsp;Linuksa trafiają na stronę wydań w&nbsp;repozytorium.
-                Pierwsze wydanie jest w&nbsp;przygotowaniu; jeśli strona jest jeszcze pusta, zbuduj
-                aplikację ze źródeł w <code>apps/desktop</code>.
+                Przed wypchnięciem widzisz dokładnie te commity i&nbsp;ten diff, które wyjdą. Wypychany
+                jest dokładnie commit z&nbsp;podglądu (commit dodany później zostaje na komputerze),
+                nigdy z&nbsp;wymuszeniem.
               </p>
               <p>
-                Paczki nie są na razie podpisane, więc macOS i&nbsp;Windows ostrzegą przed pierwszym
-                uruchomieniem. Aplikacja potrzebuje serwera team-hub, z&nbsp;którym się połączy. Do
-                pracy z&nbsp;prawdziwym modelem używa Claude Code zalogowanego na tym samym komputerze
-                albo klucza API Anthropic.
-              </p>
-              <div class="actions">
-                <a class="button primary" href="https://github.com/jash90/team-hub/releases/latest"
-                  >Wydania na GitHubie</a
-                >
-                <a
-                  class="button"
-                  href="https://github.com/jash90/team-hub/blob/main/apps/desktop/README.md#building-and-running"
-                  >Budowanie ze źródeł</a
-                >
-              </div>
-              <p class="honest">
-                Jak dotąd aplikacja była uruchamiana tylko na Linuksie. Piaskownice na macOS
-                i&nbsp;Windows, ikona w&nbsp;zasobniku, powiadomienia i&nbsp;instalatory nie zostały jeszcze
-                sprawdzone.
+                Gdy diff dotyka plików CI albo budowania, wygląda, jakby zawierał sekret, albo
+                dodaje plik binarny, dowiązanie lub plik wykonywalny, aplikacja odmawia, dopóki
+                nie potwierdzisz wypchnięcia, podając nazwę.
               </p>
             </div>
             <figure class="shot narrow">
@@ -577,18 +749,201 @@
                   src="../assets/img/desktop-push-800.webp"
                   width="800"
                   height="528"
-                  alt="Okno dialogowe „Push the branch” w&nbsp;angielskiej wersji interfejsu: gałąź i&nbsp;adres repozytorium, do którego trafi, zdanie o&nbsp;tym, że wypychany jest dokładnie ten commit, a&nbsp;wszystko, co wątek zacommituje później, zostaje na komputerze, jeden commit, diff jednego dodanego pliku oraz przyciski Cancel i&nbsp;„Push 1 commits”."
+                  alt="Okno dialogowe „Push the branch” w angielskiej wersji interfejsu: gałąź i adres repozytorium, do którego trafi, zdanie o tym, że wypychany jest dokładnie ten commit, a wszystko, co wątek zacommituje później, zostaje na komputerze, jeden commit, diff jednego dodanego pliku oraz przyciski Cancel i „Push 1 commits”."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
                 Podgląd przed wypchnięciem, tu w&nbsp;angielskiej wersji interfejsu: jeden commit, jego
-                diff i&nbsp;adres, pod który trafi. Oba zrzuty aplikacji pochodzą z&nbsp;jej własnego testu
-                end-to-end, w&nbsp;którym model zastępuje skryptowany agent testowy; stąd angielskie
-                wypowiedzi agenta i&nbsp;autor commita „Fake Agent”.
+                diff i&nbsp;adres, pod który trafi. Autorem commita jest „Fake Agent”, bo zrobił go
+                skryptowany agent testowy.
               </figcaption>
             </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Także runner, na tym komputerze</h3>
+              <p>
+                Widok <strong>Runnery</strong> pokazuje tę samą listę co przeglądarka,
+                z&nbsp;zaznaczonym tym komputerem. Nowy wątek mówi, gdzie ma pracować: na tym komputerze
+                (domyślnie), na innym runnerze albo na dowolnym pasującym.
+              </p>
+              <p>
+                Widok <strong>Testy</strong> uruchamia testy projektu i&nbsp;śledzi uruchomienie na
+                żywo. Domyślnie aplikacja przyjmuje tylko te testy, które wysłano do tego komputera
+                imiennie: uruchomienie testów to uruchomienie kodu z&nbsp;repozytorium na Twoim
+                komputerze, więc dzieje się wtedy, gdy o&nbsp;to prosisz.
+              </p>
+              <p class="honest">
+                Na Linuksie z&nbsp;bubblewrap testy działają w&nbsp;piaskownicy. Na macOS i&nbsp;Windows takiej
+                osłony jeszcze nie ma: testy działają jako Ty, z&nbsp;czystym środowiskiem.
+              </p>
+            </div>
+            <div class="stack">
+              <figure class="shot">
+                <a class="frame" href="../assets/img/desktop-runners-en-1600.webp">
+                  <img
+                    class="light-only"
+                    src="../assets/img/desktop-runners-en-1600.webp"
+                    width="874"
+                    height="412"
+                    alt="Widok Runners aplikacji desktopowej w angielskiej wersji interfejsu, z dwoma runnerami. Pierwszy, z oznaczeniami „This computer”, „computer” i „online”, przyjmuje testy tylko imiennie, w każdym projekcie, który jego właściciel może edytować, oraz zlecenia dla agentów w projekcie WEB. Drugi, „Cloud runner 1” z oznaczeniami „shared service” i „online”, przyjmuje testy i zlecenia dla agentów w każdym projekcie."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </a>
+                <figcaption>
+                  Runnery w&nbsp;aplikacji desktopowej (interfejs angielski): ten komputer, który przyjmuje
+                  testy tylko imiennie, oraz wspólny runner w&nbsp;chmurze. To prawdziwy zrzut:
+                  prawdziwy rdzeń aplikacji połączony z&nbsp;prawdziwym serwerem.
+                </figcaption>
+              </figure>
+              <figure class="shot">
+                <a class="frame" href="../assets/img/desktop-tests-en-1600.webp">
+                  <img
+                    class="light-only"
+                    src="../assets/img/desktop-tests-en-1600.webp"
+                    width="874"
+                    height="925"
+                    alt="Widok Tests aplikacji desktopowej w angielskiej wersji interfejsu. Formularz „Run the suite” z gałęzią, opcjonalnym filtrem i polem Where ustawionym na „This computer” oraz notatka, że testy działają na procesorze i pamięci tego komputera, a serwer tylko przechowuje to, co wróci. Niżej uruchomienie nr 6, zakończone na tym komputerze, z końcem logu: dwa testy zaliczone, raport wysłany. Przycisk otwiera sesję w przeglądarce."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </a>
+                <figcaption>
+                  Testy w&nbsp;aplikacji: testy wysłane na ten komputer, zakończone uruchomienie i&nbsp;koniec
+                  jego logu. Sesja otwiera się w&nbsp;przeglądarce, bo tam jest nagranie.
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+
+          <div class="pair entry" id="download">
+            <div class="text">
+              <h3>Pobieranie</h3>
+              <p>
+                Instalatory dla macOS, Windows i&nbsp;Linuksa oraz samo polecenie <code>hub</code> są
+                publikowane na stronie wydań w&nbsp;repozytorium; 0.1.0 to pierwsze wydanie. Jeśli na
+                tej stronie nie ma jeszcze żadnego wydania, to nie zostało ono opublikowane: zbuduj
+                aplikację ze źródeł w <code>apps/desktop</code>.
+              </p>
+              <p>
+                Instalator nie zawiera środowiska agenta. Przy pierwszym uruchomieniu aplikacja
+                pobiera Claude Agent SDK Twoim własnym npm: około 165 MB na macOS i&nbsp;Windows, około
+                330 MB na Linuksie. Dlatego potrzebny jest Node.js 22.18 lub nowszy, razem z&nbsp;npm.
+              </p>
+              <p>
+                Paczki nie są podpisane, więc macOS i&nbsp;Windows ostrzegą przy pierwszym uruchomieniu.
+                Jak je otworzyć i&nbsp;jak sprawdzić pobrany plik z <code>SHA256SUMS</code>, opisują
+                <a class="ext" href="https://github.com/jash90/team-hub/blob/main/apps/desktop/RELEASE_NOTES.md"
+                  >informacje o&nbsp;wydaniu</a
+                >
+                (po angielsku).
+              </p>
+              <div class="actions">
+                <a class="button primary" href="https://github.com/jash90/team-hub/releases/latest">Wydania na GitHubie</a>
+                <a class="button" href="https://github.com/jash90/team-hub/blob/main/apps/desktop/README.md#building-and-running"
+                  >Budowanie ze źródeł</a
+                >
+              </div>
+              <p class="honest">
+                Traktuj 0.1.0 jako wersję poglądową. Aplikacja powstała i&nbsp;była uruchamiana
+                wyłącznie na Linuksie. Instalatory zbudowały maszyny GitHuba i&nbsp;żadnego nie
+                zainstalował ani nie wypróbował człowiek, a&nbsp;wersje dla macOS i&nbsp;Windows nie zostały
+                dotąd uruchomione ani razu.
+              </p>
+            </div>
+            <div>
+              <table class="files">
+                <caption>
+                  Wydanie 0.1.0
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">System</th>
+                    <th scope="col">Plik</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">macOS 13 lub nowszy, Apple silicon</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-macos-arm64.dmg</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">macOS 13 lub nowszy, Intel</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-macos-x64.dmg</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Windows 10 i&nbsp;11, 64-bitowy Intel/AMD</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-windows-x64-setup.exe</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Debian 12 lub nowszy, Ubuntu 22.04 lub nowszy</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-linux-x64.deb</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Fedora</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-linux-x64.rpm</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Inny Linux (glibc 2.35 lub nowsza)</th>
+                    <td>
+                      <code>team-hub-desktop-0.1.0-linux-x64.AppImage</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Samo polecenie <code>hub</code></th>
+                    <td>
+                      <code>hub-0.1.0-macos-arm64.tar.gz</code><br />
+                      <code>hub-0.1.0-macos-x64.tar.gz</code><br />
+                      <code>hub-0.1.0-linux-x64.tar.gz</code><br />
+                      <code>hub-0.1.0-windows-x64.zip</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Sumy kontrolne wszystkich plików</th>
+                    <td>
+                      <code>SHA256SUMS</code>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <h4 class="code-title">Czego potrzebuje poza instalatorem</h4>
+              <dl class="facts">
+                <div>
+                  <dt>Serwer</dt>
+                  <dd>adres serwera team-hub i&nbsp;token API</dd>
+                </div>
+                <div>
+                  <dt>Node.js</dt>
+                  <dd>22.18 lub nowszy, z&nbsp;npm; nie ma go w&nbsp;instalatorze</dd>
+                </div>
+                <div>
+                  <dt>Pierwsze uruchomienie</dt>
+                  <dd>sieć, jeden raz, i&nbsp;około 400 MB na dysku</dd>
+                </div>
+                <div>
+                  <dt>git</dt>
+                  <dd>i&nbsp;lokalny klon każdego repozytorium, w&nbsp;którym mają pracować agenci</dd>
+                </div>
+                <div>
+                  <dt>Model</dt>
+                  <dd>zalogowany Claude Code albo klucz API Anthropic</dd>
+                </div>
+              </dl>
+            </div>
           </div>
         </div>
       </section>
@@ -596,7 +951,7 @@
       <section class="chapter" id="everyday" aria-labelledby="everyday-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">05</span>Szukanie, raporty, plany</p>
+            <p class="kicker"><span class="num">06</span>Szukanie, raporty, plany</p>
             <h2 id="everyday-title">Język zapytań, raporty i&nbsp;oś czasu na tych samych danych.</h2>
           </div>
 
@@ -710,7 +1065,7 @@ drift is not empty                        <span class="c">-- status nie zgadza s
       <section class="chapter" id="modules" aria-labelledby="modules-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">06</span>Moduły i&nbsp;import</p>
+            <p class="kicker"><span class="num">07</span>Moduły i&nbsp;import</p>
             <h2 id="modules-title">Weź to, czego potrzebujesz. Przenieś to, co już masz.</h2>
           </div>
 
@@ -739,26 +1094,26 @@ drift is not empty                        <span class="c">-- status nie zgadza s
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/modules-1600.webp">
+              <a class="frame" href="../assets/img/modules-top-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/modules-1600.webp"
+                  src="../assets/img/modules-top-1600.webp"
                   srcset="
-                    ../assets/img/modules-800.webp   800w,
-                    ../assets/img/modules-1600.webp 1600w
+                    ../assets/img/modules-top-800.webp   800w,
+                    ../assets/img/modules-top-1600.webp 1600w
                   "
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="1013"
-                  alt="Ustawienia projektu, karta Moduły: siedem modułów, każdy z&nbsp;jednozdaniowym opisem po angielsku i&nbsp;przełącznikiem, wszystkie włączone. GitHub, Knowledge base, Confluence import, Jira import, Reports, Tests (e2e) oraz AI agents (MCP)."
+                  height="529"
+                  alt="Ustawienia projektu, karta Moduły, początek listy: GitHub, Knowledge base i&nbsp;Confluence import, każdy z&nbsp;jednozdaniowym opisem po angielsku i&nbsp;włączonym przełącznikiem."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Ustawienia projektu → Moduły. Moduł wyłączony tutaj zachowuje dane, ale jego
-                nawigacja, panel w&nbsp;zadaniach i&nbsp;oznaczenia na kartach znikają z&nbsp;tego projektu.
-                Opisy modułów przychodzą z&nbsp;serwera, a&nbsp;ten pisze po angielsku.
+                Początek listy w&nbsp;Ustawienia projektu → Moduły. Moduł wyłączony tutaj zachowuje
+                dane, ale jego nawigacja, panel w&nbsp;zadaniach i&nbsp;oznaczenia na kartach znikają z&nbsp;tego
+                projektu. Opisy modułów przychodzą z&nbsp;serwera, a&nbsp;ten pisze po angielsku.
               </figcaption>
             </figure>
           </div>
@@ -804,7 +1159,7 @@ drift is not empty                        <span class="c">-- status nie zgadza s
       <section class="chapter" id="built" aria-labelledby="built-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">07</span>Jak to jest zbudowane</p>
+            <p class="kicker"><span class="num">08</span>Jak to jest zbudowane</p>
             <h2 id="built-title">Jeden plik binarny, jeden katalog danych.</h2>
           </div>
 
@@ -825,10 +1180,12 @@ drift is not empty                        <span class="c">-- status nie zgadza s
               </dd>
             </div>
             <div>
-              <dt>Obok</dt>
+              <dt>Runnery</dt>
               <dd>
-                <strong>Nic do uruchamiania.</strong> Bez serwera bazy danych, bez kolejki, bez
-                cache’u. GitHub, Jirę, Confluence i&nbsp;dostawcę modelu podłączasz, jeśli ich używasz.
+                Pracy, która wymaga repozytorium na dysku, serwer nie wykonuje. Robią to runnery:
+                aplikacja desktopowa albo runner w&nbsp;chmurze, czyli rdzeń aplikacji desktopowej
+                uruchomiony bez okna w&nbsp;kontenerze. Runner w&nbsp;chmurze łączy się tylko na zewnątrz:
+                z&nbsp;serwerem team-hub, z&nbsp;GitHubem i&nbsp;z&nbsp;dostawcą modelu.
               </dd>
             </div>
             <div>
@@ -841,17 +1198,17 @@ drift is not empty                        <span class="c">-- status nie zgadza s
               <dt>Moduły</dt>
               <dd>
                 Każdy w&nbsp;swoim folderze: crate w&nbsp;Ruście i&nbsp;jego ekrany, włączane przez feature
-                w&nbsp;Cargo. Moduł
-                pominięty przy budowaniu nie ma tabel, tras ani pozycji w&nbsp;Ustawieniach.
+                w&nbsp;Cargo. Moduł pominięty przy budowaniu nie ma tabel, tras ani pozycji
+                w&nbsp;Ustawieniach.
               </dd>
             </div>
             <div>
               <dt>Logowanie</dt>
               <dd>
-                Hasła są haszowane algorytmem Argon2, a&nbsp;liczba prób logowania jest ograniczana.
-                Tokeny API są przechowywane
-                jako skróty i&nbsp;pokazywane raz. Tokeny innych systemów są szyfrowane kluczem
-                instancji i&nbsp;żadna trasa ich nie zwraca.
+                Sesja przeglądarki to ciasteczko HttpOnly i&nbsp;token CSRF wymagany przy każdym
+                zapisie. Hasła są haszowane algorytmem Argon2, a&nbsp;liczba prób logowania jest
+                ograniczana. Tokeny API są przechowywane jako skróty i&nbsp;pokazywane raz. Tokeny
+                innych systemów są szyfrowane kluczem instancji i&nbsp;żadna trasa ich nie zwraca.
               </dd>
             </div>
             <div>
@@ -862,13 +1219,18 @@ drift is not empty                        <span class="c">-- status nie zgadza s
               </dd>
             </div>
             <div>
+              <dt>Licencja</dt>
+              <dd>
+                <strong><a href="https://github.com/jash90/team-hub/blob/main/LICENSE">MIT</a>.</strong> W&nbsp;instalatorach
+                aplikacji desktopowej nie ma niczego od Anthropic; Claude Agent SDK, który
+                aplikacja pobiera przy pierwszym uruchomieniu, należy do Anthropic i&nbsp;podlega jego
+                warunkom.
+              </dd>
+            </div>
+            <div>
               <dt>Więcej</dt>
               <dd>
-                <a
-                  class="ext"
-                  href="https://github.com/jash90/team-hub/blob/main/docs/architecture.md"
-                  >docs/architecture.md</a
-                >
+                <a class="ext" href="https://github.com/jash90/team-hub/blob/main/docs/architecture.md">docs/architecture.md</a>
                 (po angielsku, jak cała dokumentacja)
               </dd>
             </div>
@@ -879,7 +1241,7 @@ drift is not empty                        <span class="c">-- status nie zgadza s
       <section class="chapter" id="run" aria-labelledby="run-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">08</span>Uruchomienie</p>
+            <p class="kicker"><span class="num">09</span>Uruchomienie</p>
             <h2 id="run-title">Trzy polecenia albo jeden kontener.</h2>
           </div>
 
@@ -898,6 +1260,13 @@ drift is not empty                        <span class="c">-- status nie zgadza s
                 świat, postaw przed nim proxy z&nbsp;TLS. Jeśli adres jest dostępny dla innych, zanim
                 skonfigurujesz instancję, ustaw <code>TEAM_HUB_SETUP_TOKEN</code>: założenie
                 pierwszego konta będzie wtedy wymagało jego podania.
+              </p>
+              <p>
+                Zlecenia dla agentów w&nbsp;kodzie i&nbsp;uruchomienia testów potrzebują jeszcze
+                <a href="#runners">runnera</a>: aplikacji desktopowej na czyimś komputerze albo
+                runnera w&nbsp;chmurze jako drugiego kontenera
+                (<a class="ext" href="https://github.com/jash90/team-hub/blob/main/docs/cloud-runner.md">docs/cloud-runner.md</a
+                >).
               </p>
               <p>
                 Na Railway repozytorium wdraża się tak, jak jest: wolumen pod <code>/data</code>,
@@ -943,7 +1312,7 @@ drift is not empty                        <span class="c">-- status nie zgadza s
       <section class="chapter" id="not-yet" aria-labelledby="not-yet-title">
         <div class="wrap">
           <div class="chapter-head">
-            <p class="kicker"><span class="num">09</span>Czego jeszcze nie ma</p>
+            <p class="kicker"><span class="num">10</span>Czego jeszcze nie ma</p>
             <h2 id="not-yet-title">Czego team-hub jeszcze nie robi.</h2>
           </div>
 
@@ -976,6 +1345,15 @@ drift is not empty                        <span class="c">-- status nie zgadza s
                 <li>
                   Aplikacja desktopowa działała dotąd tylko na Linuksie. Piaskownice na macOS
                   i&nbsp;Windows, zasobnik, powiadomienia i&nbsp;instalatory nie są sprawdzone.
+                </li>
+                <li>
+                  Wspólny runner loguje się tokenem API administratora: nie ma własnej tożsamości
+                  z&nbsp;węższymi uprawnieniami.
+                </li>
+                <li>
+                  Nagrania sprawdzono na filmach przygotowanych ręcznie w&nbsp;formacie frameworka,
+                  a&nbsp;nie na prawdziwym nagranym przebiegu. Runner w&nbsp;chmurze nie działał
+                  dotąd na prawdziwym hoście.
                 </li>
                 <li>
                   Serwer pisze po angielsku. Interfejs na bieżąco tłumaczy na polski jego błędy,
@@ -1023,6 +1401,8 @@ drift is not empty                        <span class="c">-- status nie zgadza s
                   >Kontrakt zleceń dla agentów</a
                 >
               </li>
+              <li><a class="ext" href="https://github.com/jash90/team-hub/blob/main/docs/runners.md">Runnery</a></li>
+              <li><a class="ext" href="https://github.com/jash90/team-hub/blob/main/LICENSE">Licencja: MIT</a></li>
               <li><a href="../" hreflang="en" lang="en">In English</a></li>
             </ul>
             <p>
