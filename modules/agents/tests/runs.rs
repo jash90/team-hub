@@ -343,7 +343,7 @@ async fn refine_proposes_a_new_description_that_is_applied_as_the_approver_and_l
     assert_eq!(world.text("SELECT description FROM issue WHERE key = 'WEB-1'").as_deref(), Some(NEW_DESCRIPTION));
     assert_eq!(world.text("SELECT actor_label FROM change WHERE field = 'description'").as_deref(), Some("AI agent"));
     assert_eq!(world.count(&format!("SELECT count(*) FROM change WHERE field = 'description' AND actor_id = {}", world.admin.id)), 1);
-    assert_eq!(world.count("SELECT count(*) FROM event WHERE kind = 'agent.run' AND issue_id IS NOT NULL AND project_id IS NOT NULL") > 6, true);
+    assert!(world.count("SELECT count(*) FROM event WHERE kind = 'agent.run' AND issue_id IS NOT NULL AND project_id IS NOT NULL") > 6);
     assert_eq!(world.count("SELECT count(*) FROM notification WHERE kind = 'agent' AND text LIKE 'WEB-1: the agent proposes%'"), 1);
 }
 
@@ -961,7 +961,7 @@ async fn issues_carry_a_mark_a_panel_and_a_dashboard_entry_while_an_agent_needs_
     world.ok(Method::PATCH, &format!("/runs/{id}"), Some(json!({ "state": "succeeded", "summary": "Done" }))).await;
 
     assert_eq!(ext(&world), None);
-    assert!(dashboard(&world.app, &world.admin).expect("my work").ext.get("agents").is_none());
+    assert!(!dashboard(&world.app, &world.admin).expect("my work").ext.contains_key("agents"));
 }
 
 // ---------- a plain MCP client as a runner ----------

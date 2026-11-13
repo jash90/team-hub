@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS thread (
     run_id INTEGER,
     run_sent TEXT NOT NULL DEFAULT '{}',
     answers_seen INTEGER NOT NULL DEFAULT 0,
+    first_prompt TEXT NOT NULL DEFAULT '',
     next_prompt TEXT,
     summary TEXT,
     pull_request_url TEXT,
@@ -199,6 +200,9 @@ pub struct ThreadSeed {
 pub struct ThreadPrivate {
     pub issue_type: String,
     pub wanted_branch: Option<String>,
+    /// What the thread was asked at the start.
+    pub first_prompt: String,
+    /// What the person said since the agent last listened; it starts the next turn.
     pub next_prompt: Option<String>,
     pub run_sent: Value,
     pub answers_seen: i64,
@@ -279,7 +283,7 @@ impl Store {
 
             db.execute(
                 "INSERT INTO thread (issue_key, issue_summary, issue_type, project_key, kind, instructions, model, repo_id, repo_path, wanted_branch,
-                                     state, origin, run_id, next_prompt, created_at)
+                                     state, origin, run_id, first_prompt, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'queued', ?11, ?12, ?13, ?14)",
                 params![
                     seed.issue_key,
@@ -342,13 +346,14 @@ impl Store {
     }
 
     pub fn thread_private(&self, id: i64) -> CoreResult<ThreadPrivate> {
-        Ok(self.db().query_row("SELECT issue_type, wanted_branch, next_prompt, run_sent, answers_seen FROM thread WHERE id = ?1", [id], |row| {
+        Ok(self.db().query_row("SELECT issue_type, wanted_branch, first_prompt, next_prompt, run_sent, answers_seen FROM thread WHERE id = ?1", [id], |row| {
             Ok(ThreadPrivate {
                 issue_type: row.get(0)?,
                 wanted_branch: row.get(1)?,
-                next_prompt: row.get(2)?,
-                run_sent: json_column(row.get(3)?),
-                answers_seen: row.get(4)?,
+                first_prompt: row.get(2)?,
+                next_prompt: row.get(3)?,
+                run_sent: json_column(row.get(4)?),
+                answers_seen: row.get(5)?,
             })
         })?)
     }

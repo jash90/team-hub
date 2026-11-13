@@ -96,7 +96,7 @@ fn repo_folder_name(repo: &Path) -> String {
 impl Inner {
     fn emit(&self, event: AppEvent) {
         let _ = self.events.send(event);
-        self.activity.notify_waiters();
+        self.activity.notify_one();
     }
 
     fn changed(&self, thread_id: i64) {
@@ -179,9 +179,10 @@ impl Inner {
 
         let thread = self.store.thread(thread_id)?;
         let prompt = match (&thread.session_id, private.next_prompt) {
-            (_, Some(prompt)) => prompt,
+            (Some(_), Some(said)) => said,
             (Some(_), None) => CONTINUE.to_string(),
-            (None, None) => return Err(CoreError::not_possible("The thread has nothing to do: it has no instructions and no session to continue")),
+            (None, Some(said)) => format!("{}\n\n{said}", private.first_prompt),
+            (None, None) => private.first_prompt,
         };
 
         Ok(StartThread {
@@ -253,6 +254,7 @@ impl Inner {
         }
 
         let _ = to_helper.send(ToSidecar::Start(Box::new(start)));
+        let _ = self.store.set_next_prompt(thread_id, None);
         self.running().insert(thread_id, Running { to_helper: to_helper.clone(), pid, stopping: Arc::clone(&stopping), exited });
 
         let inner = Arc::clone(self);
@@ -355,12 +357,14 @@ impl Inner {
                     cost_usd.unwrap_or(0.0),
                     i64::from(turns.unwrap_or(0)),
                 );
-                let _ = self.store.set_next_prompt(thread_id, None);
                 let Ok(thread) = self.store.thread(thread_id) else { return true };
-                let next = match (thread.pending_question, ok) {
-                    (true, _) => ThreadState::Waiting,
-                    (false, true) => ThreadState::Done,
-                    (false, false) => ThreadState::Failed,
+                let said_meanwhile = self.store.thread_private(thread_id).is_ok_and(|private| private.next_prompt.is_some());
+                let next = match (said_meanwhile, thread.pending_question, ok) {
+                    // The person answered while the agent was still finishing its turn.
+                    (true, _, _) => ThreadState::Queued,
+                    (false, true, _) => ThreadState::Waiting,
+                    (false, false, true) => ThreadState::Done,
+                    (false, false, false) => ThreadState::Failed,
                 };
 
                 if !ok {
@@ -371,6 +375,7 @@ impl Inner {
                     match next {
                         ThreadState::Waiting => self.notify(&thread, format!("{} is waiting for your answer", thread.issue_key), &summary),
                         ThreadState::Failed => self.notify(&thread, format!("{} failed", thread.issue_key), &summary),
+                        ThreadState::Queued => {}
                         _ if thread.pending_proposals > 0 => self.notify(&thread, format!("{} has proposals to decide", thread.issue_key), &summary),
                         _ => self.notify(&thread, format!("{} is done", thread.issue_key), &summary),
                     }
@@ -527,27 +532,20 @@ impl Runtime {
         let inner = &self.inner;
         let thread = inner.store.thread(thread_id)?;
 
-        if thread.state.is_active() {
-            return Err(CoreError::not_possible("The thread is already working or waiting for its turn"));
-        }
-
         let message = message.map(str::trim).filter(|message| !message.is_empty());
 
         if let Some(message) = message {
             if let Ok(event) = inner.store.add_event(thread_id, EventKind::Answer, message, &Value::Null, mirrored) {
                 inner.emit(AppEvent::ThreadEvent { thread_id, event });
             }
+
+            inner.store.set_next_prompt(thread_id, Some(message))?;
         }
 
-        let first = inner.store.thread_private(thread_id)?.next_prompt;
-        let prompt = match (thread.session_id.is_some(), first, message) {
-            (true, _, Some(message)) => Some(message.to_string()),
-            (true, _, None) => None,
-            (false, Some(first), Some(message)) => Some(format!("{first}\n\n{message}")),
-            (false, first, message) => first.or(message.map(String::from)),
-        };
-
-        inner.store.set_next_prompt(thread_id, prompt.as_deref())?;
+        // A working thread hears it when its turn ends; a queued one when it starts.
+        if thread.state.is_active() {
+            return inner.store.thread(thread_id);
+        }
 
         let from = [ThreadState::Waiting, ThreadState::Done, ThreadState::Failed, ThreadState::Stopped];
 
