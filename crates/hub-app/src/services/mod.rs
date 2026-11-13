@@ -3,6 +3,7 @@ pub mod history;
 pub mod issues;
 pub mod notifications;
 pub mod overview;
+pub mod pairing;
 pub mod personal_keys;
 pub mod project_modules;
 pub mod projects;

@@ -72,6 +72,12 @@ export const exact: Record<string, string> = {
 
   // ---- access and accounts ----
   'Sign in to continue': 'Zaloguj się, aby kontynuować',
+  'This request to connect has expired or was declined; start again in the app': 'Ta prośba o połączenie wygasła albo została odrzucona; zacznij od nowa w aplikacji',
+  'The app needs a name of 1 to 80 characters': 'Aplikacja musi mieć nazwę o długości od 1 do 80 znaków',
+  'Too many apps are waiting to be connected; try again in a few minutes': 'Zbyt wiele aplikacji czeka na połączenie; spróbuj ponownie za kilka minut',
+  'An app is connected in the browser, signed in, not with an API token': 'Aplikację łączy się w przeglądarce, po zalogowaniu, a nie tokenem API',
+  'Somebody else has connected this app already': 'Tę aplikację połączył już ktoś inny',
+  'This is not the app that asked to be connected': 'To nie ta aplikacja prosiła o połączenie',
   'Wrong e-mail or password': 'Nieprawidłowy e-mail lub hasło',
   'Too many attempts; try again in a few minutes': 'Zbyt wiele prób; spróbuj ponownie za kilka minut',
   'Missing or stale CSRF token; reload the page': 'Brak tokenu CSRF albo token jest nieaktualny; odśwież stronę',

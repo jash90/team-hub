@@ -489,6 +489,21 @@ pub struct ApiToken {
     pub last_used_at: Option<String>,
 }
 
+/// A desktop app that asks to be connected to the account of whoever reads this.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DesktopPairing {
+    /// What the app shows too, for the person to compare.
+    pub code: String,
+    /// What the app calls itself. It chose the name: it proves nothing.
+    pub name: String,
+    pub created_at: String,
+    pub expires_at: String,
+    /// Somebody has said yes already, and the app has not collected its token yet.
+    pub approved: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]

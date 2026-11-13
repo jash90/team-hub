@@ -14,11 +14,12 @@ export const BacklogView = lazyView(() => import('./backlog.tsx').then((loaded) 
 export const ReleasesView = lazyView(() => import('./releases.tsx').then((loaded) => loaded.ReleasesView));
 export const ScheduleView = lazyView(() => import('./schedule.tsx').then((loaded) => loaded.ScheduleView));
 export const RunnersView = lazyView(() => import('./runners.tsx').then((loaded) => loaded.RunnersView));
+export const PairView = lazyView(() => import('./pair.tsx').then((loaded) => loaded.PairView));
 export const ProjectSettingsView = lazyView(() => import('./project-settings.tsx').then((loaded) => loaded.ProjectSettingsView));
 // A dialog: nothing stands in for it while its code arrives.
 export const CreateIssueDialog = lazyView(() => import('./create-issue.tsx').then((loaded) => loaded.CreateIssueDialog), null);
 
-const ALL = [DashboardView, ProjectsView, SearchView, IssueView, SettingsView, BoardView, BacklogView, ReleasesView, ScheduleView, ProjectSettingsView, RunnersView, CreateIssueDialog];
+const ALL = [DashboardView, ProjectsView, SearchView, IssueView, SettingsView, BoardView, BacklogView, ReleasesView, ScheduleView, ProjectSettingsView, RunnersView, PairView, CreateIssueDialog];
 
 /** Fetches the code of every core view that is not here yet. A view that fails says so when it is shown. */
 export function preloadViews(): void {

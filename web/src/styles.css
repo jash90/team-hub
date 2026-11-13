@@ -1494,6 +1494,21 @@ td > .picker-field {
   max-width: 920px;
 }
 
+/* The code a desktop app shows too: large enough to compare at a glance. */
+.pair-code {
+  font-family: var(--mono);
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  margin: 12px 0;
+}
+
+.pair-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
 .view-head {
   display: flex;
   align-items: flex-start;
