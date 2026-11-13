@@ -30,7 +30,7 @@ function Pairing({ pairing, onCancel }: { pairing: PairingView; onCancel: () => 
       <aside className="desk-pair-side">
         <div className="auth-brand">
           <span className="brand-mark" />
-          team-hub
+          TeamHub
         </div>
         <h1>{t('Sign in and confirm')}</h1>
         <p className="muted">{inApp ? t('Sign in to {server} on the right, then confirm that the page shows this code.', { server: pairing.serverUrl }) : t('Sign in to {server} in the tab that opened, then confirm that the page shows this code.', { server: pairing.serverUrl })}</p>
@@ -159,7 +159,7 @@ export function ConnectView({ status, onConnected }: { status: ConnectionStatus;
       <div className="auth-card">
         <div className="auth-brand">
           <span className="brand-mark" />
-          team-hub
+          TeamHub
         </div>
         <h1>{t('Connect to your team-hub')}</h1>
         <p className="muted">{t('Sign in with the account you use in the browser. The password goes to your server and is kept nowhere; the app gets a token of its own, in the keychain of this computer.')}</p>

@@ -196,7 +196,7 @@ pub fn node_problem(node: &str) -> Option<String> {
 
     let advice = format!(
         "Agent threads need Node.js {}.{} or newer. Install it from https://nodejs.org, or put the full path of the node program \
-         in Settings → Node command (in a terminal: `which node`, on Windows `where node`), then start team-hub again. \
+         in Settings → Node command (in a terminal: `which node`, on Windows `where node`), then start TeamHub again. \
          The rest of the app works without it.",
         NODE_22.0, NODE_22.1
     );

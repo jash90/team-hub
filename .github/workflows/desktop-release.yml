@@ -235,18 +235,18 @@ jobs:
           mkdir -p "$work"
 
           dpkg-deb -x "dist/team-hub-desktop-$VERSION-$LABEL.deb" "$work/deb"
-          node apps/desktop/scripts/check-packaged.mjs "$work/deb/usr/lib/team-hub" --app "$work/deb/usr/bin/team-hub-desktop"
+          node apps/desktop/scripts/check-packaged.mjs "$work/deb/usr/lib/TeamHub" --app "$work/deb/usr/bin/team-hub-desktop"
 
           cp "dist/team-hub-desktop-$VERSION-$LABEL.AppImage" "$work/app.AppImage"
           chmod +x "$work/app.AppImage"
           (cd "$work" && ./app.AppImage --appimage-extract > /dev/null)
           # AppRun, so that npm runs in the environment an AppImage gives what it starts.
-          node apps/desktop/scripts/check-packaged.mjs "$work/squashfs-root/usr/lib/team-hub" --app "$work/squashfs-root/AppRun"
+          node apps/desktop/scripts/check-packaged.mjs "$work/squashfs-root/usr/lib/TeamHub" --app "$work/squashfs-root/AppRun"
 
       - name: The packaged app fetches its runtime and starts the helper (macOS, the .app)
         if: runner.os == 'macOS'
         run: |
-          bundle="apps/desktop/src-tauri/target/$TARGET/release/bundle/macos/team-hub.app/Contents"
+          bundle="apps/desktop/src-tauri/target/$TARGET/release/bundle/macos/TeamHub.app/Contents"
           set -- "$bundle/Resources"
 
           # The app itself does the fetching where this machine can run it. The build for the

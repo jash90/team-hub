@@ -31,8 +31,8 @@ const EVENT: &str = "hub";
 
 /// Run from a terminal, the app fetches the agent runtime, prints what npm says, and ends.
 const FETCH_FLAG: &str = "--fetch-agent-runtime";
-const TITLE: &str = "team-hub";
-const NO_THREADS: &str = "team-hub: agent threads cannot start";
+const TITLE: &str = "TeamHub";
+const NO_THREADS: &str = "TeamHub: agent threads cannot start";
 
 /// The agent runtime of an installed app (see `runtime.rs`), and how fetching it is going.
 struct Fetch {
@@ -55,9 +55,9 @@ impl Fetch {
 
         Some(match last.filter(|_| !self.fetching.load(Ordering::SeqCst)) {
             Some(reason) => format!(
-                "The agent runtime is not on this computer. The last try ended with: {reason} team-hub is trying again now and will say how it went."
+                "The agent runtime is not on this computer. The last try ended with: {reason} TeamHub is trying again now and will say how it went."
             ),
-            None => format!("team-hub is downloading {}. Start the thread again when it says the runtime is ready.", runtime::WHAT),
+            None => format!("TeamHub is downloading {}. Start the thread again when it says the runtime is ready.", runtime::WHAT),
         })
     }
 }
@@ -124,7 +124,7 @@ fn forward_events(app: AppHandle, desktop: &Desktop) {
 }
 
 fn tray(app: &AppHandle, fetches: bool) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open team-hub", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open TeamHub", true, None::<&str>)?;
     let runtime = MenuItem::with_id(app, "runtime", "Download the agent runtime", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit (stops working threads)", true, None::<&str>)?;
     let menu = if fetches { Menu::with_items(app, &[&open, &runtime, &quit])? } else { Menu::with_items(app, &[&open, &quit])? };
@@ -241,11 +241,11 @@ fn fetch_runtime(app: &AppHandle, announce: bool) {
             if announce {
                 app.dialog()
                     .message(format!(
-                        "team-hub is downloading {}.\n\nIt is fetched with your npm, from the registry npm is set up with, and kept in {}. You can use the app meanwhile; agent threads can start when the window's title stops saying \"downloading\" and a notification says the runtime is ready.",
+                        "TeamHub is downloading {}.\n\nIt is fetched with your npm, from the registry npm is set up with, and kept in {}. You can use the app meanwhile; agent threads can start when the window's title stops saying \"downloading\" and a notification says the runtime is ready.",
                         runtime::WHAT,
                         fetch.plan.root().display()
                     ))
-                    .title("team-hub: downloading the agent runtime")
+                    .title("TeamHub: downloading the agent runtime")
                     .kind(MessageDialogKind::Info)
                     .show(|_| {});
             }
@@ -264,7 +264,7 @@ fn fetch_runtime(app: &AppHandle, announce: bool) {
 
             outcome.map_err(|failure| {
                 format!(
-                    "The agent runtime could not be downloaded: {}\n\n{}\n\nteam-hub ran `{}` in a folder of its own under {}; everything npm printed is in {}.\nTo try from a terminal:\n    \"{}\" {FETCH_FLAG}\n\nUntil then agent threads cannot start; the rest of the app works.",
+                    "The agent runtime could not be downloaded: {}\n\n{}\n\nTeamHub ran `{}` in a folder of its own under {}; everything npm printed is in {}.\nTo try from a terminal:\n    \"{}\" {FETCH_FLAG}\n\nUntil then agent threads cannot start; the rest of the app works.",
                     failure.reason,
                     failure.detail,
                     fetch.plan.command_line(&npm),

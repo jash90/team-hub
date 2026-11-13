@@ -15,10 +15,10 @@
 //   node apps/desktop/scripts/check-packaged.mjs <resources> [--app <program>]
 //
 //   <resources>                                         --app
-//     <unpacked .deb>/usr/lib/team-hub                    <unpacked .deb>/usr/bin/team-hub-desktop
+//     <unpacked .deb>/usr/lib/TeamHub                     <unpacked .deb>/usr/bin/team-hub-desktop
 //     squashfs-root/usr/lib/team-hub                      squashfs-root/AppRun
-//     team-hub.app/Contents/Resources                     team-hub.app/Contents/MacOS/team-hub-desktop
-//     %LOCALAPPDATA%\team-hub                             %LOCALAPPDATA%\team-hub\team-hub-desktop.exe
+//     TeamHub.app/Contents/Resources                     TeamHub.app/Contents/MacOS/team-hub-desktop
+//     %LOCALAPPDATA%\TeamHub                              %LOCALAPPDATA%\TeamHub\team-hub-desktop.exe
 //     apps/desktop                                        (the source tree: no program)
 //
 // It needs npm and the network (about 350 MB), and no account.

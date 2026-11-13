@@ -1,7 +1,7 @@
 {
   "name": "team-hub-desktop-sidecar",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "Runs one agent thread through the Claude Agent SDK, speaking JSON lines with the desktop core.",
   "scripts": {

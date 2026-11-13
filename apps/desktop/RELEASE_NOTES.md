@@ -1,36 +1,36 @@
-# team-hub desktop 0.3.0
+# TeamHub desktop 0.4.0
 
-The desktop app for [team-hub](https://github.com/jash90/team-hub). New in 0.3.0:
+The desktop app for [team-hub](https://github.com/jash90/team-hub). New in 0.4.0:
 
-- **One sign-in.** The first screen asks for the server's address, your e-mail and your
-  password, as a browser does. The app gets an API token of its own from that, kept in the
-  system's keychain, and the tracker in the window is signed in by the same sign-in. The
-  password goes to your server and is stored nowhere.
-- **Signing in with a code**, under "Other ways to connect", for when the password should
-  not pass through the app at all: the app shows a code, you sign in on the server's page
-  beside it and confirm that it shows the same code. An API token pasted by hand still works.
-- **From a run to its thread.** A run this computer carries out has **Open the thread in the
-  app** on its card in the tracker; the thread's header leads back to the issue.
-- **Without the server** the tracker's place says so and has **Try again**; threads keep
-  working, and the tracker returns when the server does.
-- **Disconnect** in Settings removes the app's token on the server too.
-- **Runners** and **Tests** in the bar open the tracker's own pages; the app's separate
-  views for them are gone.
-- On macOS the tracker no longer covers the bottom of the app's bar (in 0.2.0 it lay a title
-  bar too high), and a Mac's runner and token carry the computer's name instead of
-  "this computer".
+- **The app is called TeamHub**: in the window's title, the menu of its icon, its messages
+  and the name of the installed program. The download files keep their names, and so do the
+  identifier and the data of an installed app: threads and the connection stay.
+- **Views are tabs at the top**: Tracker, Threads, Repositories. The bar that repeated the
+  tracker's own search, theme switch, Runners and Tests is gone; those are in the tracker.
+- **Threads and decisions in one column on the right**, beside every view, one list at a
+  time: what waits for a decision, what is working, every thread. A comment or a change to
+  an issue is approved or rejected on its card, without leaving the page. A push or a pull
+  request is still reviewed in its dialog, from the thread.
+- **Threads have a page of their own**, at the width of the window, with filters.
+- **The language and the theme are in Settings**, and the tracker follows both. The language
+  choice Settings had before did not change the tracker.
+- The column of your work on the server is gone: the tracker's start page is that list.
 
-It needs a server that knows the sign-in for the desktop app (team-hub from 13 November
-2026); against an older server, connect with an API token.
+On Windows the program installs under the new name, so an installed 0.3.0 stays beside it:
+uninstall the old "team-hub" from Settings → Apps. On macOS drag the old `team-hub.app` to
+the Trash. The `.deb` and `.rpm` replace the old package.
 
-**Read this first.** The app was written on Linux and run there, and for this release its
-window was also run on macOS 27 (Apple silicon) in a development build: both sign-ins, the
-tracker beside the panel, resizing, the thread link, the server going away and coming back,
-and disconnecting. The installers themselves were not installed and tried by a person: the
-Windows and Linux ones and the `hub` archives were built by GitHub's machines, the two macOS
-`.dmg` files on a Mac that holds the certificate, and the Windows build has never been run
-at all. The Windows installer is not signed. Treat 0.3.0 as a preview and
-[report](https://github.com/jash90/team-hub/issues) what does not work.
+Signing in with a password or a code needs team-hub on the server from 13 November 2026;
+against an older server, connect with an API token.
+
+**Read this first.** The app was written on Linux and run there. For this release the new
+window was run on macOS 27 (Apple silicon) in a development build: the tabs, the column and
+hiding it, the page of threads, a thread, the theme, the tracker beside the column. It was
+run with no decision waiting, so deciding on a card in the column was not tried. The renamed
+installers were built by GitHub's machines (Windows, Linux, the `hub` archives) and on a Mac
+that holds the certificate (the two `.dmg` files); none was installed and tried by a person,
+and the Windows build has never been run at all. The Windows installer is not signed. Treat
+0.4.0 as a preview and [report](https://github.com/jash90/team-hub/issues) what does not work.
 
 ## What it is
 
@@ -102,7 +102,7 @@ needs other versions:
   network, the registry refusing) and has a Retry button; the tray menu has "Download the
   agent runtime". From a terminal `team-hub-desktop --fetch-agent-runtime` does the same and
   shows what npm prints (on macOS the program is
-  `/Applications/team-hub.app/Contents/MacOS/team-hub-desktop`; on Windows nothing is
+  `/Applications/TeamHub.app/Contents/MacOS/team-hub-desktop`; on Windows nothing is
   printed, and npm's output is in `agent-runtime\install.log`). Until the runtime is there,
   starting a thread tells you so, and the rest of the app works. Afterwards no network is
   needed for it.
@@ -113,13 +113,13 @@ needs other versions:
 
 | System | File |
 |---|---|
-| macOS 13 or newer, Apple silicon | `team-hub-desktop-0.3.0-macos-arm64.dmg` |
-| macOS 13 or newer, Intel | `team-hub-desktop-0.3.0-macos-x64.dmg` |
-| Windows 10 and 11, 64-bit Intel/AMD | `team-hub-desktop-0.3.0-windows-x64-setup.exe` |
-| Debian 12 or newer, Ubuntu 22.04 or newer | `team-hub-desktop-0.3.0-linux-x64.deb` |
-| Fedora (other RPM systems are untried) | `team-hub-desktop-0.3.0-linux-x64.rpm` |
-| Other Linux (glibc 2.35 or newer) | `team-hub-desktop-0.3.0-linux-x64.AppImage` |
-| The `hub` command line alone | `hub-0.3.0-macos-arm64.tar.gz`, `hub-0.3.0-macos-x64.tar.gz`, `hub-0.3.0-linux-x64.tar.gz`, `hub-0.3.0-windows-x64.zip` |
+| macOS 13 or newer, Apple silicon | `team-hub-desktop-0.4.0-macos-arm64.dmg` |
+| macOS 13 or newer, Intel | `team-hub-desktop-0.4.0-macos-x64.dmg` |
+| Windows 10 and 11, 64-bit Intel/AMD | `team-hub-desktop-0.4.0-windows-x64-setup.exe` |
+| Debian 12 or newer, Ubuntu 22.04 or newer | `team-hub-desktop-0.4.0-linux-x64.deb` |
+| Fedora (other RPM systems are untried) | `team-hub-desktop-0.4.0-linux-x64.rpm` |
+| Other Linux (glibc 2.35 or newer) | `team-hub-desktop-0.4.0-linux-x64.AppImage` |
+| The `hub` command line alone | `hub-0.4.0-macos-arm64.tar.gz`, `hub-0.4.0-macos-x64.tar.gz`, `hub-0.4.0-linux-x64.tar.gz`, `hub-0.4.0-windows-x64.zip` |
 | Checksums of all of the above | `SHA256SUMS` |
 
 Check a download: `sha256sum --ignore-missing -c SHA256SUMS` (macOS:
@@ -144,9 +144,9 @@ needs the internet).
 ### Linux
 
 ```bash
-sudo apt install ./team-hub-desktop-0.3.0-linux-x64.deb      # Debian, Ubuntu
-sudo dnf install ./team-hub-desktop-0.3.0-linux-x64.rpm      # Fedora
-chmod +x team-hub-desktop-0.3.0-linux-x64.AppImage && ./team-hub-desktop-0.3.0-linux-x64.AppImage
+sudo apt install ./team-hub-desktop-0.4.0-linux-x64.deb      # Debian, Ubuntu
+sudo dnf install ./team-hub-desktop-0.4.0-linux-x64.rpm      # Fedora
+chmod +x team-hub-desktop-0.4.0-linux-x64.AppImage && ./team-hub-desktop-0.4.0-linux-x64.AppImage
 ```
 
 The packages need WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), which the `.deb` and `.rpm` ask
@@ -162,7 +162,7 @@ threads (`hub thread run`, `hub runner`) it needs the helper and the agent runti
 not fetch the runtime itself: install the app, let it download the runtime once, and point
 `TEAM_HUB_SIDECAR` at the app's launcher, which finds what the app fetched:
 `TEAM_HUB_SIDECAR="node /usr/lib/team-hub/sidecar/launch.mjs"` on Linux or
-`TEAM_HUB_SIDECAR="node /Applications/team-hub.app/Contents/Resources/sidecar/launch.mjs"` on macOS.
+`TEAM_HUB_SIDECAR="node /Applications/TeamHub.app/Contents/Resources/sidecar/launch.mjs"` on macOS.
 
 ## Licence
 
