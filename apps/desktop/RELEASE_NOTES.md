@@ -1,16 +1,35 @@
-# team-hub desktop 0.2.0
+# team-hub desktop 0.3.0
 
-The desktop app for [team-hub](https://github.com/jash90/team-hub). New in 0.2.0: **the
-window now shows the tracker**, your server's own web interface, beside the app's panel of
-agent threads. The app's own issue and search views are gone: an issue's key and the search
-field open the page in the tracker. The macOS app is signed with an Apple Developer ID and
-notarized by Apple, as in 0.1.1.
+The desktop app for [team-hub](https://github.com/jash90/team-hub). New in 0.3.0:
 
-**Read this first.** The app was written and run on Linux only. The Windows and Linux
-installers and the `hub` archives were built by GitHub's machines, the two macOS `.dmg` files
-on a Mac that holds the certificate; none of them was installed and tried by a person before
-this release, and the Windows build has never been run at all. The Windows installer is not
-signed. Treat 0.2.0 as a preview and
+- **One sign-in.** The first screen asks for the server's address, your e-mail and your
+  password, as a browser does. The app gets an API token of its own from that, kept in the
+  system's keychain, and the tracker in the window is signed in by the same sign-in. The
+  password goes to your server and is stored nowhere.
+- **Signing in with a code**, under "Other ways to connect", for when the password should
+  not pass through the app at all: the app shows a code, you sign in on the server's page
+  beside it and confirm that it shows the same code. An API token pasted by hand still works.
+- **From a run to its thread.** A run this computer carries out has **Open the thread in the
+  app** on its card in the tracker; the thread's header leads back to the issue.
+- **Without the server** the tracker's place says so and has **Try again**; threads keep
+  working, and the tracker returns when the server does.
+- **Disconnect** in Settings removes the app's token on the server too.
+- **Runners** and **Tests** in the bar open the tracker's own pages; the app's separate
+  views for them are gone.
+- On macOS the tracker no longer covers the bottom of the app's bar (in 0.2.0 it lay a title
+  bar too high), and a Mac's runner and token carry the computer's name instead of
+  "this computer".
+
+It needs a server that knows the sign-in for the desktop app (team-hub from 13 November
+2026); against an older server, connect with an API token.
+
+**Read this first.** The app was written on Linux and run there, and for this release its
+window was also run on macOS 27 (Apple silicon) in a development build: both sign-ins, the
+tracker beside the panel, resizing, the thread link, the server going away and coming back,
+and disconnecting. The installers themselves were not installed and tried by a person: the
+Windows and Linux ones and the `hub` archives were built by GitHub's machines, the two macOS
+`.dmg` files on a Mac that holds the certificate, and the Windows build has never been run
+at all. The Windows installer is not signed. Treat 0.3.0 as a preview and
 [report](https://github.com/jash90/team-hub/issues) what does not work.
 
 ## What it is
@@ -52,7 +71,7 @@ How it works and the safety model in full:
 
 | | |
 |---|---|
-| A team-hub server | The app is a client: it needs the address of a server and an API token (in team-hub: Settings → API tokens). |
+| A team-hub server | The app is a client: it needs the address of a server and your account there (e-mail and password), or an API token (in team-hub: Settings → API tokens). |
 | Node.js 22.18 or newer, with npm | Not included. Node runs the agent's helper, and npm (it comes with Node) fetches the agent runtime the first time the app starts; see below. The app says so at start when it does not find them. If Node comes from a version manager and is not found, put its full path in the app's Settings → Node command. |
 | The network, once, and about 400 MB of disk | For that first download. |
 | git | And a local clone of each repository agents should work in. |
@@ -94,13 +113,13 @@ needs other versions:
 
 | System | File |
 |---|---|
-| macOS 13 or newer, Apple silicon | `team-hub-desktop-0.2.0-macos-arm64.dmg` |
-| macOS 13 or newer, Intel | `team-hub-desktop-0.2.0-macos-x64.dmg` |
-| Windows 10 and 11, 64-bit Intel/AMD | `team-hub-desktop-0.2.0-windows-x64-setup.exe` |
-| Debian 12 or newer, Ubuntu 22.04 or newer | `team-hub-desktop-0.2.0-linux-x64.deb` |
-| Fedora (other RPM systems are untried) | `team-hub-desktop-0.2.0-linux-x64.rpm` |
-| Other Linux (glibc 2.35 or newer) | `team-hub-desktop-0.2.0-linux-x64.AppImage` |
-| The `hub` command line alone | `hub-0.2.0-macos-arm64.tar.gz`, `hub-0.2.0-macos-x64.tar.gz`, `hub-0.2.0-linux-x64.tar.gz`, `hub-0.2.0-windows-x64.zip` |
+| macOS 13 or newer, Apple silicon | `team-hub-desktop-0.3.0-macos-arm64.dmg` |
+| macOS 13 or newer, Intel | `team-hub-desktop-0.3.0-macos-x64.dmg` |
+| Windows 10 and 11, 64-bit Intel/AMD | `team-hub-desktop-0.3.0-windows-x64-setup.exe` |
+| Debian 12 or newer, Ubuntu 22.04 or newer | `team-hub-desktop-0.3.0-linux-x64.deb` |
+| Fedora (other RPM systems are untried) | `team-hub-desktop-0.3.0-linux-x64.rpm` |
+| Other Linux (glibc 2.35 or newer) | `team-hub-desktop-0.3.0-linux-x64.AppImage` |
+| The `hub` command line alone | `hub-0.3.0-macos-arm64.tar.gz`, `hub-0.3.0-macos-x64.tar.gz`, `hub-0.3.0-linux-x64.tar.gz`, `hub-0.3.0-windows-x64.zip` |
 | Checksums of all of the above | `SHA256SUMS` |
 
 Check a download: `sha256sum --ignore-missing -c SHA256SUMS` (macOS:
@@ -125,9 +144,9 @@ needs the internet).
 ### Linux
 
 ```bash
-sudo apt install ./team-hub-desktop-0.2.0-linux-x64.deb      # Debian, Ubuntu
-sudo dnf install ./team-hub-desktop-0.2.0-linux-x64.rpm      # Fedora
-chmod +x team-hub-desktop-0.2.0-linux-x64.AppImage && ./team-hub-desktop-0.2.0-linux-x64.AppImage
+sudo apt install ./team-hub-desktop-0.3.0-linux-x64.deb      # Debian, Ubuntu
+sudo dnf install ./team-hub-desktop-0.3.0-linux-x64.rpm      # Fedora
+chmod +x team-hub-desktop-0.3.0-linux-x64.AppImage && ./team-hub-desktop-0.3.0-linux-x64.AppImage
 ```
 
 The packages need WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), which the `.deb` and `.rpm` ask
@@ -152,8 +171,7 @@ what the app downloads at its first start is described above.
 
 ## First steps
 
-1. Start the app, enter the server's address and your API token, and sign in to the tracker
-   with your password when it asks (once).
+1. Start the app and enter the server's address, your e-mail and your password.
 2. **Repositories → Choose the folder…** next to a project's GitHub repository, and pick your
    local clone.
 3. Open an issue assigned to you in the tracker and choose **New** in the panel to start a
@@ -162,17 +180,22 @@ what the app downloads at its first start is described above.
 
 ## Known limits
 
-- **Only Linux was ever run.** Not verified anywhere: macOS (the seatbelt sandbox, Keychain)
-  and Windows (Credential Manager; there is no shell sandbox on Windows, so threads work
-  without a shell unless you allow one in Settings); the tray icon, system notifications and
-  the folder dialog; a long real implementation run. On Windows, console windows may appear
-  while the app runs git or an agent.
-- **The window with the tracker in it has run on Linux only**, on a virtual screen. On macOS
-  and Windows the same code places the tracker with Tauri's own calls, which compile and
-  have not been run by anybody.
-- The app is connected twice: the core with an API token, and the tracker by signing in with
-  your password, once. The tracker needs the server: offline, the panel and the threads keep
-  working and the tracker shows the browser engine's own error page.
+- **Run on Linux and, the window, on macOS; never on Windows.** Not verified anywhere: a
+  long real implementation run; the tray icon, system notifications and the folder dialog on
+  macOS and Windows; the seatbelt sandbox for an agent's shell on macOS; Windows as a whole
+  (Credential Manager; there is no shell sandbox on Windows, so threads work without a shell
+  unless you allow one in Settings; console windows may appear while the app runs git or an
+  agent).
+- **On macOS** the window was run in a development build, not from the signed installer,
+  and one thing was not seen there: a link that leads away from the server opening in your
+  browser. Test jobs on macOS and Windows run unconfined, as you, with a clean environment.
+- The tracker's sign-in lasts 30 days and the app's token does not end: after a month the
+  tracker shows its own sign-in page once.
+- Every sign-in makes a new token called "Desktop · <computer's name>" on the server;
+  reinstalling without **Disconnect** leaves the old one in Settings → API tokens.
+- Signing in with a code has the weakness of every such flow: confirming a code somebody
+  else sent you gives them a token. Confirm only a code your own app shows.
+- The tracker needs the server: without it the panel and the threads keep working.
 - **The installers are untested**, as said above, and the Windows installer and the `hub`
   archives are unsigned. The AppImage is the least certain of the three Linux packages.
 - **Node.js and npm are not bundled.** The app looks for `node` and `npm` on the `PATH` of
