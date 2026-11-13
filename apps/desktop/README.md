@@ -106,10 +106,13 @@ that token. The app acts as you, with your permissions.
 - **One working tree and branch per thread.** The main clone's checkout, index and branch are
   never touched: the app only reads it (`git status`, `rev-parse`) and adds working trees.
 - **The shell is in the operating system's sandbox**: no network, writes only inside the
-  working tree plus the four places in the clone's `.git` a commit needs (objects, the tree's
-  own folder, the branch's ref and reflog). Hooks, config and the tree's pointers back to the
-  clone stay closed. Where the system has no sandbox (Windows; Linux without bubblewrap) the
-  thread gets **no shell at all**, unless you switch that on in Settings.
+  working tree plus what a commit needs in the clone's `.git`: the object store, the tree's
+  own folder, and the folders of its branch's ref and reflog. Everything else there is closed
+  by name: every other branch (a thread cannot move `main` under your checkout),
+  remote-tracking refs (a push is judged against them), tags, `HEAD`, the index, hooks,
+  config, the packs, other threads' trees. Where the system has no sandbox (Windows; Linux
+  without bubblewrap) the thread gets **no shell at all**, unless you switch that on in
+  Settings; it then commits through the app (`commit_changes`), which runs no hook.
 - **File tools are tied to the working tree**: `Edit` and `Write` are allowed for that folder
   only; review and analysis threads do not get them. Credential folders (`~/.ssh`, `~/.aws`,
   `~/.config/gh`, …) and the app's own state cannot be read.
@@ -148,7 +151,7 @@ that token. The app acts as you, with your permissions.
   server it starts itself, with a throwaway repository and the fake agent: delegate, claim,
   working tree, question and answer, proposals, push, pull request, cancel.
 - `(cd sidecar && npm run check && npm test)`: the real helper type-checked against the
-  installed Claude Agent SDK, and its side of the protocol.
+  installed Claude Agent SDK, its options, and its side of the protocol.
 - The interface in a browser, with the real core behind it:
 
   ```bash
@@ -163,17 +166,50 @@ that token. The app acts as you, with your permissions.
 TypeScript types under `ui/src/bindings` are generated from the Rust ones by `cargo test`;
 types of the server come straight from `web/src/bindings`. Never edit either by hand.
 
+## What was run against a real model, and what was not
+
+On the Linux machine this was written on (bubblewrap sandbox, Claude Agent SDK 0.3.323,
+`claude-haiku-5-5`), real threads were run through the real helper with a list of things to
+try, and the outcome read back:
+
+| Tried by the agent | Outcome |
+|---|---|
+| `get_issue` through the relayed MCP tool; `propose_comment`, `propose_push` | worked; proposals recorded, nothing applied |
+| `Write` inside the working tree | worked |
+| `Write` outside it | refused ("running in don't ask mode") |
+| shell: write a file outside the tree | `Read-only file system` |
+| shell: fetch `https://example.com` with Python | blocked ("host is not on the allow list") |
+| shell: `curl`, `git config` | refused by the deny list |
+| shell: `git add -A`, `git commit` on its branch | worked |
+| shell: move `main`, `origin/main`, a made-up `origin/<branch>`, create a tag, write a hook | `Read-only file system` |
+| read the app's state folder (file tool and shell) | refused / not found |
+| `Agent` / `Task` | the tools are not there |
+| answer and follow-ups in the same session | remembered |
+
+Two things only the real run showed, both fixed: the Linux sandbox puts placeholder dotfiles
+into the tree that broke `git add -A` (the thread's git now ignores them), and it opens the
+whole `.git` of the clone by itself, so "only its branch" has to be enforced by closing
+everything else by name (before that fix the agent could move `main`).
+
+The window itself (the Tauri binary, WebKitGTK) was built and run under Xvfb: it starts,
+shows real data, navigates on a click, and shows a run delegated on the server arriving live.
+
+Not verified anywhere: macOS (seatbelt sandbox, Keychain) and Windows (Credential Manager,
+no sandbox); the tray icon, system notifications and the folder dialog (no desktop session
+here); a long real implementation run; how the SDK reports cost for a resumed session (the
+app takes the larger of "replace" and "add", see `Store::record_result`).
+
 ## What is not done
 
-- The real helper has not been run against a model on the machine it was written on (no
-  Claude account there). It type-checks against `@anthropic-ai/claude-agent-sdk` and its
-  protocol side is tested; the permission settings (`dontAsk`, the sandbox, the allow list)
-  follow the SDK's types and agent-hub's working configuration, and need a first real run.
 - Packaging is configured (`tauri.conf.json` bundles the sidecar's sources and its
   `node_modules` as resources) but no installer was built or signed; Node has to be installed
   on the user's machine.
 - A pull request is opened with the `gh` command when it is installed; otherwise the app opens
   GitHub's compare page and you paste the address back. The app has no GitHub token of its own.
+- Two runners of the same person (the app on two computers) can race for the run the app
+  creates for its own thread: the other one may claim it first and start a second thread. The
+  thread here then works unmirrored and says so. The server would need a way to create a run
+  already claimed by a runner.
 - One server and one account. No review remarks in line, no evidence or device tooling, no
   supervisor threads: those parts of agent-hub were left out on purpose.
 - Core messages (errors, status lines of threads) are English only; the interface is
@@ -181,3 +217,5 @@ types of the server come straight from `web/src/bindings`. Never edit either by 
 - Agent proposals are limited to a comment, a status change, subtasks, a push and a pull
   request. The run contract's `update_fields`, `create_issue` and `log_work` are not offered
   to agents, and an edited payload on approval is not sent.
+- A thread whose agent commits with a signing setup that needs the network or an agent socket
+  will fail to sign inside the sandbox.

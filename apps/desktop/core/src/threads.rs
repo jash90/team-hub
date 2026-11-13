@@ -242,9 +242,12 @@ impl Inner {
         // The thread's git must not take the sandbox's placeholder files for its own work.
         if let Some(excludes) = sandboxed.then(|| policy::sandbox_excludes(&self.config.worktrees_root, git::global_excludes().as_deref())).flatten()
         {
-            env.insert("GIT_CONFIG_COUNT".to_string(), "1".to_string());
+            env.insert("GIT_CONFIG_COUNT".to_string(), "2".to_string());
             env.insert("GIT_CONFIG_KEY_0".to_string(), "core.excludesFile".to_string());
             env.insert("GIT_CONFIG_VALUE_0".to_string(), excludes.to_string_lossy().into_owned());
+            // The packs are closed to the thread, so git must not try to repack on its own.
+            env.insert("GIT_CONFIG_KEY_1".to_string(), "gc.auto".to_string());
+            env.insert("GIT_CONFIG_VALUE_1".to_string(), "0".to_string());
         }
 
         Ok(StartThread {
@@ -257,7 +260,7 @@ impl Inner {
             rules,
             allowed_tools: policy::allowed_tools(thread.kind, &cwd, shell),
             denied_tools: denied,
-            sandbox: sandboxed.then(|| SandboxPolicy { writable: access.writable, protected: access.protected, unreadable }),
+            sandbox: sandboxed.then_some(SandboxPolicy { writable: access.writable, protected: access.protected, unreadable }),
             hub_tools: self.host.hub_tools(&thread),
             commit_tool: !shell && policy::writes_files(thread.kind),
             env,
@@ -419,7 +422,7 @@ impl Inner {
                 false
             }
             AgentEvent::Tool { name, detail } => {
-                self.say(thread_id, EventKind::Tool, &format!("{name} {detail}").trim().to_string(), json!({ "name": name, "detail": detail }));
+                self.say(thread_id, EventKind::Tool, format!("{name} {detail}").trim(), json!({ "name": name, "detail": detail }));
 
                 false
             }

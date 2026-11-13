@@ -158,10 +158,19 @@ fn a_tree_whose_git_pointer_was_replaced_is_still_read_through_the_clones_own_re
 fn the_sandbox_opens_only_what_a_commit_needs_in_the_clones_git_folder() {
     let repo = repo("worktree-access");
     let tree = repo.root.path().join("trees/a");
+    let other = repo.root.path().join("trees/other");
 
     run(&repo.clone, &["branch", "feature/WEB-9-somebody-elses"]);
+    run(&repo.clone, &["branch", "release/1.0"]);
+    run(&repo.clone, &["tag", "v1"]);
+    git::create_worktree(&repo.clone, &other, "feature/WEB-2").unwrap();
     git::create_worktree(&repo.clone, &tree, "feature/WEB-1").unwrap();
+    // After a gc branches live in packed-refs only; they still have to be closed by name.
+    run(&repo.clone, &["pack-refs", "--all"]);
 
+    assert!(!repo.clone.join(".git/refs/heads/main").exists());
+
+    let main = run(&repo.clone, &["rev-parse", "main"]);
     let access = git::write_access(&repo.clone, &tree, "feature/WEB-1").unwrap();
     let dot_git = repo.clone.join(".git");
     let text = |path: std::path::PathBuf| path.to_string_lossy().into_owned();
@@ -177,11 +186,39 @@ fn the_sandbox_opens_only_what_a_commit_needs_in_the_clones_git_folder() {
         ]
     );
 
-    for closed in ["hooks", "config", "info", "modules", "worktrees/a/gitdir", "worktrees/a/commondir", "refs/heads/feature/WEB-9-somebody-elses"] {
-        assert!(access.protected.contains(&text(dot_git.join(closed))), "{closed}");
+    let closed = [
+        "hooks",
+        "config",
+        "info",
+        "modules",
+        "HEAD",
+        "index",
+        "packed-refs",
+        "objects/pack",
+        "refs/heads/main",
+        "refs/heads/release",
+        "refs/heads/feature/WEB-9-somebody-elses",
+        "refs/heads/feature/WEB-2",
+        "refs/remotes",
+        "refs/tags",
+        "logs/HEAD",
+        "worktrees/other",
+        "worktrees/a/gitdir",
+        "worktrees/a/commondir",
+    ];
+
+    for path in closed {
+        assert!(access.protected.contains(&text(dot_git.join(path))), "{path} is open");
     }
 
-    assert!(!access.protected.contains(&text(dot_git.join("refs/heads/feature/WEB-1"))));
+    for open in ["refs/heads/feature/WEB-1", "refs/heads/feature", "refs/heads", "refs", "objects", "worktrees/a", "worktrees"] {
+        assert!(!access.protected.contains(&text(dot_git.join(open))), "{open} is closed");
+    }
+
+    // Making the packed branches closable changed nothing about them.
+    assert_eq!(run(&repo.clone, &["rev-parse", "main"]), main);
+    assert_eq!(std::fs::read_to_string(dot_git.join("refs/heads/main")).unwrap().trim(), main);
+    assert_eq!(run(&repo.clone, &["status", "--porcelain"]), "");
 
     // A branch without a folder of its own opens refs/heads, with every other branch closed by name.
     let flat = repo.root.path().join("trees/b");

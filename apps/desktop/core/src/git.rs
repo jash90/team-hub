@@ -280,41 +280,91 @@ pub struct WriteAccess {
     pub protected: Vec<String>,
 }
 
-/// A commit in a working tree needs four places in the clone's `.git`: the object store, the
-/// tree's administrative folder, and the folders that hold the ref and the reflog of its
-/// branch (git updates a ref by writing `<ref>.lock` beside it and renaming, so the folder
-/// has to be writable, not only the file). Every other ref already in those folders is
-/// closed again by name, so a thread can move its own branch and nobody else's. Everything
-/// in `.git` that runs code or redirects git (hooks, config, info, modules, the tree's
-/// pointers back to the clone) stays closed.
+/// Entries of a folder other than the one named.
+fn others(folder: &Path, keep: &std::ffi::OsStr) -> Vec<PathBuf> {
+    std::fs::read_dir(folder)
+        .map(|entries| entries.flatten().filter(|entry| entry.file_name() != keep).map(|entry| entry.path()).collect())
+        .unwrap_or_default()
+}
+
+/// Gives every local branch a file of its own under `refs/heads`. Branches that live only in
+/// `packed-refs` have none, and a path that does not exist cannot be closed to a thread: it
+/// could then create the file and so move the branch. The value written is the one the branch
+/// already has, which is what git itself writes on the branch's next update.
+fn unpack_branches(repo: &Path, common: &Path) -> CoreResult<()> {
+    let listing = git(repo, &["for-each-ref", "--format=%(refname) %(objectname)", "refs/heads"])?;
+
+    for line in listing.lines() {
+        let Some((name, commit)) = line.split_once(' ') else { continue };
+        let file = common.join(name);
+
+        if !file.exists() && is_full_sha(commit) {
+            if let Some(folder) = file.parent() {
+                std::fs::create_dir_all(folder)?;
+            }
+
+            std::fs::write(file, format!("{commit}\n"))?;
+        }
+    }
+
+    Ok(())
+}
+
+/// What a thread's shell may write in the clone's `.git`, and what it may not.
+///
+/// A commit in a working tree needs four places: the object store, the tree's administrative
+/// folder, and the folders that hold the ref and the reflog of its branch (git updates a ref
+/// by writing `<ref>.lock` beside it and renaming, so the folder has to be writable, not only
+/// the file). The agent's sandbox opens the whole `.git` of a working tree's clone by itself,
+/// so everything else is closed here by name: every other branch (a thread must not be able
+/// to move `main` under the main checkout), remote-tracking refs (a push is judged against
+/// them), tags, `HEAD`, the index, `packed-refs`, hooks, config, the packs, the other
+/// threads' trees, and the pointers of this tree back to the clone.
 pub fn write_access(repo: &Path, worktree: &Path, branch: &str) -> CoreResult<WriteAccess> {
     let common = std::fs::canonicalize(git(repo, &["rev-parse", "--path-format=absolute", "--git-common-dir"])?)?;
     let admin = admin_dir(repo, worktree)?;
     let text = |path: PathBuf| path.to_string_lossy().into_owned();
-    let own = Path::new(branch).file_name().map(|name| name.to_os_string()).unwrap_or_default();
-    let folder_of = |root: &str| common.join(root).join(branch).parent().map(Path::to_path_buf).unwrap_or_else(|| common.join(root));
-    let folders = [folder_of("refs/heads"), folder_of("logs/refs/heads")];
-    let mut protected: Vec<PathBuf> = ["commondir", "gitdir", "config.worktree"]
-        .map(|name| admin.join(name))
-        .into_iter()
-        .chain(["hooks", "config", "info", "modules"].map(|name| common.join(name)))
-        .collect();
+    let name = |text: &'static str| std::ffi::OsStr::new(text);
 
-    for folder in &folders {
+    unpack_branches(repo, &common)?;
+
+    // Closed even when they do not exist yet, so they cannot be created either.
+    let mut protected: Vec<PathBuf> = ["hooks", "config", "info", "modules", "HEAD", "index", "packed-refs", "objects/pack", "objects/info"]
+        .map(|entry| common.join(entry))
+        .to_vec();
+    let open_at_top = ["objects", "refs", "logs", "worktrees"];
+
+    protected.extend(others(&common, name("")).into_iter().filter(|path| !open_at_top.iter().any(|open| path.file_name() == Some(name(open)))));
+    protected.extend(others(&common.join("refs"), name("heads")));
+    protected.extend(others(&common.join("logs"), name("refs")));
+    protected.extend(others(&common.join("logs/refs"), name("heads")));
+    protected.extend(others(&common.join("worktrees"), admin.file_name().unwrap_or_default()));
+    protected.extend(["commondir", "gitdir", "config.worktree"].map(|entry| admin.join(entry)));
+
+    // Down the branch's path, everything beside it is closed: the other branches.
+    let mut folders = Vec::new();
+
+    for root in ["refs/heads", "logs/refs/heads"] {
+        let mut folder = common.join(root);
+
         // The sandbox can only open a folder that exists; git would make these itself.
-        std::fs::create_dir_all(folder)?;
+        std::fs::create_dir_all(common.join(root).join(branch).parent().unwrap_or(&folder))?;
 
-        for entry in std::fs::read_dir(folder)?.flatten() {
-            if entry.file_name() != own {
-                protected.push(entry.path());
-            }
+        for part in Path::new(branch).components() {
+            protected.extend(others(&folder, part.as_os_str()));
+            folders.push(folder.clone());
+            folder = folder.join(part);
         }
     }
 
     protected.sort();
+    protected.dedup();
+
+    let ref_folder = common.join("refs/heads").join(branch).parent().map(Path::to_path_buf).unwrap_or_else(|| common.join("refs/heads"));
+    let log_folder = common.join("logs/refs/heads").join(branch).parent().map(Path::to_path_buf).unwrap_or_else(|| common.join("logs/refs/heads"));
 
     Ok(WriteAccess {
-        writable: [common.join("objects"), folders[0].clone(), folders[1].clone(), admin].into_iter().map(text).collect(),
+        writable: [common.join("objects"), ref_folder, log_folder, admin].into_iter().map(text).collect(),
         protected: protected.into_iter().map(text).collect(),
     })
 }

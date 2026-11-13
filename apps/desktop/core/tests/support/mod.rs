@@ -240,7 +240,7 @@ impl HubState {
         self.next_id
     }
 
-    fn authorised(&mut self, headers: &HeaderMap) -> Result<(), Response> {
+    fn authorised(&mut self, headers: &HeaderMap) -> Result<(), Box<Response>> {
         self.requests += 1;
 
         let sent = headers.get("authorization").and_then(|value| value.to_str().ok()).unwrap_or_default();
@@ -248,17 +248,17 @@ impl HubState {
         if sent == format!("Bearer {}", self.token) {
             Ok(())
         } else {
-            Err(error(StatusCode::UNAUTHORIZED, "Sign in first"))
+            Err(Box::new(error(StatusCode::UNAUTHORIZED, "Sign in first")))
         }
     }
 
-    fn runs_api(&mut self, headers: &HeaderMap) -> Result<(), Response> {
+    fn runs_api(&mut self, headers: &HeaderMap) -> Result<(), Box<Response>> {
         self.authorised(headers)?;
 
         if self.runs_api {
             Ok(())
         } else {
-            Err(error(StatusCode::NOT_FOUND, "Not found"))
+            Err(Box::new(error(StatusCode::NOT_FOUND, "Not found")))
         }
     }
 
@@ -365,7 +365,7 @@ macro_rules! guard {
         let mut state = lock(&$state);
 
         if let Err(refused) = state.authorised(&$headers) {
-            return refused;
+            return *refused;
         }
 
         state
@@ -374,7 +374,7 @@ macro_rules! guard {
         let mut state = lock(&$state);
 
         if let Err(refused) = state.runs_api(&$headers) {
-            return refused;
+            return *refused;
         }
 
         state
