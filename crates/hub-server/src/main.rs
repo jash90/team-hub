@@ -37,9 +37,23 @@ fn start() -> Result<(), Box<dyn std::error::Error>> {
     })
 }
 
+/// How long requests in flight get to finish once the process is asked to stop. The live
+/// streams of open pages never end by themselves, so without a limit it would never exit.
+const DRAIN: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// Resolves when the process is asked to stop: Ctrl-C, or the SIGTERM a container gets when
-/// it is replaced. Requests in flight are then finished before the server exits.
+/// it is replaced. Requests in flight are then finished, within `DRAIN`, before the server exits.
 async fn stop_signal() {
+    asked_to_stop().await;
+    tracing::info!("stopping");
+
+    tokio::spawn(async {
+        tokio::time::sleep(DRAIN).await;
+        std::process::exit(0);
+    });
+}
+
+async fn asked_to_stop() {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{signal, SignalKind};
