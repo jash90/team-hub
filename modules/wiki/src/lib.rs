@@ -15,7 +15,7 @@ pub mod types;
 use axum::Router;
 use hub_app::db::query_all;
 use hub_app::{ApiResult, App, AuthUser, Event, Module, ModuleMeta, ToolSpec};
-use hub_core::{IssueRow, QuickHit};
+use hub_core::{DemoLanguage, IssueRow, QuickHit};
 use rusqlite::types::Value;
 use rusqlite::Connection;
 
@@ -158,7 +158,7 @@ impl Module for WikiModule {
         tools::call(app, user, name, arguments)
     }
 
-    fn seed_demo(&self, app: &App) -> ApiResult<()> {
-        seed::seed_demo(app)
+    fn seed_demo(&self, app: &App, language: DemoLanguage) -> ApiResult<()> {
+        seed::seed_demo(app, language)
     }
 }

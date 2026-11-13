@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use hub_core::query::{Clause, QueryFieldInfo};
 use hub_core::runners::{PersonalKey, Runner};
 use hub_core::schedule::{ScheduledTask, TaskKind, TaskStarted};
-use hub_core::{IssueRow, QuickHit};
+use hub_core::{DemoLanguage, IssueRow, QuickHit};
 use rusqlite::types::Value;
 use rusqlite::Connection;
 
@@ -142,8 +142,9 @@ pub trait Module: Send + Sync + 'static {
     /// Background work; called once the application is up.
     fn start(&self, _app: &App) {}
 
-    /// Example data for a demo instance.
-    fn seed_demo(&self, _app: &App) -> ApiResult<()> {
+    /// Example data for a demo instance, written in `language`: the same data in each
+    /// language, only the texts a person reads differ.
+    fn seed_demo(&self, _app: &App, _language: DemoLanguage) -> ApiResult<()> {
         Ok(())
     }
 }

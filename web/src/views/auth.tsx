@@ -33,7 +33,8 @@ export function SetupView({ onDone, tokenRequired }: { onDone: () => Promise<voi
   function submit(event: FormEvent): void {
     event.preventDefault();
     void run(async () => {
-      await api.post('/api/setup', form);
+      // The example data is written in the language the form is read in.
+      await api.post('/api/setup', form.demo ? { ...form, demoLanguage: currentLanguage() } : form);
       await onDone();
     });
   }

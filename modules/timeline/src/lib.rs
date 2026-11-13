@@ -14,7 +14,7 @@ use axum::Router;
 use hub_app::db::query_one;
 use hub_app::{ApiError, ApiResult, App, AuthUser, FieldSql, Module, ModuleMeta, QueryScope, ToolSpec};
 use hub_core::query::{Clause, QueryFieldInfo};
-use hub_core::{IssueRow, TypeLevel};
+use hub_core::{DemoLanguage, IssueRow, TypeLevel};
 use rusqlite::Connection;
 use serde_json::{json, Value};
 
@@ -120,7 +120,8 @@ impl Module for TimelineModule {
         })
     }
 
-    fn seed_demo(&self, app: &App) -> ApiResult<()> {
+    /// The demo's dates are the same in every language.
+    fn seed_demo(&self, app: &App, _language: DemoLanguage) -> ApiResult<()> {
         seed::seed_demo(app)
     }
 }

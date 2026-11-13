@@ -77,6 +77,7 @@ export const exact: Record<string, string> = {
   'Missing or stale CSRF token; reload the page': 'Brak tokenu CSRF albo token jest nieaktualny; odśwież stronę',
   'The setup token is not right': 'Token instalacyjny jest nieprawidłowy',
   'This instance is already set up': 'Ta instancja jest już skonfigurowana',
+  'The example data comes in English (en) or Polish (pl)': 'Przykładowe dane są dostępne po angielsku (en) albo po polsku (pl)',
   'You can only view this project': 'Ten projekt możesz tylko przeglądać',
   'Only a project administrator can do that': 'To może zrobić tylko administrator projektu',
   'Only an administrator can do that': 'To może zrobić tylko administrator',

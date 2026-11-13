@@ -749,7 +749,7 @@ async fn agents_work_through_the_tools_with_the_access_of_their_user() {
 async fn the_demo_has_a_knowledge_base_tied_to_its_issues() {
     let app = test_app();
     let admin = person(&app, "Bartek Admin", Role::Admin);
-    hub_app::seed::seed_demo(&app, admin.user.id).expect("the demo data");
+    hub_app::seed::seed_demo(&app, admin.user.id, hub_core::DemoLanguage::Pl).expect("the demo data");
 
     let spaces = admin.get("/spaces").await;
     let summary: Vec<(&str, &str, Option<&str>)> = spaces
@@ -834,6 +834,6 @@ async fn the_demo_has_a_knowledge_base_tied_to_its_issues() {
     assert_eq!(titles(&admin.get("/search?q=sandbox%20karty").await)[0], "Bramka kartowa: sandbox");
 
     // Seeding twice adds nothing.
-    WikiModule.seed_demo(&app).unwrap();
+    WikiModule.seed_demo(&app, hub_core::DemoLanguage::Pl).unwrap();
     assert_eq!(admin.get("/spaces").await.as_array().unwrap().len(), 2);
 }

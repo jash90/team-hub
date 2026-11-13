@@ -556,7 +556,7 @@ async fn runs_tests_and_issues_can_be_removed() {
 async fn the_demo_has_a_done_issue_with_a_failing_test() {
     let app = test_app();
     let owner = person(&app, "Olga Owner", Role::Admin);
-    hub_app::seed::seed_demo(&app, owner.user.id).expect("demo data");
+    hub_app::seed::seed_demo(&app, owner.user.id, hub_core::DemoLanguage::Pl).expect("demo data");
 
     let page = owner.get("/projects/WEB").await;
     let tests = page["tests"].as_array().unwrap();

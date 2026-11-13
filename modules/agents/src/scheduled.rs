@@ -8,6 +8,7 @@ use hub_app::services::schedule::{self, NewTask, Outcome};
 use hub_app::services::search;
 use hub_app::services::users::get_user;
 use hub_app::{Actor, ApiError, ApiResult, App, AuthUser, Tx};
+use hub_core::demo::{DemoLanguage, DemoText};
 use hub_core::schedule::{ScheduledTask, TaskField, TaskFieldType, TaskKind, TaskOption, TaskSlot, TaskStarted};
 use hub_core::Id;
 use rusqlite::types::Value as SqlValue;
@@ -218,45 +219,52 @@ pub fn start(app: &App, task: &ScheduledTask, actor: &AuthUser) -> ApiResult<Tas
 // ---------- example data ----------
 
 struct Demo {
-    name: &'static str,
+    name: DemoText,
     slot: TaskSlot,
     query: &'static str,
     kind: AgentRunKind,
-    instructions: &'static str,
+    instructions: DemoText,
     /// Days ago the task last ran, finding nothing; none for a task that has not run yet.
     ran: Option<i64>,
 }
 
 const DEMO: &[Demo] = &[
     Demo {
-        name: "Triage nowych zgłoszeń",
+        name: DemoText::new("Triage new issues", "Triage nowych zgłoszeń"),
         slot: TaskSlot::Morning,
         query: "created >= -1d AND category = todo ORDER BY created",
         kind: AgentRunKind::Triage,
-        instructions: "Zaproponuj priorytet i etykiety. Zaznacz, czego brakuje do rozpoczęcia pracy.",
+        instructions: DemoText::new(
+            "Suggest a priority and labels. Point out what is missing before work can start.",
+            "Zaproponuj priorytet i etykiety. Zaznacz, czego brakuje do rozpoczęcia pracy.",
+        ),
         ran: Some(1),
     },
     Demo {
-        name: "Podsumowanie zadań czekających na review",
+        name: DemoText::new("Summarise issues waiting for review", "Podsumowanie zadań czekających na review"),
         slot: TaskSlot::Afternoon,
         query: "status = \"In Review\" AND updated <= -3d ORDER BY updated",
         kind: AgentRunKind::Summarize,
-        instructions: "Napisz w trzech zdaniach, na czym stoi zadanie i kto powinien zrobić następny krok.",
+        instructions: DemoText::new(
+            "Write in three sentences where the issue stands and who should take the next step.",
+            "Napisz w trzech zdaniach, na czym stoi zadanie i kto powinien zrobić następny krok.",
+        ),
         ran: None,
     },
     Demo {
-        name: "Doprecyzuj historie przed planowaniem",
+        name: DemoText::new("Refine stories before planning", "Doprecyzuj historie przed planowaniem"),
         slot: TaskSlot::OnDemand,
         query: "type = Story AND sprint is empty AND category = todo ORDER BY rank",
         kind: AgentRunKind::Refine,
-        instructions: "",
+        instructions: DemoText::EMPTY,
         ran: Some(4),
     },
 ];
 
 /// A few tasks in the demo's first project, made by its administrator, so the schedule's
-/// page has something to show. They are real: the next slot runs them.
-pub fn seed_demo(app: &App) -> ApiResult<()> {
+/// page has something to show. They are real: the next slot runs them. Their names and
+/// instructions are written in the language of the demo.
+pub fn seed_demo(app: &App, language: DemoLanguage) -> ApiResult<()> {
     let found: Option<(String, Id)> = app.read(|connection| {
         query_one(
             connection,
@@ -270,10 +278,10 @@ pub fn seed_demo(app: &App) -> ApiResult<()> {
     let admin = AuthUser { id: person.id, name: person.name, email: person.email, role: person.role, via_token: false, through: Vec::new() };
 
     for demo in DEMO {
-        let config = json!({ "query": demo.query, "kind": demo.kind.as_str(), "instructions": demo.instructions, "limit": 3 });
+        let config = json!({ "query": demo.query, "kind": demo.kind.as_str(), "instructions": demo.instructions.pick(language), "limit": 3 });
         let new = NewTask {
             kind: RUN_KIND.to_string(),
-            name: demo.name.to_string(),
+            name: demo.name.pick(language).to_string(),
             config: config.as_object().cloned().unwrap_or_default(),
             slot: demo.slot,
             enabled: None,

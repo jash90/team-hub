@@ -23,7 +23,7 @@ use hub_app::access::project_access;
 use hub_app::services::issues::{issue_access, row_by_id};
 use hub_app::{ApiError, ApiResult, App, AuthUser, Event, FieldSql, Module, ModuleMeta, QueryScope, ToolSpec};
 use hub_core::query::{Clause, ClauseOp, QueryFieldInfo, QueryValue};
-use hub_core::{Id, IssueRow};
+use hub_core::{DemoLanguage, Id, IssueRow};
 use rusqlite::types::Value as SqlValue;
 use rusqlite::Connection;
 use serde_json::{json, Value};
@@ -253,7 +253,7 @@ impl Module for E2eModule {
         }
     }
 
-    fn seed_demo(&self, app: &App) -> ApiResult<()> {
-        seed::seed_demo(app)
+    fn seed_demo(&self, app: &App, language: DemoLanguage) -> ApiResult<()> {
+        seed::seed_demo(app, language)
     }
 }

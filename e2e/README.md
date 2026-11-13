@@ -24,7 +24,8 @@ The tests use locators and assertions only, so they need no model. A key in a ti
 npm --prefix ../integrations/e2e-reporter install
 npm install
 
-# 2. a demo instance: start the server with a fresh data directory, then
+# 2. a demo instance: start the server with a fresh data directory, then set it up.
+#    Without "demoLanguage" the example data is Polish, which is what these tests look for.
 curl -X POST http://localhost:8192/api/setup -H 'content-type: application/json' \
   -d '{"name":"Bartek Admin","email":"admin@example.com","password":"correct horse","demo":true}'
 

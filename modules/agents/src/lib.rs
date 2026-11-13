@@ -32,7 +32,7 @@ use hub_app::access::visible_projects;
 use hub_app::db::{placeholders, query_all};
 use hub_app::{ApiResult, App, AuthUser, Module, ModuleMeta};
 use hub_core::schedule::{ScheduledTask, TaskKind, TaskStarted};
-use hub_core::{Id, IssueRow};
+use hub_core::{DemoLanguage, Id, IssueRow};
 use rusqlite::types::Value as SqlValue;
 use rusqlite::Connection;
 use serde::Serialize;
@@ -155,8 +155,8 @@ impl Module for AgentsModule {
         worker::start(app);
     }
 
-    fn seed_demo(&self, app: &App) -> ApiResult<()> {
-        scheduled::seed_demo(app)
+    fn seed_demo(&self, app: &App, language: DemoLanguage) -> ApiResult<()> {
+        scheduled::seed_demo(app, language)
     }
 }
 

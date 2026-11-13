@@ -80,7 +80,10 @@ cargo build --release
 ```
 
 Open <http://localhost:8080>. The first visit creates the administrator account, optionally
-with example projects, a team and a few weeks of history to look around in.
+with example projects, a team and a few weeks of history to look around in. The example data
+comes in English and in Polish: it is written in the language the setup form is shown in
+(the form follows the browser and has a switch). Over the API, `POST /api/setup` takes
+`"demo": true` and `"demoLanguage": "en"` or `"pl"`; without a language the data is Polish.
 
 Every module is in that build. To leave some out, name the ones to keep (`confluence` needs
 `wiki`); the interface is built the same way either way and fetches only the screens of the

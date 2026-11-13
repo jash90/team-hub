@@ -428,7 +428,7 @@ async fn a_project_that_switched_the_module_off_does_not_exist_for_it() {
 async fn the_demo_has_epics_planned_around_today() {
     let app = test_app();
     let admin = person(&app, "Bartek Admin", Role::Admin);
-    seed_demo(&app, admin.user.id).expect("the demo data");
+    seed_demo(&app, admin.user.id, hub_core::DemoLanguage::Pl).expect("the demo data");
 
     let web = admin.get("/projects/WEB").await;
     assert_eq!(keys(&web["epics"]), ["WEB-1", "WEB-2", "WEB-3"]);

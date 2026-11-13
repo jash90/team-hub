@@ -10,7 +10,7 @@ use hub_app::auth::{self, MaybeUser};
 use hub_app::services::users::NewUser;
 use hub_app::services::{notifications, projects, users};
 use hub_app::{seed, ApiError, ApiResult, App, AuthUser};
-use hub_core::{ApiToken, Bootstrap, Id, Role, User};
+use hub_core::{ApiToken, Bootstrap, DemoLanguage, Id, Role, User};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -64,12 +64,25 @@ struct SetupRequest {
     password: String,
     #[serde(default)]
     demo: bool,
+    /// The language of the example data: "en" or "pl".
+    #[serde(default, rename = "demoLanguage")]
+    demo_language: Option<String>,
     #[serde(default, rename = "setupToken")]
     setup_token: String,
 }
 
+/// The language the example data is written in. A request that does not say gets Polish,
+/// which is what the demo was before it had a second language.
+fn demo_language(code: Option<&str>) -> ApiResult<DemoLanguage> {
+    match code {
+        None => Ok(DemoLanguage::Pl),
+        Some(code) => DemoLanguage::parse(code).ok_or_else(|| ApiError::bad_request("The example data comes in English (en) or Polish (pl)")),
+    }
+}
+
 /// Creates the first account, an administrator. Works exactly once.
 async fn setup(State(app): State<App>, Json(request): Json<SetupRequest>) -> ApiResult<Response> {
+    let language = demo_language(request.demo_language.as_deref())?;
     let (user, session) = app
         .run(move |app| {
             let user = app.db.write(|tx| {
@@ -94,7 +107,7 @@ async fn setup(State(app): State<App>, Json(request): Json<SetupRequest>) -> Api
             })?;
 
             if request.demo {
-                seed::seed_demo(app, user.id)?;
+                seed::seed_demo(app, user.id, language)?;
             }
 
             let session = app.db.write(|tx| auth::create_session(tx, user.id))?;

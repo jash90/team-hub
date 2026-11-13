@@ -71,7 +71,7 @@ interface fetches the screens of those only, so one built `web/dist` serves any 
 | Tools for AI agents (MCP) | `fn tools` + `fn call_tool`. |
 | Work on a schedule | `fn task_kinds` (what it can run, with the form for it) and `fn start_task` (run one). See below. |
 | Background work | `fn start(&App)`: spawn a plain thread; never block the Rayon pool on the network. |
-| Demo data | `fn seed_demo(&App)`. |
+| Demo data | `fn seed_demo(&App, DemoLanguage)`. See below. |
 
 ### Work on a schedule
 
@@ -105,6 +105,24 @@ texts written in place (`TaskKind { name: "…" }`, `TaskStarted::Done { summary
 an `ApiError`'s message) and fails when one has no Polish; for a text that reaches `finish`
 some other way, add the entry all the same. `modules/agents/src/scheduled.rs` is the
 reference: one kind, its form, its start, and its example tasks for the demo.
+
+### Demo data
+
+The example data of a new instance comes in English and in Polish, and whoever sets the
+instance up gets it in the language of their interface. It is one data set: the same
+projects, issue keys, statuses, people's roles, dates, numbers and commit SHAs in both, so
+only what a person reads differs. `seed_demo(app, language)` therefore keeps one structure
+and writes every text as a pair, `DemoText::new("Password reset", "Reset hasła")`
+(`hub_core::demo`), picked with `.pick(language)`; `DemoText::same("seo")` is a text that
+reads the same in both. Long texts (a page's body) are written out in full in each language.
+
+Names that seeds share have to agree in each language: a branch a test run names is the
+branch of the demo's pull request, a `[[link]]` in a page names the title of the page in the
+same language. An id nobody reads (a commit's SHA, a test's id) is made from one of the two
+texts, always the same one, so it does not depend on the language.
+`crates/hub-server/tests/demo_languages.rs` seeds both and compares them, and fails when the
+English demo has a Polish word in it: when a seed gets a new text, add the places it is
+shown to the walk in that test if they are not there yet.
 
 ## Per project
 

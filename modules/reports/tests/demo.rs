@@ -46,7 +46,7 @@ fn demo() -> Demo {
     let _ = std::fs::remove_dir_all(&directory);
     let app = App::new(Config::for_tests(directory), vec![Arc::new(ReportsModule)]).expect("the test application starts");
     let (admin, token) = person(&app, "Bartek Admin", "admin@example.com", Role::Admin);
-    seed_demo(&app, admin.id).expect("the demo data");
+    seed_demo(&app, admin.id, hub_core::DemoLanguage::Pl).expect("the demo data");
     let router = Router::new().nest("/api/m/reports", ReportsModule.routes().expect("the module has routes")).with_state(app.clone());
 
     Demo { app, router, admin, token }
