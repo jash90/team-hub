@@ -195,6 +195,10 @@ jobs:
       # runs `npm run tauri build -- <args>` there, and what follows the second `--` is for cargo.
       - name: Build the app and its installers
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          # For the AppImage tool: `strip` would turn the agent's program in the bundle into a
+          # bare JavaScript runtime.
+          NO_STRIP: 'true'
         with:
           projectPath: apps/desktop
           tauriScript: npm run tauri
@@ -233,6 +237,55 @@ jobs:
           esac
 
           ls -l dist
+
+      # Not whether the app works, only whether the helper it carries can start: the files
+      # are where the app looks, the agent's program is still that program after packaging,
+      # and Node runs the helper from there. Without an account or the network.
+      - name: The packaged helper starts (Linux, from the .deb and the AppImage)
+        if: runner.os == 'Linux'
+        run: |
+          work="$RUNNER_TEMP/packaged"
+          mkdir -p "$work"
+
+          dpkg-deb -x "dist/team-hub-desktop-$VERSION-$LABEL.deb" "$work/deb"
+          node apps/desktop/scripts/check-packaged.mjs "$work/deb/usr/lib/team-hub"
+
+          cp "dist/team-hub-desktop-$VERSION-$LABEL.AppImage" "$work/app.AppImage"
+          chmod +x "$work/app.AppImage"
+          (cd "$work" && ./app.AppImage --appimage-extract > /dev/null)
+          node apps/desktop/scripts/check-packaged.mjs "$work/squashfs-root/usr/lib/team-hub"
+
+      - name: The packaged helper starts (macOS, from the .app)
+        if: runner.os == 'macOS'
+        env:
+          NPM_OS: ${{ matrix.npm_os }}
+          NPM_CPU: ${{ matrix.npm_cpu }}
+        run: |
+          node apps/desktop/scripts/check-packaged.mjs \
+            "apps/desktop/src-tauri/target/$TARGET/release/bundle/macos/team-hub.app/Contents/Resources" \
+            --os "$NPM_OS" --cpu "$NPM_CPU"
+
+      # The only place the Windows installer is ever run before a person does. It reports and
+      # does not stop the release: an installer that will not install silently on a build
+      # machine may still be fine on a desk.
+      - name: The installer installs and the helper starts (Windows; reported, not required)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path "dist/team-hub-desktop-${env:VERSION}-${env:LABEL}-setup.exe").Path
+          $folder = Join-Path $env:RUNNER_TEMP 'team-hub-installed'
+          # NSIS: /S is silent, and /D= (last, unquoted) is the folder to install into.
+          $install = Start-Process -FilePath $installer -ArgumentList '/S', "/D=$folder" -Wait -PassThru
+
+          if ($install.ExitCode -ne 0) {
+            Write-Output "::error::The installer ended with $($install.ExitCode)."
+            exit 1
+          }
+
+          node apps/desktop/scripts/check-packaged.mjs $folder
+          exit $LASTEXITCODE
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

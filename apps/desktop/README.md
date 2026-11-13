@@ -275,11 +275,21 @@ What the workflow builds, each on the system it is for:
 only (`scripts/prepare-sidecar.mjs`). That folder holds the Claude Agent SDK and its native
 `claude` program for exactly one system, about 350 MB unpacked, which is why there are two
 macOS builds instead of a universal one and why an installer should come to around 200 MB
-(none was built yet to weigh). **Node.js is
+(none was built yet; a `.deb` of the helper alone, made by hand, is 190 MB). **Node.js is
 not carried**: the app runs `node` (Settings → Node command) from the `PATH` of the person's
 shell, and says so in a dialog at start when there is none or it is older than 22.18. There
 is no `.msi`: add `"msi"` to `bundle.targets` in `tauri.conf.json` to get one. There is no
 updater.
+
+**The workflow tries what it built, as far as a build machine can.** After packaging,
+`scripts/check-packaged.mjs` looks into the `.deb`, the AppImage and the macOS `.app`: the
+helper's files are where the app looks for them, the agent's program still answers as
+itself, and Node starts the helper from there. That matters because packaging tools rewrite
+programs they find: `strip` turns the agent's program into a bare JavaScript runtime that
+still starts (tried here; the AppImage tool is told not to strip, and it also rewrites the
+program's library path, which did it no harm here). On Windows the installer is run silently
+and the same check made on what it installed; that step reports and does not stop the
+release. None of this starts the window or an agent.
 
 **Signing is optional and off.** Without secrets the macOS app gets an ad-hoc signature and
 the Windows installer none; people have to allow the app by hand, as the notes describe.
