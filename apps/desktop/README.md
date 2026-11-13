@@ -17,8 +17,18 @@ core/        hub-desktop-core: everything that is not a window. No Tauri; shares
 src-tauri/   The window: one command that forwards to the core, the tray, notifications, window state.
 ui/          The interface: React, TypeScript, Vite. Polish and English, light and dark.
 sidecar/     Node helper that runs one agent turn through the Claude Agent SDK, JSON lines on stdin/stdout.
-scripts/     The end-to-end check against a real server; the icon generator.
+scripts/     The end-to-end check against a real server; the icon generator; the release's version check
+             and the helper's dependencies as an installer carries them.
 ```
+
+## Download
+
+Installers for macOS, Windows and Linux, and the `hub` command line alone, are on the
+repository's [Releases page](https://github.com/jash90/team-hub/releases) (the releases named
+"team-hub desktop"). What you need besides the installer, how to open an unsigned build, and
+what is known not to work: [RELEASE_NOTES.md](RELEASE_NOTES.md), which is also the text of the
+release. The installers are built by GitHub Actions and were not tried by a person; see
+[Releasing](#releasing).
 
 ## Building and running
 
@@ -33,7 +43,18 @@ directly), git, and a team-hub server to connect to. For real agents: Claude Cod
 ```
 
 For development, with reloading: `(cd apps/desktop && npm install && npm run dev)`.
-For installers (`.dmg`, `.msi`, `.deb`/AppImage): `(cd apps/desktop && npm install && npm run build)`.
+For installers on your own machine (`.dmg`; a Windows `-setup.exe`; `.deb`, `.rpm`, AppImage):
+
+```bash
+cd apps/desktop
+npm ci && npm ci --prefix ui
+npm run sidecar        # the helper's production dependencies, as the installer carries them
+npm run build          # → src-tauri/target/release/bundle/
+```
+
+`npm run sidecar` replaces `sidecar/node_modules`; run `npm install` in `sidecar` again before
+its `npm run check` and `npm test`. Released installers are not built this way but by GitHub
+Actions: see [Releasing](#releasing).
 
 | System | Besides Rust and Node |
 |---|---|
@@ -199,11 +220,115 @@ no sandbox); the tray icon, system notifications and the folder dialog (no deskt
 here); a long real implementation run; how the SDK reports cost for a resumed session (the
 app takes the larger of "replace" and "add", see `Store::record_result`).
 
+What the first release added to the window's start was not run in a window either: taking
+the `PATH` of the person's shell, the dialog about a missing or old Node, and running the
+helper from the installed resources (`src-tauri/src/environment.rs`, `main.rs`). It compiles
+with the app, and its parts are tested alone (`rustc --edition 2021 --test
+src-tauri/src/environment.rs`, then run the program it makes); the helper was started from a
+copy laid out like the installed one, with production dependencies only, and answered `ready`.
+
+## Releasing
+
+A release is built on GitHub's machines by
+[`.github/workflows/desktop-release.yml`](../../.github/workflows/desktop-release.yml) when a
+tag `desktop-vX.Y.Z` is pushed, and waits as a **draft** until a person publishes it.
+
+1. **One version everywhere.** Set it in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`
+   and the three `package.json` files, and let the lock files follow:
+
+   ```bash
+   cd apps/desktop
+   for folder in . ui sidecar; do npm version 0.2.0 --no-git-tag-version --prefix "$folder"; done
+   # … edit "version" in src-tauri/tauri.conf.json and src-tauri/Cargo.toml, then:
+   (cd src-tauri && cargo update --package team-hub-desktop)
+   node scripts/check-version.mjs 0.2.0        # says which file still differs
+   ```
+
+2. **Write the notes.** [RELEASE_NOTES.md](RELEASE_NOTES.md) becomes the body of the release;
+   its heading has to name the version, and its file names and limits have to be true for it.
+3. Merge to `main`. For a rehearsal that publishes nothing: Actions → **Desktop release** →
+   **Run workflow**, with the version; the installers are then artifacts of that run.
+4. **Tag and push the tag**:
+
+   ```bash
+   git tag desktop-v0.2.0 && git push origin desktop-v0.2.0
+   ```
+
+5. The workflow checks that the tag is the version in the files, builds, and creates the draft
+   release "team-hub desktop v0.2.0" with the installers, the `hub` archives and `SHA256SUMS`.
+   Download them, try them, then **publish** the draft on the Releases page. Running the
+   workflow again for the same tag (after deleting and pushing the tag again, or "Re-run
+   jobs") replaces the files of the draft; a published release is never changed by it.
+
+What the workflow builds, each on the system it is for:
+
+| Job | Runner | Result |
+|---|---|---|
+| App · macos-arm64, macos-x64 | `macos-latest`, one build per architecture | `.dmg` |
+| App · windows-x64 | `windows-latest` | NSIS `-setup.exe`, installed per user |
+| App · linux-x64 | `ubuntu-22.04` | `.deb`, `.rpm`, `.AppImage` |
+| hub · the same four | the same | `hub-…tar.gz`, `hub-…zip` |
+| Draft the release | `ubuntu-latest`, the only job that may write | `SHA256SUMS`, the draft |
+
+**What an installer carries.** The window, the interface, and under its resources the helper:
+`sidecar/src`, `sidecar/package.json` and `sidecar/node_modules` with production dependencies
+only (`scripts/prepare-sidecar.mjs`). That folder holds the Claude Agent SDK and its native
+`claude` program for exactly one system, about 350 MB unpacked, which is why there are two
+macOS builds instead of a universal one and why an installer should come to around 200 MB
+(none was built yet to weigh). **Node.js is
+not carried**: the app runs `node` (Settings → Node command) from the `PATH` of the person's
+shell, and says so in a dialog at start when there is none or it is older than 22.18. There
+is no `.msi`: add `"msi"` to `bundle.targets` in `tauri.conf.json` to get one. There is no
+updater.
+
+**Signing is optional and off.** Without secrets the macOS app gets an ad-hoc signature and
+the Windows installer none; people have to allow the app by hand, as the notes describe.
+Once a system is signed, take its "not signed" paragraph out of the notes.
+
+- *macOS.* Add the repository secrets `APPLE_CERTIFICATE` (a Developer ID Application
+  certificate as base64 of the `.p12`), `APPLE_CERTIFICATE_PASSWORD` and
+  `APPLE_SIGNING_IDENTITY` to sign; add `APPLE_ID`, `APPLE_PASSWORD` (an app-specific
+  password) and `APPLE_TEAM_ID` as well to notarize. The workflow passes them to Tauri only
+  when they are set. This path was never run. One thing to watch on the first try: Apple
+  notarizes an app only when every program inside it is signed. The `claude` program under
+  `Contents/Resources/sidecar/node_modules` is one; Tauri leaves it as it came, signed by
+  Anthropic's Developer ID, and whether Apple accepts the app with it has not been tried.
+- *Windows.* Nothing is wired. It needs a code-signing certificate and, in `tauri.conf.json`,
+  either `bundle.windows.certificateThumbprint` with `digestAlgorithm` and `timestampUrl` (the
+  certificate imported into the runner's store from secrets in a step before the build), or
+  `bundle.windows.signCommand` for a signing service such as Azure Trusted Signing (with its
+  credentials as secrets). Certificates issued today live on hardware or in a service, so the
+  second is the usual way.
+
+**What the repository needs.** GitHub Actions enabled, with third-party actions allowed
+(`tauri-apps/tauri-action`, `Swatinem/rust-cache`; every action is pinned to a commit). No
+secret. The workflow asks for its own permissions, read everywhere and
+`contents: write` for the one job that drafts the release, so the repository's default
+workflow permissions can stay read-only.
+
+**Before publishing, two things only the owner can settle.** The repository has no licence
+file, so a release says nothing about what people may do with the app. And the installers
+pass on software that is not ours: the Claude Agent SDK and its `claude` program are
+"© Anthropic PBC. All rights reserved", used under Anthropic's
+[legal agreements](https://code.claude.com/docs/en/legal-and-compliance); check that they
+allow handing the program on inside an installer. If they do not, the way out is an installer
+without `sidecar/node_modules` that fetches it on the person's computer (`npm ci` at first
+start), which is not built.
+
+**Never run.** The workflow was written and checked (actionlint, shellcheck, the inputs of
+each action, the Tauri configuration against the schema) on a machine that cannot run GitHub
+Actions. Its first run is its first test.
+
 ## What is not done
 
-- Packaging is configured (`tauri.conf.json` bundles the sidecar's sources and its
-  `node_modules` as resources) but no installer was built or signed; Node has to be installed
-  on the user's machine.
+- No installer was installed and tried by a person, on any system, and none is signed with a
+  developer certificate. The release workflow has not run yet. Node has to be installed on
+  the user's machine.
+- The `hub` command line, downloaded alone, finds no helper: it looks where the source tree
+  was when it was built. Agent threads from it need `TEAM_HUB_SIDECAR` (see the release
+  notes).
+- On Windows the core starts git and the helper without hiding their console, so windows may
+  flash; nobody has looked.
 - A pull request is opened with the `gh` command when it is installed (it is then yours). Without
   it, the server opens it with its own GitHub token when the repository is connected to the
   issue's project there, so the pull request is authored by whoever that token belongs to.
