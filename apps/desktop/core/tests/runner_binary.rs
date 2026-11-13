@@ -9,8 +9,13 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use support::cloud::{github, runner_variables, GITHUB_TOKEN, MODEL_KEY};
-use support::{group_alive, FakeHub, TempDir, TOKEN};
+use support::cloud::{github, runner_variables};
+// What only the Linux-only check of the process's memory looks for.
+#[cfg(target_os = "linux")]
+use support::cloud::{GITHUB_TOKEN, MODEL_KEY};
+#[cfg(target_os = "linux")]
+use support::TOKEN;
+use support::{group_alive, FakeHub, TempDir};
 
 struct Runner {
     child: Child,
@@ -130,7 +135,8 @@ async fn the_runner_leaves_within_seconds_of_sigterm_keeps_its_run_and_continues
     })
     .await;
 
-    let children = Command::new("ps").args(["-o", "pid=", "--ppid", &runner.child.id().to_string()]).output().unwrap();
+    // pgrep, not `ps --ppid`: that flag is GNU's, and macOS's ps has none like it.
+    let children = Command::new("pgrep").args(["-P", &runner.child.id().to_string()]).output().unwrap();
     let helpers: Vec<u32> = String::from_utf8_lossy(&children.stdout).lines().filter_map(|pid| pid.trim().parse().ok()).collect();
 
     assert!(helpers.iter().any(|pid| group_alive(*pid)), "{helpers:?}");

@@ -282,7 +282,11 @@ test('the real helper and SDK refuse a scripted agent every file outside its wor
 
   // Nothing from outside the tree ever reached the "model": not through a tool, not through
   // a file named in the prompt, and the model key is in no message either.
-  for (const secret of ['RUNNER-STATE-CONTENT', 'OTHER-CLONE-CONTENT', 'OTHER-THREAD-CONTENT', FAKE_KEY, readFileSync('/etc/hostname', 'utf8').trim() + '\\n']) {
+  // /etc/hostname is Linux's: where there is none (macOS), the mention in the prompt names
+  // nothing and there is no content to look for.
+  const hostname = existsSync('/etc/hostname') ? [readFileSync('/etc/hostname', 'utf8').trim() + '\\n'] : [];
+
+  for (const secret of ['RUNNER-STATE-CONTENT', 'OTHER-CLONE-CONTENT', 'OTHER-THREAD-CONTENT', FAKE_KEY, ...hostname]) {
     assert.ok(!sent.includes(secret), `${secret} was sent to the model`);
   }
 

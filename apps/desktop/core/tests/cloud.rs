@@ -388,7 +388,9 @@ async fn the_helper_gets_the_model_key_a_home_of_its_own_and_none_of_the_runners
     assert!(names.contains(&"PATH".to_string()) && names.contains(&"ANTHROPIC_API_KEY".to_string()));
     assert!(
         names.iter().all(|name| hub_desktop_core::policy::PASSED_TO_A_HEADLESS_HELPER.contains(&name.as_str())
-            || ["HOME", "ANTHROPIC_API_KEY"].contains(&name.as_str())),
+            || ["HOME", "ANTHROPIC_API_KEY"].contains(&name.as_str())
+            // macOS gives this one to every process it starts; nobody passed it on.
+            || (cfg!(target_os = "macos") && name == "__CF_USER_TEXT_ENCODING")),
         "{names:?}"
     );
     assert_eq!(said(&events, "HOME="), format!("HOME={}", bench.data.path().join("agent-home").display()));

@@ -145,7 +145,8 @@ async fn the_desktop_app_runs_the_test_jobs_sent_to_it_by_name_on_the_computer()
 
     // Where the system has a sandbox, the job cannot read the app's state or the person's
     // keys and cannot write outside its own folder; without one it is the person's own user.
-    if sandbox_here() == SandboxState::Available {
+    // Test jobs are confined on Linux only (`JobOptions::for_desktop`).
+    if cfg!(target_os = "linux") && sandbox_here() == SandboxState::Available {
         assert_eq!(seen["probes"][state_file.to_str().unwrap()], "ENOENT");
         assert_ne!(seen["probes"][home_keys.to_str().unwrap()], "read");
         // What it wrote beside its folder went to a /tmp of its own, not to the disk.

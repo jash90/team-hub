@@ -220,8 +220,10 @@ async fn a_job_is_checked_out_run_and_its_report_and_files_come_back() {
 
     let given = ["PATH", "HOME", "CI", "PLAYWRIGHT_BROWSERS_PATH", "SUITE_URL", "SUITE_MODE", "SUITE_PASSWORD"];
     let added_by_npx = |name: &str| name.starts_with("npm_") || ["NODE", "INIT_CWD", "COLOR", "EDITOR", "PWD", "_"].contains(&name);
+    // macOS gives the first to every process it starts, and its `sh` counts its depth.
+    let added_by_macos = |name: &str| cfg!(target_os = "macos") && ["__CF_USER_TEXT_ENCODING", "SHLVL"].contains(&name);
 
-    assert!(env.keys().all(|name| given.contains(&name.as_str()) || added_by_npx(name)), "{:?}", env.keys().collect::<Vec<_>>());
+    assert!(env.keys().all(|name| given.contains(&name.as_str()) || added_by_npx(name) || added_by_macos(name)), "{:?}", env.keys().collect::<Vec<_>>());
     assert!(std::env::var("TEAM_HUB_TOKEN").is_ok(), "the runner's own environment has them");
     assert!(
         !seen.to_string().contains(TOKEN) && !seen.to_string().contains(GITHUB_TOKEN) && !seen.to_string().contains("sk-ant-not-for-test-suites")
