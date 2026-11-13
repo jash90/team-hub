@@ -53,3 +53,39 @@ A module can be switched off at runtime (Settings → Modules); while off, its r
   `ts_rs::TS` with `#[ts(export)]`; `cargo test` writes them to `web/src/bindings/`.
 - **Tests use no network**: build the app with `App::new(Config::for_tests(dir), vec![…])`,
   serve fake upstreams from `127.0.0.1:0`.
+
+## The web half
+
+`modules/<id>/web/index.tsx` exports one `WebModule` (the type, with a comment on every
+field, is in `web/src/modules.ts`, where the module is also listed). It only shows up where
+it has something: project navigation, full pages, badges on issue cards, a panel on the issue
+page, a section of "My work", tabs in project and instance settings.
+`modules/github/web/index.tsx` uses every one of these and is the reference.
+
+- **Imports**: `react`, and the application through the `@/` alias (`web/src`). Nothing else
+  resolves from a module folder, so no extra packages: charts are hand-drawn SVG.
+  - `@/api.ts`: `api.get/post/patch/put/del/upload`, `query()`, `errorMessage()`.
+  - `@/session.tsx`: `useSession()` (user, people, `moduleEnabled`), `useRemote(load, deps, live?)`
+    (data that reloads when the server announces a change the predicate accepts),
+    `useProject()` inside project pages, `useStored()` for per-browser interface state.
+  - `@/components/ui.tsx`: `Button`, `Dialog`, `ConfirmDialog`, `Picker`, `Menu`, `Popover`,
+    `Tabs`, `Tag`, `Field`, `Empty`, `Spinner`, `ErrorNote`, `ProgressBar`, `Avatar`,
+    `InlineEdit`, `attempt()`, `useBusy()`, `toast()`, `copyText()`.
+  - `@/components/icon.tsx` (`Icon`, the names are the keys of its table),
+    `@/components/issue-bits.tsx` (`IssueLine`, `IssueKey`, pickers for issue fields),
+    `@/components/markdown.tsx` (`Markdown`, `MarkdownEditor`), `@/router.tsx` (`Link`,
+    `navigate`, `useSearchParams`, `setParam`), `@/views/settings.tsx` (`SettingsCard`).
+  - `@/bindings/*`: the types generated from Rust. Never write those shapes by hand.
+- **Routes**: a pattern starting with `/p/:key/` renders inside the project (so `useProject()`
+  works); anything else is a top-level page.
+- **Text**: English in place through `t('…', { name })`; `modules/<id>/web/pl.ts` holds the
+  Polish for every phrase the module uses (the key is the English text). Dates and durations
+  come from `@/i18n/index.ts` (`formatDate`, `formatDateTime`, `timeAgo`, `countOf`).
+- **Looks**: reuse the application's classes (`view`, `view-head`, `panel`, `panel-head`,
+  `table`, `tag`, `form`, `inline-form`, `muted`, …) and its CSS variables (`--surface`,
+  `--sunk`, `--ink`, `--muted`, `--line`, `--accent`, `--green`, `--amber`, `--red`,
+  `--blue`, `--purple` and their `-soft` variants), which follow the light and dark themes.
+  A module's own rules go in `modules/<id>/web/styles.css`, imported from its `index.tsx`,
+  with class names prefixed by the module id.
+- **Check**: `cd web && npx tsc --noEmit && npm run build`, then look at it in a browser in
+  both themes and both languages.

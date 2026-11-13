@@ -48,7 +48,9 @@ fn excerpt(body: &str, highlighted: &str) -> String {
     let (folded, ranges) = marked_ranges(highlighted);
     let original: Vec<char> = body.chars().collect();
     let text = if original.len() == folded.len() { original } else { folded };
-    let Some(&(first, _)) = ranges.first() else { return truncate(&text.iter().collect::<String>().split_whitespace().collect::<Vec<_>>().join(" "), LENGTH) };
+    let Some(&(first, _)) = ranges.first() else {
+        return truncate(&text.iter().collect::<String>().split_whitespace().collect::<Vec<_>>().join(" "), LENGTH);
+    };
 
     let mut start = first.saturating_sub(BEFORE);
 
@@ -94,7 +96,9 @@ fn excerpt(body: &str, highlighted: &str) -> String {
 
 /// Pages matching every word of `text` (as prefixes), best first, in the spaces `user` may see.
 pub fn search_pages(connection: &Connection, user: &AuthUser, text: &str, space_key: Option<&str>) -> ApiResult<Vec<WikiSearchHit>> {
-    let Some(expression) = fts_match(text, None) else { return Ok(Vec::new()) };
+    let Some(expression) = fts_match(text, None) else {
+        return Ok(Vec::new());
+    };
     let (visible, visible_params) = visible_spaces(user, "s");
     let mut params = vec![Value::Text(expression)];
     params.extend(visible_params);
@@ -121,12 +125,19 @@ pub fn search_pages(connection: &Connection, user: &AuthUser, text: &str, space_
 
     Ok(rows
         .into_iter()
-        .map(|(page_id, space_key, title, body, highlighted)| WikiSearchHit { page_id, space_key, title, snippet: excerpt(&body, &highlighted) })
+        .map(|(page_id, space_key, title, body, highlighted)| WikiSearchHit {
+            page_id,
+            space_key,
+            title,
+            snippet: excerpt(&body, &highlighted),
+        })
         .collect())
 }
 
 pub fn quick_hits(connection: &Connection, user: &AuthUser, text: &str) -> ApiResult<Vec<QuickHit>> {
-    let Some(expression) = fts_match(text, None) else { return Ok(Vec::new()) };
+    let Some(expression) = fts_match(text, None) else {
+        return Ok(Vec::new());
+    };
     let (visible, visible_params) = visible_spaces(user, "s");
     let mut params = vec![Value::Text(expression)];
     params.extend(visible_params);
@@ -144,7 +155,13 @@ pub fn quick_hits(connection: &Connection, user: &AuthUser, text: &str) -> ApiRe
             let id: Id = row.get(0)?;
             let space_key: String = row.get(1)?;
 
-            Ok(QuickHit { kind: "page".to_string(), id: id.to_string(), title: row.get(2)?, subtitle: row.get(3)?, url: format!("/wiki/{space_key}/{id}") })
+            Ok(QuickHit {
+                kind: "page".to_string(),
+                id: id.to_string(),
+                title: row.get(2)?,
+                subtitle: row.get(3)?,
+                url: format!("/wiki/{space_key}/{id}"),
+            })
         },
     )
 }
@@ -158,7 +175,10 @@ mod tests {
         let body = "Kanał powiadomień\n\nPłatność BLIK wymaga osobnego kanału.";
         let highlighted = "kanal powiadomien\n\n\u{1}platnosc\u{2} blik wymaga osobnego kanalu.";
 
-        assert_eq!(excerpt(body, highlighted), "Kanał powiadomień <mark>Płatność</mark> BLIK wymaga osobnego kanału.");
+        assert_eq!(
+            excerpt(body, highlighted),
+            "Kanał powiadomień <mark>Płatność</mark> BLIK wymaga osobnego kanału."
+        );
     }
 
     #[test]
@@ -180,6 +200,9 @@ mod tests {
 
     #[test]
     fn without_a_match_in_the_body_the_excerpt_is_its_beginning() {
-        assert_eq!(excerpt("Pierwszy akapit.\n\nDrugi.", "pierwszy akapit.\n\ndrugi."), "Pierwszy akapit. Drugi.");
+        assert_eq!(
+            excerpt("Pierwszy akapit.\n\nDrugi.", "pierwszy akapit.\n\ndrugi."),
+            "Pierwszy akapit. Drugi."
+        );
     }
 }

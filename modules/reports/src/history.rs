@@ -76,7 +76,11 @@ impl IssueHistory {
             return;
         }
 
-        let step = Step { at: self.status_since.clone().max(last.at.clone()), old: last.new, new: Some(self.status_id) };
+        let step = Step {
+            at: self.status_since.clone().max(last.at.clone()),
+            old: last.new,
+            new: Some(self.status_id),
+        };
         self.status_steps.push(step);
     }
 }

@@ -10,6 +10,7 @@ use crate::app::Tx;
 use crate::auth::AuthUser;
 use crate::db::{query_all, query_one};
 use crate::error::{ApiError, ApiResult};
+use crate::services::history::{record_change, FieldChange};
 use crate::services::{sprints, versions};
 
 fn map_summary(row: &rusqlite::Row) -> rusqlite::Result<ProjectSummary> {
@@ -374,6 +375,16 @@ pub fn delete_status(tx: &Tx, access: &ProjectAccess, id: Id, move_to: Option<Id
         let target = move_to.filter(|target| *target != id).ok_or_else(|| ApiError::conflict("Choose a status for the issues that are in this one"))?;
         owned_by(tx, "status", target, access.id, "Status")?;
         let done: bool = tx.query_row("SELECT category = 'done' FROM status WHERE id = ?1", [target], |row| row.get(0))?;
+
+        let (old_name, new_name): (String, String) = (
+            tx.query_row("SELECT name FROM status WHERE id = ?1", [id], |row| row.get(0))?,
+            tx.query_row("SELECT name FROM status WHERE id = ?1", [target], |row| row.get(0))?,
+        );
+        let moved: Vec<Id> = query_all(tx, "SELECT id FROM issue WHERE status_id = ?1", [id], |row| row.get(0))?;
+
+        for issue_id in moved {
+            record_change(tx, issue_id, &FieldChange::reference("status", Some((id, old_name.clone())), Some((target, new_name.clone()))))?;
+        }
 
         tx.execute("UPDATE issue SET status_id = ?1, status_since = ?2, updated_at = ?2 WHERE status_id = ?3", (target, &tx.now, id))?;
 

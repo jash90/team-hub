@@ -12,6 +12,8 @@ path = "src/main.rs"
 hub-core.workspace = true
 hub-app.workspace = true
 hub-mod-github = { path = "../../modules/github" }
+hub-mod-reports = { path = "../../modules/reports" }
+hub-mod-agents = { path = "../../modules/agents" }
 axum.workspace = true
 chrono.workspace = true
 rayon.workspace = true

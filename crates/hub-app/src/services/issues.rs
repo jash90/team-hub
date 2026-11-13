@@ -636,9 +636,28 @@ pub fn update_issue(tx: &Tx, id: Id, patch: &IssuePatch) -> ApiResult<Vec<&'stat
         }
 
         tx.execute("UPDATE issue SET sprint_id = ?1 WHERE id = ?2", (sprint_id, id))?;
-        // Subtasks travel with their parent.
-        tx.execute("UPDATE issue SET sprint_id = ?1 WHERE parent_id = ?2 AND type_id IN (SELECT id FROM issue_type WHERE level = 'subtask')", (sprint_id, id))?;
         record_change(tx, id, &FieldChange::reference("sprint", name_in(tx, "sprint", current.sprint_id)?, name_in(tx, "sprint", sprint_id)?))?;
+
+        // Subtasks travel with their parent, and their history says so.
+        let subtasks: Vec<(Id, Option<Id>)> = query_all(
+            tx,
+            "SELECT id, sprint_id FROM issue WHERE parent_id = ?1 AND type_id IN (SELECT id FROM issue_type WHERE level = 'subtask')",
+            [id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+
+        for (subtask_id, subtask_sprint) in subtasks {
+            if subtask_sprint == sprint_id {
+                continue;
+            }
+
+            tx.execute("UPDATE issue SET sprint_id = ?1, updated_at = ?2 WHERE id = ?3", (sprint_id, &tx.now, subtask_id))?;
+            record_change(
+                tx,
+                subtask_id,
+                &FieldChange::reference("sprint", name_in(tx, "sprint", subtask_sprint)?, name_in(tx, "sprint", sprint_id)?),
+            )?;
+        }
         changed.push("sprint");
     }
 
@@ -1064,7 +1083,7 @@ pub fn add_attachment(app: &App, tx: &Tx, issue_id: Id, filename: &str, mime: &s
 
     let current = load_current(tx, issue_id)?;
     let filename = safe_filename(filename);
-    let stored = format!("{}-{}", crate::auth::random_token()?[..16].to_string(), issue_id);
+    let stored = format!("{}-{}", &crate::auth::random_token()?[..16], issue_id);
     let directory = app.config.attachments_dir();
 
     std::fs::create_dir_all(&directory)?;

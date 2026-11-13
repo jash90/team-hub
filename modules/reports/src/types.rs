@@ -47,7 +47,7 @@ pub struct ReportBurndownDay {
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct ReportBurndown {
-    /// None when the project has neither a running nor a completed sprint.
+    /// Null when the project has neither a running nor a completed sprint.
     pub sprint: Option<Sprint>,
     pub unit: ReportUnit,
     /// The sprint's scope at the end of its first day.
@@ -123,12 +123,12 @@ pub struct ReportCycleIssue {
     pub resolved_at: String,
     /// Days from creation to resolution.
     pub lead_days: f64,
-    /// Days from the first move into an in-progress status to resolution; none when the
+    /// Days from the first move into an in-progress status to resolution; null when the
     /// issue was resolved without ever being in progress.
     pub cycle_days: Option<f64>,
 }
 
-/// Nearest-rank percentiles; none when there is nothing to measure.
+/// Nearest-rank percentiles; null when there is nothing to measure.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -152,7 +152,7 @@ pub struct ReportCycleTime {
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct ReportWorkloadRow {
-    /// None for the row of issues nobody is assigned to.
+    /// Null for the row of issues nobody is assigned to.
     pub assignee_id: Option<Id>,
     pub name: String,
     pub open_issues: i64,
