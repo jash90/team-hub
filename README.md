@@ -25,8 +25,19 @@ the knowledge base instead of bolted onto them.
 - **Reports** (module `reports`): burndown, velocity, cumulative flow, cycle time, workload,
   all reconstructed from issue history.
 - **Tests** (module `e2e`): runs of the [e2e](https://github.com/e2e-inc/e2e) testing
-  framework arrive through a reporter; each test is linked to the issues it verifies, so an
-  issue shows whether what it describes actually works.
+  framework arrive through a reporter, or are started from team-hub: a *test job* has a
+  runner check the project's repository out, run its suite with recording on, and send
+  everything back ([docs/e2e-jobs.md](docs/e2e-jobs.md)). A run opens as a session a person
+  can watch: the recording with each step tied to its moment, the screenshots, the error,
+  the trace. Each test is linked to the issues it verifies, so an issue shows whether what
+  it describes actually works.
+- **Runners** ([docs/runners.md](docs/runners.md)): agent runs in code and test jobs need a
+  repository on disk, and a runner has one: the desktop app on somebody's computer, using
+  that computer, or the [cloud runner](docs/cloud-runner.md), a container next to the
+  server that the whole team shares. One page lists them all; work can be left to any
+  runner that fits or sent to one by name. A shared runner holds no keys: each person
+  stores their own model key and GitHub token (Settings → My keys), and their work runs
+  with those.
 - **AI agents** (module `agents`): work on an issue can be handed to an agent from the
   issue's page (refine the description, break it into subtasks, review the pull request,
   implement it in code, or a task in your own words). A run shows what the agent did, asks
@@ -172,6 +183,10 @@ Known gaps in what is there:
   imports, the GitHub API calls, and the server's own agent runs (a fake model). The
   desktop app has run on Linux only; its macOS and Windows sandboxes, the tray,
   notifications and installers are unverified.
+- A shared runner signs in with an administrator's API token: it has no identity of its
+  own with narrower rights. Recordings were verified with videos made by hand in the
+  framework's format, not with a real recorded run; the cloud runner has never run on a
+  real host.
 - The server writes English. The interface puts its errors, notifications and status lines
   into Polish as they arrive, from a dictionary the build checks against the server's
   sources. The descriptions of agent tools, which the agent itself reads, stay English.
