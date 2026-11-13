@@ -146,8 +146,8 @@ impl App {
         let app = self.clone();
 
         rayon::spawn(move || {
-            let outcome = std::panic::catch_unwind(AssertUnwindSafe(|| work(&app)))
-                .unwrap_or_else(|_| Err(ApiError::internal("the request handler panicked")));
+            let outcome =
+                std::panic::catch_unwind(AssertUnwindSafe(|| work(&app))).unwrap_or_else(|_| Err(ApiError::internal("the request handler panicked")));
             let _ = sender.send(outcome);
         });
 
@@ -231,9 +231,7 @@ impl App {
             if let Some(missing) = module.meta().depends_on.iter().find(|dependency| !self.module_enabled(dependency)) {
                 return Err(ApiError::conflict(format!("Enable the \"{missing}\" module first")));
             }
-        } else if let Some(dependant) =
-            self.enabled_modules().find(|other| other.meta().depends_on.contains(&id))
-        {
+        } else if let Some(dependant) = self.enabled_modules().find(|other| other.meta().depends_on.contains(&id)) {
             return Err(ApiError::conflict(format!("The \"{}\" module depends on this one", dependant.meta().id)));
         }
 

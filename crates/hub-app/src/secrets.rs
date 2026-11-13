@@ -25,9 +25,7 @@ fn hint_of(value: &str) -> String {
 pub fn set_secret(connection: &Connection, key: &[u8; 32], name: &str, value: &str) -> ApiResult<()> {
     let mut nonce = [0u8; 12];
     getrandom::fill(&mut nonce).map_err(|error| ApiError::internal(format!("random: {error}")))?;
-    let sealed = cipher(key)
-        .encrypt(Nonce::from_slice(&nonce), value.as_bytes())
-        .map_err(|_| ApiError::internal("could not encrypt the secret"))?;
+    let sealed = cipher(key).encrypt(Nonce::from_slice(&nonce), value.as_bytes()).map_err(|_| ApiError::internal("could not encrypt the secret"))?;
 
     connection.execute(
         "INSERT INTO secret (name, nonce, sealed, hint, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)

@@ -195,7 +195,8 @@ pub fn default_rules(connection: &Connection, project_id: Id) -> ApiResult<()> {
 
     for (trigger, status_id) in rules {
         if let Some(status_id) = status_id {
-            connection.execute("INSERT INTO gh_rule (project_id, trigger, status_id) VALUES (?1, ?2, ?3)", (project_id, trigger.as_str(), status_id))?;
+            connection
+                .execute("INSERT INTO gh_rule (project_id, trigger, status_id) VALUES (?1, ?2, ?3)", (project_id, trigger.as_str(), status_id))?;
         }
     }
 
@@ -204,13 +205,17 @@ pub fn default_rules(connection: &Connection, project_id: Id) -> ApiResult<()> {
 
 pub fn connect_repo(connection: &Connection, project_id: Id, full_name: &str) -> ApiResult<Id> {
     let valid_part = |part: &str| !part.is_empty() && part.chars().all(|character| character.is_ascii_alphanumeric() || "-_.".contains(character));
-    let (owner, name) = full_name.trim().split_once('/').filter(|(owner, name)| valid_part(owner) && valid_part(name)).ok_or_else(|| {
-        ApiError::bad_request("A repository is written owner/name, for example acme/web-shop")
-    })?;
-    let taken: Option<String> =
-        query_one(connection, "SELECT p.key FROM gh_repo r JOIN project p ON p.id = r.project_id WHERE r.owner = ?1 AND r.name = ?2", (owner, name), |row| {
-            row.get(0)
-        })?;
+    let (owner, name) = full_name
+        .trim()
+        .split_once('/')
+        .filter(|(owner, name)| valid_part(owner) && valid_part(name))
+        .ok_or_else(|| ApiError::bad_request("A repository is written owner/name, for example acme/web-shop"))?;
+    let taken: Option<String> = query_one(
+        connection,
+        "SELECT p.key FROM gh_repo r JOIN project p ON p.id = r.project_id WHERE r.owner = ?1 AND r.name = ?2",
+        (owner, name),
+        |row| row.get(0),
+    )?;
 
     if let Some(project) = taken {
         return Err(ApiError::conflict(format!("{owner}/{name} is already connected to project {project}")));
@@ -283,7 +288,8 @@ async fn set_rules(State(app): State<App>, user: AuthUser, Path(key): Path<Strin
 
             for rule in &rules {
                 let Some(status_id) = rule.status_id else { continue };
-                let owned: Option<Id> = query_one(tx, "SELECT id FROM status WHERE id = ?1 AND project_id = ?2", (status_id, access.id), |row| row.get(0))?;
+                let owned: Option<Id> =
+                    query_one(tx, "SELECT id FROM status WHERE id = ?1 AND project_id = ?2", (status_id, access.id), |row| row.get(0))?;
 
                 if owned.is_none() {
                     return Err(ApiError::bad_request("That status does not belong to this project"));
@@ -315,10 +321,7 @@ async fn sync_repo(State(app): State<App>, user: AuthUser, Path(id): Path<Id>) -
         .await?;
     let worker = app.clone();
 
-    tokio::task::spawn_blocking(move || sync_and_record(&worker, &repo))
-        .await
-        .map_err(|_| ApiError::internal("the sync was interrupted"))?
-        .map(Json)
+    tokio::task::spawn_blocking(move || sync_and_record(&worker, &repo)).await.map_err(|_| ApiError::internal("the sync was interrupted"))?.map(Json)
 }
 
 pub fn issue_panel(app: &App, connection: &Connection, issue: &IssueRow) -> ApiResult<Option<GithubIssuePanel>> {
@@ -363,7 +366,12 @@ fn valid_branch_name(name: &str) -> bool {
 }
 
 /// Creates a branch for the issue on GitHub, from the tip of the default branch.
-async fn create_branch(State(app): State<App>, user: AuthUser, Path(key): Path<String>, Json(input): Json<BranchInput>) -> Reply<Option<GithubIssuePanel>> {
+async fn create_branch(
+    State(app): State<App>,
+    user: AuthUser,
+    Path(key): Path<String>,
+    Json(input): Json<BranchInput>,
+) -> Reply<Option<GithubIssuePanel>> {
     let reader = user.clone();
     let (issue, repo, name) = app
         .run(move |app| {
@@ -371,11 +379,15 @@ async fn create_branch(State(app): State<App>, user: AuthUser, Path(key): Path<S
                 let (issue_id, access) = issue_access(connection, &reader, &key)?;
                 access.require_edit()?;
                 let issue = hub_app::services::issues::row_by_id(app, connection, issue_id)?;
-                let repo = repo_by_id(connection, input.repo_id)?.filter(|repo| repo.project_id == issue.project_id).ok_or_else(|| {
-                    ApiError::bad_request("That repository is not connected to this issue's project")
-                })?;
+                let repo = repo_by_id(connection, input.repo_id)?
+                    .filter(|repo| repo.project_id == issue.project_id)
+                    .ok_or_else(|| ApiError::bad_request("That repository is not connected to this issue's project"))?;
                 let type_name: String = connection.query_row("SELECT name FROM issue_type WHERE id = ?1", [issue.type_id], |row| row.get(0))?;
-                let name = input.name.clone().filter(|name| !name.trim().is_empty()).unwrap_or_else(|| suggest_branch_name(&issue.key, &issue.summary, &type_name));
+                let name = input
+                    .name
+                    .clone()
+                    .filter(|name| !name.trim().is_empty())
+                    .unwrap_or_else(|| suggest_branch_name(&issue.key, &issue.summary, &type_name));
 
                 if !valid_branch_name(name.trim()) {
                     return Err(ApiError::bad_request("A branch name may contain letters, digits, dashes, dots, underscores and slashes"));
@@ -443,7 +455,8 @@ async fn webhook(State(app): State<App>, headers: HeaderMap, body: Bytes) -> Rep
         }
 
         if let Some(delivery) = &delivery {
-            let seen: Option<Id> = app.read(|connection| query_one(connection, "SELECT id FROM gh_delivery WHERE delivery_id = ?1", [delivery], |row| row.get(0)))?;
+            let seen: Option<Id> =
+                app.read(|connection| query_one(connection, "SELECT id FROM gh_delivery WHERE delivery_id = ?1", [delivery], |row| row.get(0)))?;
 
             if seen.is_some() {
                 return Ok(json!({ "outcome": "duplicate" }));

@@ -105,8 +105,7 @@ impl Db {
                     return Ok(());
                 }
 
-                tx.execute_batch(sql)
-                    .map_err(|error| ApiError::internal(format!("migration {namespace}/{version}: {error}")))?;
+                tx.execute_batch(sql).map_err(|error| ApiError::internal(format!("migration {namespace}/{version}: {error}")))?;
                 tx.execute("INSERT INTO migration (namespace, version, applied_at) VALUES (?1, ?2, ?3)", (namespace, version, now_iso()))?;
 
                 Ok(())
@@ -121,24 +120,14 @@ pub fn now_iso() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-pub fn query_all<T>(
-    connection: &Connection,
-    sql: &str,
-    params: impl Params,
-    map: impl FnMut(&Row) -> rusqlite::Result<T>,
-) -> ApiResult<Vec<T>> {
+pub fn query_all<T>(connection: &Connection, sql: &str, params: impl Params, map: impl FnMut(&Row) -> rusqlite::Result<T>) -> ApiResult<Vec<T>> {
     let mut statement = connection.prepare_cached(sql)?;
     let rows = statement.query_map(params, map)?.collect::<rusqlite::Result<Vec<T>>>()?;
 
     Ok(rows)
 }
 
-pub fn query_one<T>(
-    connection: &Connection,
-    sql: &str,
-    params: impl Params,
-    map: impl FnOnce(&Row) -> rusqlite::Result<T>,
-) -> ApiResult<Option<T>> {
+pub fn query_one<T>(connection: &Connection, sql: &str, params: impl Params, map: impl FnOnce(&Row) -> rusqlite::Result<T>) -> ApiResult<Option<T>> {
     let mut statement = connection.prepare_cached(sql)?;
 
     Ok(statement.query_row(params, map).optional()?)

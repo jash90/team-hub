@@ -50,15 +50,11 @@ fn detail(app: &App, user: &AuthUser, id: Id) -> ApiResult<WikiPageDetail> {
 // ---------- spaces ----------
 
 async fn list_spaces(State(app): State<App>, user: AuthUser) -> Reply<Vec<WikiSpace>> {
-    app.run(move |app| app.read(|connection| spaces::list_spaces(connection, &user)))
-        .await
-        .map(Json)
+    app.run(move |app| app.read(|connection| spaces::list_spaces(connection, &user))).await.map(Json)
 }
 
 async fn get_space(State(app): State<App>, user: AuthUser, Path(key): Path<String>) -> Reply<WikiSpace> {
-    app.run(move |app| app.read(|connection| spaces::describe(connection, &spaces::space_access(connection, &user, &key)?)))
-        .await
-        .map(Json)
+    app.run(move |app| app.read(|connection| spaces::describe(connection, &spaces::space_access(connection, &user, &key)?))).await.map(Json)
 }
 
 async fn create_space(State(app): State<App>, user: AuthUser, Json(request): Json<WikiNewSpace>) -> Reply<WikiSpace> {
@@ -120,9 +116,7 @@ async fn delete_space(State(app): State<App>, user: AuthUser, Path(key): Path<St
 }
 
 async fn space_tree(State(app): State<App>, user: AuthUser, Path(key): Path<String>) -> Reply<Vec<WikiTreeNode>> {
-    app.run(move |app| app.read(|connection| pages::tree(connection, spaces::space_access(connection, &user, &key)?.space.id)))
-        .await
-        .map(Json)
+    app.run(move |app| app.read(|connection| pages::tree(connection, spaces::space_access(connection, &user, &key)?.space.id))).await.map(Json)
 }
 
 // ---------- pages ----------
@@ -310,10 +304,7 @@ async fn tasks_to_issues(
             pages::tasks_to_issues(tx, &access.space, &page, &request.project_key, request.type_id, &request.lines)
         })?;
 
-        Ok(WikiTasksResult {
-            keys,
-            page: detail(app, &user, id)?,
-        })
+        Ok(WikiTasksResult { keys, page: detail(app, &user, id)? })
     })
     .await
     .map(Json)
@@ -353,9 +344,7 @@ struct SearchQuery {
 }
 
 async fn run_search(State(app): State<App>, user: AuthUser, Query(query): Query<SearchQuery>) -> Reply<Vec<WikiSearchHit>> {
-    app.run(move |app| app.read(|connection| search::search_pages(connection, &user, &query.q, query.space.as_deref())))
-        .await
-        .map(Json)
+    app.run(move |app| app.read(|connection| search::search_pages(connection, &user, &query.q, query.space.as_deref()))).await.map(Json)
 }
 
 async fn list_templates(_user: AuthUser) -> Json<Vec<WikiTemplate>> {

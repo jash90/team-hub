@@ -18,20 +18,14 @@ use tower::ServiceExt;
 static NEXT: AtomicU32 = AtomicU32::new(0);
 
 pub fn test_app() -> App {
-    let directory = std::env::temp_dir().join(format!(
-        "team-hub-wiki-test-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
+    let directory = std::env::temp_dir().join(format!("team-hub-wiki-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
     let _ = std::fs::remove_dir_all(&directory);
 
     App::new(Config::for_tests(directory), vec![Arc::new(WikiModule) as Arc<dyn Module>]).expect("the test application starts")
 }
 
 pub fn router(app: &App) -> Router {
-    Router::new()
-        .nest("/api/m/wiki", WikiModule.routes().expect("the wiki has routes"))
-        .with_state(app.clone())
+    Router::new().nest("/api/m/wiki", WikiModule.routes().expect("the wiki has routes")).with_state(app.clone())
 }
 
 /// Somebody signed in with an API token.
@@ -44,61 +38,28 @@ pub struct Client {
 
 pub fn person(app: &App, name: &str, role: Role) -> Client {
     let email = format!("{}@example.com", name.to_lowercase().replace(' ', "."));
-    let new = NewUser {
-        name: name.to_string(),
-        email: email.clone(),
-        password: None,
-        role: Some(role),
-        github_login: None,
-    };
+    let new = NewUser { name: name.to_string(), email: email.clone(), password: None, role: Some(role), github_login: None };
     let user = app.db.write(|tx| create_user(tx, &new)).expect("a user");
     let token = app.db.write(|tx| create_token(tx, user.id, "tests")).expect("a token");
 
-    Client {
-        router: router(app),
-        bearer: Some(token),
-        user: AuthUser {
-            id: user.id,
-            name: user.name,
-            email,
-            role,
-            via_token: true,
-        },
-    }
+    Client { router: router(app), bearer: Some(token), user: AuthUser { id: user.id, name: user.name, email, role, via_token: true } }
 }
 
 pub fn project(app: &App, owner: &Client, key: &str, is_private: bool) -> Id {
-    let new = NewProject {
-        key: key.to_string(),
-        name: format!("Project {key}"),
-        description: String::new(),
-        board_mode: None,
-        is_private,
-        lead_id: None,
-    };
+    let new =
+        NewProject { key: key.to_string(), name: format!("Project {key}"), description: String::new(), board_mode: None, is_private, lead_id: None };
 
-    app.write(owner.user.actor(), |tx| create_project(tx, &owner.user, &new))
-        .expect("a project")
-        .summary
-        .id
+    app.write(owner.user.actor(), |tx| create_project(tx, &owner.user, &new)).expect("a project").summary.id
 }
 
 pub fn member(app: &App, owner: &Client, key: &str, who: &Client, role: ProjectRole) {
-    app.write(owner.user.actor(), |tx| {
-        set_member(tx, &access::project_access(tx, &owner.user, key)?, who.user.id, Some(role))
-    })
-    .expect("a membership");
+    app.write(owner.user.actor(), |tx| set_member(tx, &access::project_access(tx, &owner.user, key)?, who.user.id, Some(role)))
+        .expect("a membership");
 }
 
 /// Creates an issue and returns its key.
 pub fn issue(app: &App, who: &Client, project_key: &str, summary: &str) -> String {
-    let new = NewIssue {
-        project_key: project_key.to_string(),
-        fields: IssuePatch {
-            summary: Some(summary.to_string()),
-            ..Default::default()
-        },
-    };
+    let new = NewIssue { project_key: project_key.to_string(), fields: IssuePatch { summary: Some(summary.to_string()), ..Default::default() } };
 
     app.write(Actor::user(who.user.id), |tx| {
         let id = hub_app::services::issues::create_issue(tx, &new)?;
@@ -117,9 +78,7 @@ impl Client {
         }
 
         let request = match body {
-            Some(body) => request
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body.to_string())),
+            Some(body) => request.header(header::CONTENT_TYPE, "application/json").body(Body::from(body.to_string())),
             None => request.body(Body::empty()),
         }
         .expect("a valid request");
@@ -167,12 +126,7 @@ impl Client {
 }
 
 pub fn titles(value: &Value) -> Vec<String> {
-    value
-        .as_array()
-        .expect("an array")
-        .iter()
-        .map(|item| item["title"].as_str().unwrap_or("").to_string())
-        .collect()
+    value.as_array().expect("an array").iter().map(|item| item["title"].as_str().unwrap_or("").to_string()).collect()
 }
 
 pub fn id_of(value: &Value) -> Id {

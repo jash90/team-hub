@@ -4,6 +4,7 @@
 use chrono::{Duration, SecondsFormat, Utc};
 use hub_core::{BoardMode, Id, IssuePatch, LinkType, NewIssue, Role};
 
+use crate::access::project_access;
 use crate::app::{Actor, App};
 use crate::auth::AuthUser;
 use crate::db::query_one;
@@ -13,7 +14,6 @@ use crate::services::projects::{add_component, create_project, ComponentInput, N
 use crate::services::sprints::{complete_sprint, create_sprint, start_sprint, SprintInput};
 use crate::services::users::{create_user, get_user, NewUser};
 use crate::services::versions::{create_version, set_released, VersionInput};
-use crate::access::project_access;
 
 struct Spec {
     kind: &'static str,
@@ -55,7 +55,7 @@ const WEB: &[Spec] = &[
     Spec { kind: "Epic", summary: "Wydajność i SEO", created: -28, ..BASE },
     Spec { summary: "Koszyk: dodawanie i usuwanie produktów", parent: Some("WEB-1"), sprint: Some(0), path: &[("In Progress", -19), ("In Review", -16), ("Done", -15)], assignee: Some(1), points: Some(5.0), component: Some("Koszyk"), version: Some(0), ..BASE },
     Spec { summary: "Formularz adresu dostawy z walidacją", parent: Some("WEB-1"), sprint: Some(0), path: &[("In Progress", -18), ("In Review", -13), ("Done", -12)], assignee: Some(2), points: Some(3.0), component: Some("Frontend"), version: Some(0), ..BASE },
-    Spec { kind: "Bug", summary: "Cena w koszyku nie uwzględnia rabatu", description: "## Kroki\n\n1. Dodaj produkt objęty promocją\n2. Otwórz koszyk\n\n## Aktualnie\n\nSuma liczona z ceny katalogowej.\n\n## Oczekiwane\n\nSuma uwzględnia rabat pozycji.", parent: Some("WEB-1"), sprint: Some(0), path: &[("In Progress", -14), ("Done", -11)], assignee: Some(3), points: Some(2.0), priority: 2, labels: &["regresja"], component: Some("Koszyk"), version: Some(0), created: -17, ..BASE },
+    Spec { kind: "Bug", summary: "Cena w koszyku nie uwzględnia rabatu", description: "## Kroki\n\n1. Dodaj produkt objęty promocją\n2. Otwórz koszyk\n\n## Aktualnie\n\nSuma liczona z ceny katalogowej.\n\n## Oczekiwane\n\nSuma uwzględnia rabat pozycji.", parent: Some("WEB-1"), sprint: Some(0), path: &[("In Progress", -14), ("Done", -11)], assignee: Some(3), points: Some(2.0), priority: 2, labels: &["regresja"], component: Some("Koszyk"), version: Some(0), created: -17 },
     Spec { kind: "Task", summary: "Konfiguracja CI: testy i lint na każdym PR", sprint: Some(0), path: &[("In Progress", -20), ("Done", -17)], assignee: Some(4), points: Some(2.0), labels: &["devops"], version: Some(0), ..BASE },
     Spec { summary: "Rejestracja i logowanie e-mailem", parent: Some("WEB-2"), sprint: Some(0), path: &[("In Progress", -17), ("In Review", -10), ("Done", -8)], assignee: Some(0), points: Some(5.0), component: Some("Frontend"), version: Some(0), ..BASE },
     Spec { summary: "Płatność kartą przez bramkę", description: "Integracja z bramką płatniczą: formularz karty, 3-D Secure, webhook potwierdzenia.\n\nKryteria akceptacji:\n\n- [ ] płatność testową kartą przechodzi\n- [ ] odrzucona karta pokazuje czytelny komunikat\n- [ ] zamówienie zmienia status po webhooku", parent: Some("WEB-1"), sprint: Some(1), path: &[("In Progress", -5), ("In Review", -1)], assignee: Some(1), points: Some(8.0), priority: 2, labels: &["płatności"], component: Some("Płatności"), version: Some(1), created: -12, ..BASE },
@@ -83,13 +83,54 @@ const WEB: &[Spec] = &[
 
 const API: &[Spec] = &[
     Spec { kind: "Epic", summary: "API zamówień v2", created: -20, ..BASE },
-    Spec { summary: "Endpoint listy zamówień ze stronicowaniem", parent: Some("API-1"), path: &[("To Do", -15), ("In Progress", -12), ("In Review", -9), ("Done", -7)], assignee: Some(4), points: Some(3.0), created: -18, ..BASE },
-    Spec { summary: "Webhook zmiany statusu zamówienia", parent: Some("API-1"), path: &[("To Do", -10), ("In Progress", -4)], assignee: Some(4), points: Some(5.0), priority: 2, created: -14, ..BASE },
-    Spec { kind: "Bug", summary: "Limit zapytań liczony per IP zamiast per klucz", path: &[("To Do", -6), ("In Progress", -5), ("In Review", -2)], assignee: Some(2), priority: 2, labels: &["bezpieczeństwo"], created: -8, ..BASE },
-    Spec { kind: "Task", summary: "Dokumentacja OpenAPI dla zamówień", parent: Some("API-1"), path: &[("To Do", -3)], assignee: Some(0), created: -9, ..BASE },
+    Spec {
+        summary: "Endpoint listy zamówień ze stronicowaniem",
+        parent: Some("API-1"),
+        path: &[("To Do", -15), ("In Progress", -12), ("In Review", -9), ("Done", -7)],
+        assignee: Some(4),
+        points: Some(3.0),
+        created: -18,
+        ..BASE
+    },
+    Spec {
+        summary: "Webhook zmiany statusu zamówienia",
+        parent: Some("API-1"),
+        path: &[("To Do", -10), ("In Progress", -4)],
+        assignee: Some(4),
+        points: Some(5.0),
+        priority: 2,
+        created: -14,
+        ..BASE
+    },
+    Spec {
+        kind: "Bug",
+        summary: "Limit zapytań liczony per IP zamiast per klucz",
+        path: &[("To Do", -6), ("In Progress", -5), ("In Review", -2)],
+        assignee: Some(2),
+        priority: 2,
+        labels: &["bezpieczeństwo"],
+        created: -8,
+        ..BASE
+    },
+    Spec {
+        kind: "Task",
+        summary: "Dokumentacja OpenAPI dla zamówień",
+        parent: Some("API-1"),
+        path: &[("To Do", -3)],
+        assignee: Some(0),
+        created: -9,
+        ..BASE
+    },
     Spec { kind: "Task", summary: "Rotacja kluczy API bez przestoju", priority: 2, created: -5, ..BASE },
     Spec { summary: "Filtrowanie zamówień po dacie i statusie", parent: Some("API-1"), created: -4, ..BASE },
-    Spec { kind: "Bug", summary: "Błędny kod odpowiedzi przy braku uprawnień (500 zamiast 403)", path: &[("To Do", -2)], assignee: Some(2), created: -3, ..BASE },
+    Spec {
+        kind: "Bug",
+        summary: "Błędny kod odpowiedzi przy braku uprawnień (500 zamiast 403)",
+        path: &[("To Do", -2)],
+        assignee: Some(2),
+        created: -3,
+        ..BASE
+    },
 ];
 
 fn at(day: i64, hour: i64) -> String {
@@ -185,7 +226,13 @@ pub fn seed_demo(app: &App, owner_id: Id) -> ApiResult<()> {
         ("Maria Wiśniewska", "maria.wisniewska@example.com", "mwisniewska"),
         ("Tomasz Kowalczyk", "tomasz.kowalczyk@example.com", "tkowalczyk"),
     ] {
-        let new = NewUser { name: name.to_string(), email: email.to_string(), password: None, role: Some(Role::Member), github_login: Some(login.to_string()) };
+        let new = NewUser {
+            name: name.to_string(),
+            email: email.to_string(),
+            password: None,
+            role: Some(Role::Member),
+            github_login: Some(login.to_string()),
+        };
         people.push(app.db.write(|tx| create_user(tx, &new))?.id);
     }
 
@@ -268,7 +315,11 @@ pub fn seed_demo(app: &App, owner_id: Id) -> ApiResult<()> {
         add_link(tx, &admin, id_of("WEB-9")?, LinkType::Blocks, "WEB-16")?;
         add_link(tx, &admin, id_of("WEB-11")?, LinkType::Relates, "WEB-6")?;
         add_link(tx, &admin, id_of("WEB-10")?, LinkType::Relates, "WEB-9")?;
-        update_issue(tx, id_of("WEB-9")?, &IssuePatch { due_date: Some(Some(date(3))), estimate_minutes: Some(Some(16 * 60)), ..Default::default() })?;
+        update_issue(
+            tx,
+            id_of("WEB-9")?,
+            &IssuePatch { due_date: Some(Some(date(3))), estimate_minutes: Some(Some(16 * 60)), ..Default::default() },
+        )?;
         update_issue(tx, id_of("WEB-12")?, &IssuePatch { due_date: Some(Some(date(6))), ..Default::default() })?;
         update_issue(tx, id_of("WEB-15")?, &IssuePatch { due_date: Some(Some(date(-1))), ..Default::default() })?;
 

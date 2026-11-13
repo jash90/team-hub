@@ -10,6 +10,7 @@ import { useSession } from './session.tsx';
 
 import { agentsModule } from '../../modules/agents/web/index.tsx';
 import { confluenceModule } from '../../modules/confluence/web/index.tsx';
+import { e2eModule } from '../../modules/e2e/web/index.tsx';
 import { githubModule } from '../../modules/github/web/index.tsx';
 import { reportsModule } from '../../modules/reports/web/index.tsx';
 import { wikiModule } from '../../modules/wiki/web/index.tsx';
@@ -43,7 +44,7 @@ export type WebModule = {
   polish?: Record<string, string>;
 };
 
-const ALL: WebModule[] = [githubModule, wikiModule, confluenceModule, reportsModule, agentsModule];
+const ALL: WebModule[] = [githubModule, wikiModule, confluenceModule, reportsModule, e2eModule, agentsModule];
 
 for (const module of ALL) {
   if (module.polish) {

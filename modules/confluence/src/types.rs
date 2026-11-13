@@ -55,8 +55,7 @@ pub struct ConfluenceImportRequest {
     /// The key of the knowledge base space to write into; by default the Confluence key.
     pub target_space_key: Option<String>,
     /// Titles or ids of pages to leave out, together with everything under them.
-    #[serde(default)]
-    pub exclude: Vec<String>,
+    pub exclude: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

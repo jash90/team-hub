@@ -690,6 +690,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "hub-mod-e2e"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "http-body-util",
+ "hub-app",
+ "hub-core",
+ "rayon",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "ts-rs",
+]
+
+[[package]]
 name = "hub-mod-github"
 version = "0.1.0"
 dependencies = [

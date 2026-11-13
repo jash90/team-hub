@@ -2582,7 +2582,7 @@ td > .picker-field {
   align-items: center;
   gap: 4px;
   flex: none;
-  width: 84px;
+  min-width: 84px;
   font-size: 12px;
   font-weight: 600;
   background: none !important;

@@ -4,4 +4,4 @@ export type WikiSpacePatch = { name?: string, description?: string,
 /**
  * A project key binds the space, `null` unbinds it, absent leaves the binding alone.
  */
-projectKey: string | null, };
+projectKey?: string | null, };

@@ -56,11 +56,8 @@ fn canonical(field: &str) -> String {
 
 /// An FTS5 expression matching every word of `text` as a prefix, optionally in one column.
 pub fn fts_match(text: &str, column: Option<&str>) -> Option<String> {
-    let terms: Vec<String> = fold(text)
-        .split(|character: char| !character.is_alphanumeric())
-        .filter(|term| !term.is_empty())
-        .map(|term| format!("\"{term}\"*"))
-        .collect();
+    let terms: Vec<String> =
+        fold(text).split(|character: char| !character.is_alphanumeric()).filter(|term| !term.is_empty()).map(|term| format!("\"{term}\"*")).collect();
 
     if terms.is_empty() {
         return None;
@@ -108,7 +105,9 @@ impl Compiler<'_> {
         clause
             .values
             .iter()
-            .map(|value| value_text(value).ok_or_else(|| QueryError::new(format!("A function cannot be used with \"{}\"", clause.field), clause.position)))
+            .map(|value| {
+                value_text(value).ok_or_else(|| QueryError::new(format!("A function cannot be used with \"{}\"", clause.field), clause.position))
+            })
             .collect()
     }
 
@@ -348,9 +347,8 @@ impl Compiler<'_> {
                 for text in self.texts(clause)? {
                     let priority = priority_from_name(&text).or_else(|| text.parse::<i64>().ok().filter(|value| (1..=5).contains(value)));
 
-                    priorities.push(priority.ok_or_else(|| {
-                        QueryError::new("Priority is one of: Highest, High, Medium, Low, Lowest", clause.position)
-                    })?);
+                    priorities
+                        .push(priority.ok_or_else(|| QueryError::new("Priority is one of: Highest, High, Medium, Low, Lowest", clause.position))?);
                 }
 
                 // Priority 1 is the highest, so "greater than Medium" means a smaller number.

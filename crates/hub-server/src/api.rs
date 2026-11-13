@@ -138,7 +138,13 @@ async fn setup(State(app): State<App>, Json(request): Json<SetupRequest>) -> Api
                     return Err(ApiError::conflict("This instance is already set up"));
                 }
 
-                let new = NewUser { name: request.name, email: request.email, password: Some(request.password), role: Some(Role::Admin), github_login: None };
+                let new = NewUser {
+                    name: request.name,
+                    email: request.email,
+                    password: Some(request.password),
+                    role: Some(Role::Admin),
+                    github_login: None,
+                };
 
                 users::create_user(tx, &new)
             })?;
@@ -259,7 +265,12 @@ async fn add_status(State(app): State<App>, user: AuthUser, Path(key): Path<Stri
     configure(app, user, key, move |tx, access| projects::add_status(tx, access, &input).map(|_| ())).await
 }
 
-async fn update_status(State(app): State<App>, user: AuthUser, Path((key, id)): Path<(String, Id)>, Json(input): Json<StatusInput>) -> Reply<Project> {
+async fn update_status(
+    State(app): State<App>,
+    user: AuthUser,
+    Path((key, id)): Path<(String, Id)>,
+    Json(input): Json<StatusInput>,
+) -> Reply<Project> {
     configure(app, user, key, move |tx, access| projects::update_status(tx, access, id, &input)).await
 }
 
@@ -301,7 +312,12 @@ struct MemberRequest {
     role: Option<ProjectRole>,
 }
 
-async fn set_member(State(app): State<App>, user: AuthUser, Path((key, user_id)): Path<(String, Id)>, Json(request): Json<MemberRequest>) -> Reply<Project> {
+async fn set_member(
+    State(app): State<App>,
+    user: AuthUser,
+    Path((key, user_id)): Path<(String, Id)>,
+    Json(request): Json<MemberRequest>,
+) -> Reply<Project> {
     configure(app, user, key, move |tx, access| projects::set_member(tx, access, user_id, request.role)).await
 }
 
@@ -429,7 +445,8 @@ async fn bulk_update(State(app): State<App>, user: AuthUser, Json(request): Json
                 for key in &request.keys {
                     let (id, access) = issues::issue_access(tx, &user, key)?;
                     access.require_edit()?;
-                    issues::update_issue(tx, id, &request.patch).map_err(|error| ApiError::new(error.status, error.code, format!("{key}: {}", error.message)))?;
+                    issues::update_issue(tx, id, &request.patch)
+                        .map_err(|error| ApiError::new(error.status, error.code, format!("{key}: {}", error.message)))?;
                 }
 
                 Ok(request.keys.len())
@@ -595,9 +612,7 @@ fn percent_decode(text: &str) -> String {
     let mut index = 0;
 
     while index < bytes.len() {
-        let escaped = (bytes[index] == b'%')
-            .then(|| text.get(index + 1..index + 3).and_then(|hex| u8::from_str_radix(hex, 16).ok()))
-            .flatten();
+        let escaped = (bytes[index] == b'%').then(|| text.get(index + 1..index + 3).and_then(|hex| u8::from_str_radix(hex, 16).ok())).flatten();
 
         match escaped {
             Some(byte) => {
@@ -638,7 +653,8 @@ async fn download_attachment(State(app): State<App>, user: AuthUser, Path(id): P
     let (attachment, path) = app.run(move |app| app.read(|connection| issues::attachment_file(app, connection, &user, id))).await?;
     let bytes = tokio::fs::read(&path).await.map_err(|_| ApiError::not_found("Attachment"))?;
     let inline = attachment.mime.starts_with("image/") && attachment.mime != "image/svg+xml";
-    let name: String = attachment.filename.chars().filter(|character| character.is_ascii() && !matches!(character, '"' | '\\' | '\r' | '\n')).collect();
+    let name: String =
+        attachment.filename.chars().filter(|character| character.is_ascii() && !matches!(character, '"' | '\\' | '\r' | '\n')).collect();
     let disposition = format!("{}; filename=\"{}\"", if inline { "inline" } else { "attachment" }, if name.is_empty() { "file" } else { &name });
     let mime = if inline { attachment.mime.clone() } else { "application/octet-stream".to_string() };
 

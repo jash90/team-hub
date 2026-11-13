@@ -6,9 +6,9 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use hub_app::app::set_setting;
 use hub_app::secrets::{clear_secret, secret_hint, set_secret};
-use hub_app::{ApiResult, App, AuthUser};
+use hub_app::{ApiError, ApiResult, App, AuthUser};
 
-use crate::client::{clean_base_url, load_settings, Client, BASE_URL_SETTING, EMAIL_SETTING, TOKEN_SECRET};
+use crate::client::{clean_base_url, load_settings, origin, Client, BASE_URL_SETTING, EMAIL_SETTING, TOKEN_SECRET};
 use crate::import::{self, ImportConfig};
 use crate::types::{
     ConfluenceImport, ConfluenceImportReport, ConfluenceImportRequest, ConfluenceRemoteSpace, ConfluenceSettings, ConfluenceSettingsUpdate,
@@ -50,15 +50,20 @@ async fn put_settings(State(app): State<App>, user: AuthUser, Json(update): Json
     user.require_admin()?;
 
     app.run(move |app| {
-        let base_url = if update.base_url.trim().is_empty() {
-            String::new()
-        } else {
-            clean_base_url(&update.base_url)?
-        };
+        let base_url = if update.base_url.trim().is_empty() { String::new() } else { clean_base_url(&update.base_url)? };
         let email = update.email.as_deref().unwrap_or("").trim().to_string();
         let token = update.token.as_deref().map(str::trim).filter(|token| !token.is_empty());
 
         app.db.write(|tx| {
+            // The stored token was entered for one server; nobody gets it sent to another by
+            // changing the address.
+            let stored = load_settings(tx, &app.config.secret_key)?;
+            let moves = stored.token.is_some() && !base_url.is_empty() && origin(&stored.base_url) != origin(&base_url);
+
+            if moves && token.is_none() && update.clear_token != Some(true) {
+                return Err(ApiError::bad_request("The address points to another server; enter the token for it"));
+            }
+
             set_setting(tx, BASE_URL_SETTING, &base_url)?;
             set_setting(tx, EMAIL_SETTING, &email)?;
 
@@ -78,14 +83,11 @@ async fn put_settings(State(app): State<App>, user: AuthUser, Json(update): Json
 }
 
 async fn client(app: &App) -> ApiResult<Client> {
-    app.run(|app| app.read(|connection| Client::new(&load_settings(connection, &app.config.secret_key)?)))
-        .await
+    app.run(|app| app.read(|connection| Client::new(&load_settings(connection, &app.config.secret_key)?))).await
 }
 
 async fn blocking<T: Send + 'static>(work: impl FnOnce() -> ApiResult<T> + Send + 'static) -> ApiResult<T> {
-    tokio::task::spawn_blocking(work)
-        .await
-        .map_err(|error| hub_app::ApiError::internal(format!("the request to Confluence stopped: {error}")))?
+    tokio::task::spawn_blocking(work).await.map_err(|error| ApiError::internal(format!("the request to Confluence stopped: {error}")))?
 }
 
 /// Tries the stored address and token. A refusal by Confluence is an answer, not an error.
@@ -95,14 +97,8 @@ async fn test_connection(State(app): State<App>, user: AuthUser) -> Reply<Conflu
     let client = client(&app).await?;
     let base = client.base().to_string();
     let result = match blocking(move || client.check()).await {
-        Ok(()) => ConfluenceTestResult {
-            ok: true,
-            message: format!("Connected to {base}"),
-        },
-        Err(error) => ConfluenceTestResult {
-            ok: false,
-            message: error.message,
-        },
+        Ok(()) => ConfluenceTestResult { ok: true, message: format!("Connected to {base}") },
+        Err(error) => ConfluenceTestResult { ok: false, message: error.message },
     };
 
     Ok(Json(result))
@@ -114,36 +110,17 @@ async fn remote_spaces(State(app): State<App>, user: AuthUser) -> Reply<Vec<Conf
     let client = client(&app).await?;
     let spaces = blocking(move || client.spaces()).await?;
 
-    Ok(Json(
-        spaces
-            .into_iter()
-            .map(|space| ConfluenceRemoteSpace {
-                key: space.key,
-                name: space.name,
-            })
-            .collect(),
-    ))
+    Ok(Json(spaces.into_iter().map(|space| ConfluenceRemoteSpace { key: space.key, name: space.name }).collect()))
 }
 
 async fn start_import(State(app): State<App>, user: AuthUser, Json(request): Json<ConfluenceImportRequest>) -> Reply<ConfluenceImportReport> {
     user.require_admin()?;
 
-    let target = request
-        .target_space_key
-        .as_deref()
-        .map(str::trim)
-        .filter(|key| !key.is_empty())
-        .unwrap_or(&request.space_key)
-        .to_string();
+    let target = request.target_space_key.as_deref().map(str::trim).filter(|key| !key.is_empty()).unwrap_or(&request.space_key).to_string();
     let config = ImportConfig {
         space_key: request.space_key,
         root_page_id: request.root_page_id.map(|root| root.trim().to_string()).filter(|root| !root.is_empty()),
-        exclude: request
-            .exclude
-            .iter()
-            .map(|entry| entry.trim().to_string())
-            .filter(|entry| !entry.is_empty())
-            .collect(),
+        exclude: request.exclude.unwrap_or_default().iter().map(|entry| entry.trim().to_string()).filter(|entry| !entry.is_empty()).collect(),
         base_url: String::new(),
     };
 
@@ -157,9 +134,7 @@ async fn list_imports(State(app): State<App>, user: AuthUser) -> Reply<Vec<Confl
 async fn sync_import(State(app): State<App>, user: AuthUser, Path(wiki_space_key): Path<String>) -> Reply<ConfluenceImportReport> {
     user.require_admin()?;
 
-    let (target, config) = app
-        .run(move |app| app.read(|connection| import::stored_config(connection, &wiki_space_key)))
-        .await?;
+    let (target, config) = app.run(move |app| app.read(|connection| import::stored_config(connection, &wiki_space_key))).await?;
 
     import::run(&app, config, target).await.map(Json)
 }

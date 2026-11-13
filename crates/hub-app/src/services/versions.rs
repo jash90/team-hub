@@ -190,8 +190,7 @@ pub fn version_notes(connection: &Connection, user: &AuthUser, id: Id) -> ApiRes
     let types: Vec<String> =
         query_all(connection, "SELECT name FROM issue_type WHERE project_id = ?1 ORDER BY position, id", [version.project_id], |row| row.get(0))?;
     let type_order: Vec<&str> = types.iter().map(String::as_str).collect();
-    let issues: Vec<NotesIssue> =
-        rows.iter().map(|(key, summary, type_name, done)| NotesIssue { key, summary, type_name, done: *done }).collect();
+    let issues: Vec<NotesIssue> = rows.iter().map(|(key, summary, type_name, done)| NotesIssue { key, summary, type_name, done: *done }).collect();
 
     Ok(release_notes(&version.name, version.release_date.as_deref(), &type_order, &issues))
 }

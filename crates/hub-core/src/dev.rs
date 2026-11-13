@@ -171,7 +171,10 @@ mod tests {
 
     #[test]
     fn status_ahead_of_or_behind_the_code() {
-        assert_eq!(drift(StatusCategory::Done, "", DevSummary { prs: vec![pr(PrState::Open)], ..Default::default() }), vec![DriftKind::DoneWithOpenPr]);
+        assert_eq!(
+            drift(StatusCategory::Done, "", DevSummary { prs: vec![pr(PrState::Open)], ..Default::default() }),
+            vec![DriftKind::DoneWithOpenPr]
+        );
         assert_eq!(
             drift(StatusCategory::InProgress, "", DevSummary { prs: vec![pr(PrState::Merged)], ..Default::default() }),
             vec![DriftKind::MergedNotDone]

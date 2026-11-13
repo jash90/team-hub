@@ -392,9 +392,6 @@ pub fn project_rules(connection: &Connection, project_id: Id) -> ApiResult<Vec<G
 
     Ok(GithubTrigger::ALL
         .into_iter()
-        .map(|trigger| GithubRule {
-            trigger,
-            status_id: stored.iter().find(|(name, _)| name == trigger.as_str()).map(|(_, status_id)| *status_id),
-        })
+        .map(|trigger| GithubRule { trigger, status_id: stored.iter().find(|(name, _)| name == trigger.as_str()).map(|(_, status_id)| *status_id) })
         .collect())
 }

@@ -57,18 +57,10 @@ fn plan(config: &ImportConfig, remote: Vec<RemotePage>) -> ApiResult<Plan> {
     let root = config.root_page_id.as_deref().map(str::trim).filter(|root| !root.is_empty());
 
     if let Some(root) = root.filter(|root| !listed.contains(*root)) {
-        return Err(ApiError::bad_request(format!(
-            "The Confluence space {} has no page with the id {root}",
-            config.space_key
-        )));
+        return Err(ApiError::bad_request(format!("The Confluence space {} has no page with the id {root}", config.space_key)));
     }
 
-    let exclude: HashSet<String> = config
-        .exclude
-        .iter()
-        .map(|entry| fold(entry.trim()))
-        .filter(|entry| !entry.is_empty())
-        .collect();
+    let exclude: HashSet<String> = config.exclude.iter().map(|entry| fold(entry.trim())).filter(|entry| !entry.is_empty()).collect();
     let named = |id: &str, title: &str| exclude.contains(id) || exclude.contains(&fold(title.trim()));
     let mut excluded = 0;
     let mut pages: Vec<Planned> = Vec::new();
@@ -86,11 +78,7 @@ fn plan(config: &ImportConfig, remote: Vec<RemotePage>) -> ApiResult<Plan> {
         }
 
         // The root page hangs under nothing here, whatever is above it in Confluence.
-        let parent = page
-            .ancestors
-            .last()
-            .map(|ancestor| ancestor.id.clone())
-            .filter(|_| root != Some(page.id.as_str()));
+        let parent = page.ancestors.last().map(|ancestor| ancestor.id.clone()).filter(|_| root != Some(page.id.as_str()));
         pages.push(Planned { page, parent });
     }
 
@@ -130,10 +118,7 @@ type Known = (HashMap<String, i64>, HashMap<String, Id>);
 
 fn known(connection: &Connection, space: Option<&SpaceRecord>) -> ApiResult<Known> {
     match space {
-        Some(space) => Ok((
-            store::imported_versions(connection, space.id)?,
-            store::detached_sources(connection, space.id)?,
-        )),
+        Some(space) => Ok((store::imported_versions(connection, space.id)?, store::detached_sources(connection, space.id)?)),
         None => Ok(Known::default()),
     }
 }
@@ -152,11 +137,8 @@ fn store_pages(
 ) -> ApiResult<ConfluenceImportReport> {
     let plan = plan(config, remote)?;
     let before = app.read(|connection| known(connection, target_space(connection, target_key)?.as_ref()))?;
-    let mut converted: Vec<Option<Result<String, String>>> = plan
-        .pages
-        .par_iter()
-        .map(|planned| needs_body(&before, &planned.page).then(|| convert(&planned.page)))
-        .collect();
+    let mut converted: Vec<Option<Result<String, String>>> =
+        plan.pages.par_iter().map(|planned| needs_body(&before, &planned.page).then(|| convert(&planned.page))).collect();
 
     app.write(Actor::system(LABEL), |tx| {
         target_space(tx, target_key)?;
@@ -173,12 +155,9 @@ fn store_pages(
         )?;
         // Read again inside the transaction: this is what the pages are compared against.
         let now = known(tx, Some(&space))?;
-        let mut report = ConfluenceImportReport {
-            wiki_space_key: space.key.clone(),
-            skipped: plan.excluded,
-            ..Default::default()
-        };
-        let mut local: HashMap<&str, Id> = HashMap::new();
+        let mut report = ConfluenceImportReport { wiki_space_key: space.key.clone(), skipped: plan.excluded, ..Default::default() };
+        // Pages already here keep their place even if they cannot be stored this time.
+        let mut local: HashMap<String, Id> = store::imported_pages(tx, space.id)?.into_iter().map(|(id, source_id, _)| (source_id, id)).collect();
         let mut written: Vec<Id> = Vec::new();
 
         for (planned, converted) in plan.pages.iter().zip(converted.iter_mut()) {
@@ -203,7 +182,7 @@ fn store_pages(
 
             match stored {
                 Ok((id, outcome)) => {
-                    local.insert(&page.id, id);
+                    local.insert(page.id.clone(), id);
 
                     match outcome {
                         ImportOutcome::Created => report.created += 1,
@@ -216,10 +195,7 @@ fn store_pages(
                         written.push(id);
                     }
                 }
-                Err(reason) => report.failed.push(ConfluenceFailure {
-                    title: page.title.clone(),
-                    reason,
-                }),
+                Err(reason) => report.failed.push(ConfluenceFailure { title: page.title.clone(), reason }),
             }
         }
 
@@ -302,12 +278,10 @@ pub fn list(connection: &Connection, user: &AuthUser) -> ApiResult<Vec<Confluenc
         }
 
         let config = ImportConfig::of(&space).unwrap_or_default();
-        let last: Option<(String, String)> = query_one(
-            connection,
-            "SELECT last_run_at, last_report FROM confluence_import WHERE space_id = ?1",
-            [space.id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )?;
+        let last: Option<(String, String)> =
+            query_one(connection, "SELECT last_run_at, last_report FROM confluence_import WHERE space_id = ?1", [space.id], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })?;
 
         imports.push(ConfluenceImport {
             wiki_space_key: space.key,
@@ -326,12 +300,9 @@ pub fn list(connection: &Connection, user: &AuthUser) -> ApiResult<Vec<Confluenc
 
 /// The stored configuration of the import behind a knowledge base space.
 pub fn stored_config(connection: &Connection, wiki_space_key: &str) -> ApiResult<(String, ImportConfig)> {
-    let space = store::space_by_key(connection, wiki_space_key)?
-        .filter(|space| space.source == SOURCE)
-        .ok_or_else(|| ApiError::not_found("Import"))?;
-    let config = ImportConfig::of(&space)
-        .filter(|config| !config.space_key.is_empty())
-        .ok_or_else(|| ApiError::not_found("Import"))?;
+    let space =
+        store::space_by_key(connection, wiki_space_key)?.filter(|space| space.source == SOURCE).ok_or_else(|| ApiError::not_found("Import"))?;
+    let config = ImportConfig::of(&space).filter(|config| !config.space_key.is_empty()).ok_or_else(|| ApiError::not_found("Import"))?;
 
     Ok((space.key, config))
 }

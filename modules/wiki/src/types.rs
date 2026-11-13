@@ -204,7 +204,7 @@ pub struct WikiSpacePatch {
     pub description: Option<String>,
     /// A project key binds the space, `null` unbinds it, absent leaves the binding alone.
     #[serde(deserialize_with = "double_option")]
-    #[ts(type = "string | null")]
+    #[ts(optional, type = "string | null")]
     pub project_key: Option<Option<String>>,
 }
 

@@ -11,21 +11,11 @@ use hub_mod_wiki::WikiModule;
 use serde_json::{json, Value};
 
 async fn space(client: &Client, key: &str, project_key: Option<&str>) -> Value {
-    client
-        .post(
-            "/spaces",
-            json!({ "key": key, "name": format!("Space {key}"), "projectKey": project_key }),
-        )
-        .await
+    client.post("/spaces", json!({ "key": key, "name": format!("Space {key}"), "projectKey": project_key })).await
 }
 
 async fn page(client: &Client, space_key: &str, title: &str, body: &str, parent_id: Option<Id>) -> Value {
-    client
-        .post(
-            &format!("/spaces/{space_key}/pages"),
-            json!({ "title": title, "body": body, "parentId": parent_id }),
-        )
-        .await
+    client.post(&format!("/spaces/{space_key}/pages"), json!({ "title": title, "body": body, "parentId": parent_id })).await
 }
 
 fn link_count(app: &App, page_id: Id) -> i64 {
@@ -41,12 +31,7 @@ fn link_count(app: &App, page_id: Id) -> i64 {
 
 fn event_kinds(app: &App) -> Vec<(String, Option<Id>)> {
     app.read(|connection| {
-        query_all(
-            connection,
-            "SELECT kind, project_id FROM event WHERE kind LIKE 'page.%' ORDER BY id",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
+        query_all(connection, "SELECT kind, project_id FROM event WHERE kind LIKE 'page.%' ORDER BY id", [], |row| Ok((row.get(0)?, row.get(1)?)))
     })
     .expect("events")
 }
@@ -56,25 +41,12 @@ fn import_page(app: &App, space_key: &str, source_id: &str, version: i64, title:
     app.write(Actor::system("Confluence"), |tx| {
         let space = store::upsert_space(
             tx,
-            &ImportedSpace {
-                key: space_key,
-                name: "Imported",
-                description: "",
-                source: "confluence",
-                source_ref: &json!({ "spaceKey": "DOC" }),
-            },
+            &ImportedSpace { key: space_key, name: "Imported", description: "", source: "confluence", source_ref: &json!({ "spaceKey": "DOC" }) },
         )?;
         let imported = store::upsert_imported_page(
             tx,
             &space,
-            &ImportedPage {
-                source_id,
-                source_version: version,
-                source_url: Some("https://confluence.example/x"),
-                title,
-                body,
-                parent_id,
-            },
+            &ImportedPage { source_id, source_version: version, source_url: Some("https://confluence.example/x"), title, body, parent_id },
         )?;
         store::refresh_links(tx, &[imported.0])?;
 
@@ -91,13 +63,7 @@ async fn routes_need_a_signed_in_user() {
 
     assert_eq!(stranger.refused(Method::GET, "/spaces", None).await.0, StatusCode::UNAUTHORIZED);
     assert_eq!(stranger.refused(Method::GET, "/templates", None).await.0, StatusCode::UNAUTHORIZED);
-    assert_eq!(
-        stranger
-            .refused(Method::POST, "/spaces", Some(json!({ "key": "DOCS", "name": "Docs" })))
-            .await
-            .0,
-        StatusCode::UNAUTHORIZED
-    );
+    assert_eq!(stranger.refused(Method::POST, "/spaces", Some(json!({ "key": "DOCS", "name": "Docs" }))).await.0, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -106,12 +72,7 @@ async fn spaces_are_created_listed_changed_and_deleted() {
     let admin = person(&app, "Ada Admin", Role::Admin);
     let member = person(&app, "Marek Member", Role::Member);
 
-    let created = member
-        .post(
-            "/spaces",
-            json!({ "key": " docs ", "name": "  Team   docs ", "description": "How we work" }),
-        )
-        .await;
+    let created = member.post("/spaces", json!({ "key": " docs ", "name": "  Team   docs ", "description": "How we work" })).await;
 
     assert_eq!(created["key"], "DOCS");
     assert_eq!(created["name"], "Team docs");
@@ -120,32 +81,11 @@ async fn spaces_are_created_listed_changed_and_deleted() {
     assert_eq!(created["canEdit"], true);
     assert_eq!(created["canAdmin"], false);
 
+    assert_eq!(member.refused(Method::POST, "/spaces", Some(json!({ "key": "docs", "name": "Again" }))).await.0, StatusCode::CONFLICT);
+    assert_eq!(member.refused(Method::POST, "/spaces", Some(json!({ "key": "1x", "name": "Bad key" }))).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(member.refused(Method::POST, "/spaces", Some(json!({ "key": "OK", "name": "  " }))).await.0, StatusCode::BAD_REQUEST);
     assert_eq!(
-        member
-            .refused(Method::POST, "/spaces", Some(json!({ "key": "docs", "name": "Again" })))
-            .await
-            .0,
-        StatusCode::CONFLICT
-    );
-    assert_eq!(
-        member
-            .refused(Method::POST, "/spaces", Some(json!({ "key": "1x", "name": "Bad key" })))
-            .await
-            .0,
-        StatusCode::BAD_REQUEST
-    );
-    assert_eq!(
-        member
-            .refused(Method::POST, "/spaces", Some(json!({ "key": "OK", "name": "  " })))
-            .await
-            .0,
-        StatusCode::BAD_REQUEST
-    );
-    assert_eq!(
-        member
-            .refused(Method::POST, "/spaces", Some(json!({ "key": "OK", "name": "x", "projectKey": "NOPE" })))
-            .await
-            .0,
+        member.refused(Method::POST, "/spaces", Some(json!({ "key": "OK", "name": "x", "projectKey": "NOPE" }))).await.0,
         StatusCode::NOT_FOUND
     );
 
@@ -167,9 +107,7 @@ async fn spaces_are_created_listed_changed_and_deleted() {
     assert_eq!(admin.get("/spaces").await, json!([]));
     assert_eq!(admin.refused(Method::GET, "/spaces/DOCS/tree", None).await.0, StatusCode::NOT_FOUND);
 
-    let leftovers: i64 = app
-        .read(|connection| Ok(connection.query_row("SELECT count(*) FROM wiki_fts", [], |row| row.get(0))?))
-        .unwrap();
+    let leftovers: i64 = app.read(|connection| Ok(connection.query_row("SELECT count(*) FROM wiki_fts", [], |row| row.get(0))?)).unwrap();
     assert_eq!(leftovers, 0);
 }
 
@@ -184,17 +122,11 @@ async fn a_bound_space_follows_the_access_of_its_project() {
     member(&app, &lead, "SEC", &viewer, ProjectRole::Viewer);
 
     assert_eq!(
-        outsider
-            .refused(Method::POST, "/spaces", Some(json!({ "key": "SEC", "name": "x", "projectKey": "SEC" })))
-            .await
-            .0,
+        outsider.refused(Method::POST, "/spaces", Some(json!({ "key": "SEC", "name": "x", "projectKey": "SEC" }))).await.0,
         StatusCode::NOT_FOUND
     );
     assert_eq!(
-        viewer
-            .refused(Method::POST, "/spaces", Some(json!({ "key": "SEC", "name": "x", "projectKey": "SEC" })))
-            .await
-            .0,
+        viewer.refused(Method::POST, "/spaces", Some(json!({ "key": "SEC", "name": "x", "projectKey": "SEC" }))).await.0,
         StatusCode::FORBIDDEN
     );
 
@@ -207,39 +139,17 @@ async fn a_bound_space_follows_the_access_of_its_project() {
     // A viewer of the project reads but does not write.
     assert_eq!(viewer.get("/spaces").await[0]["canEdit"], false);
     assert_eq!(viewer.get(&format!("/pages/{secret}")).await["title"], "Klucze produkcyjne");
+    assert_eq!(viewer.refused(Method::POST, "/spaces/SEC/pages", Some(json!({ "title": "Nope" }))).await.0, StatusCode::FORBIDDEN);
     assert_eq!(
-        viewer
-            .refused(Method::POST, "/spaces/SEC/pages", Some(json!({ "title": "Nope" })))
-            .await
-            .0,
+        viewer.refused(Method::PATCH, &format!("/pages/{secret}"), Some(json!({ "body": "x", "baseVersion": 1 }))).await.0,
         StatusCode::FORBIDDEN
     );
+    assert_eq!(viewer.refused(Method::DELETE, &format!("/pages/{secret}"), None).await.0, StatusCode::FORBIDDEN);
     assert_eq!(
-        viewer
-            .refused(Method::PATCH, &format!("/pages/{secret}"), Some(json!({ "body": "x", "baseVersion": 1 })))
-            .await
-            .0,
+        viewer.refused(Method::POST, &format!("/pages/{secret}/move"), Some(json!({ "parentId": null, "position": 0 }))).await.0,
         StatusCode::FORBIDDEN
     );
-    assert_eq!(
-        viewer.refused(Method::DELETE, &format!("/pages/{secret}"), None).await.0,
-        StatusCode::FORBIDDEN
-    );
-    assert_eq!(
-        viewer
-            .refused(
-                Method::POST,
-                &format!("/pages/{secret}/move"),
-                Some(json!({ "parentId": null, "position": 0 }))
-            )
-            .await
-            .0,
-        StatusCode::FORBIDDEN
-    );
-    assert_eq!(
-        viewer.refused(Method::PATCH, "/spaces/SEC", Some(json!({ "name": "Mine" }))).await.0,
-        StatusCode::FORBIDDEN
-    );
+    assert_eq!(viewer.refused(Method::PATCH, "/spaces/SEC", Some(json!({ "name": "Mine" }))).await.0, StatusCode::FORBIDDEN);
     assert_eq!(viewer.refused(Method::DELETE, "/spaces/SEC", None).await.0, StatusCode::FORBIDDEN);
 
     // For somebody outside a private project the space does not exist.
@@ -256,25 +166,15 @@ async fn a_bound_space_follows_the_access_of_its_project() {
     }
 
     assert_eq!(
-        outsider
-            .refused(Method::PATCH, &format!("/pages/{secret}"), Some(json!({ "body": "x", "baseVersion": 1 })))
-            .await
-            .0,
+        outsider.refused(Method::PATCH, &format!("/pages/{secret}"), Some(json!({ "body": "x", "baseVersion": 1 }))).await.0,
         StatusCode::NOT_FOUND
     );
     assert_eq!(outsider.get("/search?q=sejfu").await, json!([]));
     assert_eq!(viewer.get("/search?q=sejfu").await.as_array().unwrap().len(), 1);
-    assert_eq!(
-        app.read(|connection| WikiModule.quick_search(connection, &outsider.user, "klucze"))
-            .unwrap(),
-        Vec::new()
-    );
+    assert_eq!(app.read(|connection| WikiModule.quick_search(connection, &outsider.user, "klucze")).unwrap(), Vec::new());
 
     // Unbinding makes the space visible to everyone, so it takes an instance administrator.
-    assert_eq!(
-        lead.refused(Method::PATCH, "/spaces/SEC", Some(json!({ "projectKey": null }))).await.0,
-        StatusCode::FORBIDDEN
-    );
+    assert_eq!(lead.refused(Method::PATCH, "/spaces/SEC", Some(json!({ "projectKey": null }))).await.0, StatusCode::FORBIDDEN);
     assert_eq!(admin.patch("/spaces/SEC", json!({ "projectKey": null })).await["projectKey"], Value::Null);
     assert_eq!(outsider.get("/spaces").await[0]["key"], "SEC");
 
@@ -307,100 +207,42 @@ async fn pages_form_a_tree_that_can_be_rearranged() {
     assert_eq!(titles(&detail["breadcrumbs"]), ["Guide", "Install notes"]);
     assert_eq!(detail["space"]["key"], "DOCS");
     assert_eq!(detail["version"], 1);
-    assert_eq!(
-        titles(&admin.get(&format!("/pages/{guide}")).await["children"]),
-        ["Install notes", "Usage"]
-    );
+    assert_eq!(titles(&admin.get(&format!("/pages/{guide}")).await["children"]), ["Install notes", "Usage"]);
 
+    assert_eq!(admin.refused(Method::POST, "/spaces/DOCS/pages", Some(json!({ "title": " " }))).await.0, StatusCode::BAD_REQUEST);
     assert_eq!(
-        admin.refused(Method::POST, "/spaces/DOCS/pages", Some(json!({ "title": " " }))).await.0,
+        admin.refused(Method::POST, "/spaces/DOCS/pages", Some(json!({ "title": "x", "parentId": elsewhere }))).await.0,
         StatusCode::BAD_REQUEST
     );
-    assert_eq!(
-        admin
-            .refused(Method::POST, "/spaces/DOCS/pages", Some(json!({ "title": "x", "parentId": elsewhere })))
-            .await
-            .0,
-        StatusCode::BAD_REQUEST
-    );
-    assert_eq!(
-        admin
-            .refused(Method::POST, "/spaces/DOCS/pages", Some(json!({ "title": "x", "parentId": 9999 })))
-            .await
-            .0,
-        StatusCode::BAD_REQUEST
-    );
+    assert_eq!(admin.refused(Method::POST, "/spaces/DOCS/pages", Some(json!({ "title": "x", "parentId": 9999 }))).await.0, StatusCode::BAD_REQUEST);
 
     // Usage moves in front of Install notes; FAQ moves under Guide, in the middle.
-    admin
-        .post(&format!("/pages/{usage}/move"), json!({ "parentId": guide, "position": 0 }))
-        .await;
-    let moved = admin
-        .post(&format!("/pages/{faq}/move"), json!({ "parentId": guide, "position": 1 }))
-        .await;
+    admin.post(&format!("/pages/{usage}/move"), json!({ "parentId": guide, "position": 0 })).await;
+    let moved = admin.post(&format!("/pages/{faq}/move"), json!({ "parentId": guide, "position": 1 })).await;
     assert_eq!(moved["parentId"], guide);
-    assert_eq!(
-        titles(&admin.get("/spaces/DOCS/tree").await),
-        ["Guide", "Usage", "FAQ", "Install notes", "Linux"]
-    );
+    assert_eq!(titles(&admin.get("/spaces/DOCS/tree").await), ["Guide", "Usage", "FAQ", "Install notes", "Linux"]);
 
     // A position past the end means "last"; null means the top level.
-    admin
-        .post(&format!("/pages/{install}/move"), json!({ "parentId": null, "position": 99 }))
-        .await;
-    assert_eq!(
-        titles(&admin.get("/spaces/DOCS/tree").await),
-        ["Guide", "Usage", "FAQ", "Install notes", "Linux"]
-    );
-    admin
-        .post(&format!("/pages/{install}/move"), json!({ "parentId": null, "position": 0 }))
-        .await;
-    assert_eq!(
-        titles(&admin.get("/spaces/DOCS/tree").await),
-        ["Install notes", "Linux", "Guide", "Usage", "FAQ"]
-    );
+    admin.post(&format!("/pages/{install}/move"), json!({ "parentId": null, "position": 99 })).await;
+    assert_eq!(titles(&admin.get("/spaces/DOCS/tree").await), ["Guide", "Usage", "FAQ", "Install notes", "Linux"]);
+    admin.post(&format!("/pages/{install}/move"), json!({ "parentId": null, "position": 0 })).await;
+    assert_eq!(titles(&admin.get("/spaces/DOCS/tree").await), ["Install notes", "Linux", "Guide", "Usage", "FAQ"]);
 
-    let (status, message) = admin
-        .refused(
-            Method::POST,
-            &format!("/pages/{install}/move"),
-            Some(json!({ "parentId": deep, "position": 0 })),
-        )
-        .await;
+    let (status, message) = admin.refused(Method::POST, &format!("/pages/{install}/move"), Some(json!({ "parentId": deep, "position": 0 }))).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert!(message.contains("descendants"), "{message}");
     assert_eq!(
-        admin
-            .refused(
-                Method::POST,
-                &format!("/pages/{install}/move"),
-                Some(json!({ "parentId": install, "position": 0 }))
-            )
-            .await
-            .0,
+        admin.refused(Method::POST, &format!("/pages/{install}/move"), Some(json!({ "parentId": install, "position": 0 }))).await.0,
         StatusCode::BAD_REQUEST
     );
     assert_eq!(
-        admin
-            .refused(
-                Method::POST,
-                &format!("/pages/{install}/move"),
-                Some(json!({ "parentId": elsewhere, "position": 0 }))
-            )
-            .await
-            .0,
+        admin.refused(Method::POST, &format!("/pages/{install}/move"), Some(json!({ "parentId": elsewhere, "position": 0 }))).await.0,
         StatusCode::BAD_REQUEST
     );
 
     // Deleting a page with children needs to be asked for.
-    assert_eq!(
-        admin.refused(Method::DELETE, &format!("/pages/{install}"), None).await.0,
-        StatusCode::CONFLICT
-    );
-    assert_eq!(
-        admin.refused(Method::DELETE, &format!("/pages/{install}?recursive=false"), None).await.0,
-        StatusCode::CONFLICT
-    );
+    assert_eq!(admin.refused(Method::DELETE, &format!("/pages/{install}"), None).await.0, StatusCode::CONFLICT);
+    assert_eq!(admin.refused(Method::DELETE, &format!("/pages/{install}?recursive=false"), None).await.0, StatusCode::CONFLICT);
     assert_eq!(admin.delete(&format!("/pages/{install}?recursive=true")).await, json!({ "deleted": 2 }));
     assert_eq!(admin.delete(&format!("/pages/{faq}")).await, json!({ "deleted": 1 }));
     assert_eq!(titles(&admin.get("/spaces/DOCS/tree").await), ["Guide", "Usage"]);
@@ -417,52 +259,30 @@ async fn every_save_is_a_version_and_stale_saves_are_refused() {
     let id = id_of(&page(&admin, "DOCS", "Deploy", "step one\nstep two\nstep three", None).await);
     let path = format!("/pages/{id}");
 
-    let second = other
-        .patch(
-            &path,
-            json!({ "body": "step one\nstep 2\nstep three\nstep four", "baseVersion": 1, "message": "Clearer steps" }),
-        )
-        .await;
+    let second = other.patch(&path, json!({ "body": "step one\nstep 2\nstep three\nstep four", "baseVersion": 1, "message": "Clearer steps" })).await;
     assert_eq!(second["version"], 2);
     assert_eq!(second["authorId"], admin.user.id);
     assert_eq!(second["updatedBy"], other.user.id);
 
     // The first editor still has version 1 open.
-    let (status, message) = admin
-        .refused(Method::PATCH, &path, Some(json!({ "body": "mine", "baseVersion": 1 })))
-        .await;
+    let (status, message) = admin.refused(Method::PATCH, &path, Some(json!({ "body": "mine", "baseVersion": 1 }))).await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert!(message.contains("version 2"), "{message}");
-    assert_eq!(
-        admin.refused(Method::PATCH, &path, Some(json!({ "body": "mine" }))).await.0,
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
+    assert_eq!(admin.refused(Method::PATCH, &path, Some(json!({ "body": "mine" }))).await.0, StatusCode::UNPROCESSABLE_ENTITY);
 
     // Saving what is already there is not a new version.
     assert_eq!(admin.patch(&path, json!({ "title": "Deploy", "baseVersion": 2 })).await["version"], 2);
 
     let third = admin.patch(&path, json!({ "title": "Deployment", "baseVersion": 2 })).await;
     assert_eq!((third["version"].as_i64(), third["title"].as_str()), (Some(3), Some("Deployment")));
-    assert_eq!(
-        admin
-            .refused(Method::PATCH, &path, Some(json!({ "title": "  ", "baseVersion": 3 })))
-            .await
-            .0,
-        StatusCode::BAD_REQUEST
-    );
+    assert_eq!(admin.refused(Method::PATCH, &path, Some(json!({ "title": "  ", "baseVersion": 3 }))).await.0, StatusCode::BAD_REQUEST);
 
     let revisions = admin.get(&format!("{path}/revisions")).await;
     let summary: Vec<(i64, &str, &str)> = revisions
         .as_array()
         .unwrap()
         .iter()
-        .map(|revision| {
-            (
-                revision["version"].as_i64().unwrap(),
-                revision["title"].as_str().unwrap(),
-                revision["message"].as_str().unwrap(),
-            )
-        })
+        .map(|revision| (revision["version"].as_i64().unwrap(), revision["title"].as_str().unwrap(), revision["message"].as_str().unwrap()))
         .collect();
     assert_eq!(summary, [(3, "Deployment", ""), (2, "Deploy", "Clearer steps"), (1, "Deploy", "")]);
     assert_eq!(revisions[1]["authorId"], other.user.id);
@@ -470,10 +290,7 @@ async fn every_save_is_a_version_and_stale_saves_are_refused() {
 
     let first = admin.get(&format!("{path}/revisions/1")).await;
     assert_eq!(first["body"], "step one\nstep two\nstep three");
-    assert_eq!(
-        admin.refused(Method::GET, &format!("{path}/revisions/9"), None).await.0,
-        StatusCode::NOT_FOUND
-    );
+    assert_eq!(admin.refused(Method::GET, &format!("{path}/revisions/9"), None).await.0, StatusCode::NOT_FOUND);
 
     let diff = admin.get(&format!("{path}/diff?from=1&to=2")).await;
     let lines: Vec<String> = diff["lines"]
@@ -482,22 +299,13 @@ async fn every_save_is_a_version_and_stale_saves_are_refused() {
         .iter()
         .map(|line| format!("{}:{}", line["kind"].as_str().unwrap(), line["text"].as_str().unwrap()))
         .collect();
-    assert_eq!(
-        lines,
-        ["same:step one", "removed:step two", "added:step 2", "same:step three", "added:step four"]
-    );
+    assert_eq!(lines, ["same:step one", "removed:step two", "added:step 2", "same:step three", "added:step four"]);
 
     // Without bounds the diff is the latest version against the one before.
     let latest = admin.get(&format!("{path}/diff")).await;
     assert_eq!((latest["from"].as_i64(), latest["to"].as_i64()), (Some(2), Some(3)));
-    assert_eq!(
-        (latest["fromTitle"].as_str(), latest["toTitle"].as_str()),
-        (Some("Deploy"), Some("Deployment"))
-    );
-    assert_eq!(
-        admin.refused(Method::GET, &format!("{path}/diff?from=1&to=7"), None).await.0,
-        StatusCode::NOT_FOUND
-    );
+    assert_eq!((latest["fromTitle"].as_str(), latest["toTitle"].as_str()), (Some("Deploy"), Some("Deployment")));
+    assert_eq!(admin.refused(Method::GET, &format!("{path}/diff?from=1&to=7"), None).await.0, StatusCode::NOT_FOUND);
 
     let restored = other.post(&format!("{path}/restore"), json!({ "version": 1 })).await;
     assert_eq!(restored["version"], 4);
@@ -505,13 +313,7 @@ async fn every_save_is_a_version_and_stale_saves_are_refused() {
     assert_eq!(restored["body"], "step one\nstep two\nstep three");
     assert_eq!(admin.get(&format!("{path}/revisions")).await[0]["message"], "Restored version 1");
     assert_eq!(other.post(&format!("{path}/restore"), json!({ "version": 4 })).await["version"], 4);
-    assert_eq!(
-        other
-            .refused(Method::POST, &format!("{path}/restore"), Some(json!({ "version": 12 })))
-            .await
-            .0,
-        StatusCode::NOT_FOUND
-    );
+    assert_eq!(other.refused(Method::POST, &format!("{path}/restore"), Some(json!({ "version": 12 }))).await.0, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -534,93 +336,41 @@ async fn a_mirrored_page_is_read_only_until_it_is_detached() {
     assert_eq!(admin.get("/spaces/MIR/tree").await[0]["locked"], true);
     assert_eq!(admin.get(&format!("{path}/revisions")).await[0]["authorLabel"], "Confluence");
 
-    let (status, message) = admin
-        .refused(Method::PATCH, &path, Some(json!({ "body": "mine", "baseVersion": 1 })))
-        .await;
+    let (status, message) = admin.refused(Method::PATCH, &path, Some(json!({ "body": "mine", "baseVersion": 1 }))).await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert!(message.contains("detach it to edit"), "{message}");
+    assert_eq!(admin.refused(Method::POST, &format!("{path}/restore"), Some(json!({ "version": 1 }))).await.0, StatusCode::CONFLICT);
+    assert_eq!(admin.refused(Method::POST, &format!("{path}/move"), Some(json!({ "parentId": null, "position": 0 }))).await.0, StatusCode::CONFLICT);
     assert_eq!(
-        admin
-            .refused(Method::POST, &format!("{path}/restore"), Some(json!({ "version": 1 })))
-            .await
-            .0,
-        StatusCode::CONFLICT
-    );
-    assert_eq!(
-        admin
-            .refused(Method::POST, &format!("{path}/move"), Some(json!({ "parentId": null, "position": 0 })))
-            .await
-            .0,
-        StatusCode::CONFLICT
-    );
-    assert_eq!(
-        admin
-            .refused(
-                Method::POST,
-                &format!("{path}/issues"),
-                Some(json!({ "projectKey": "WEB", "lines": [0] }))
-            )
-            .await
-            .0,
+        admin.refused(Method::POST, &format!("{path}/issues"), Some(json!({ "projectKey": "WEB", "lines": [0] }))).await.0,
         StatusCode::CONFLICT
     );
 
     // The same version again changes nothing; a newer one becomes a new revision.
-    assert_eq!(
-        import_page(&app, "MIR", "c-100", 3, "Imported page", "ignored", None),
-        (id, ImportOutcome::Unchanged)
-    );
+    assert_eq!(import_page(&app, "MIR", "c-100", 3, "Imported page", "ignored", None), (id, ImportOutcome::Unchanged));
     assert_eq!(admin.get(&path).await["version"], 1);
-    assert_eq!(
-        import_page(&app, "MIR", "c-100", 4, "Imported page", "From Confluence, edited", None),
-        (id, ImportOutcome::Updated)
-    );
+    assert_eq!(import_page(&app, "MIR", "c-100", 4, "Imported page", "From Confluence, edited", None), (id, ImportOutcome::Updated));
 
     let updated = admin.get(&path).await;
-    assert_eq!(
-        (
-            updated["version"].as_i64(),
-            updated["sourceVersion"].as_i64(),
-            updated["locked"].as_bool()
-        ),
-        (Some(2), Some(4), Some(true))
-    );
+    assert_eq!((updated["version"].as_i64(), updated["sourceVersion"].as_i64(), updated["locked"].as_bool()), (Some(2), Some(4), Some(true)));
     assert_eq!(admin.get(&format!("{path}/revisions")).await[0]["message"], "Version 4 from confluence");
 
     let detached = admin.post(&format!("{path}/detach"), json!({})).await;
     assert_eq!(detached["locked"], false);
-    assert_eq!(
-        (&detached["sourceId"], &detached["sourceVersion"], &detached["sourceUrl"]),
-        (&Value::Null, &Value::Null, &Value::Null)
-    );
+    assert_eq!((&detached["sourceId"], &detached["sourceVersion"], &detached["sourceUrl"]), (&Value::Null, &Value::Null, &Value::Null));
     assert_eq!(admin.patch(&path, json!({ "body": "Ours now", "baseVersion": 2 })).await["version"], 3);
 
     // The importer is told the page was detached and leaves it alone, whatever the version.
-    assert_eq!(
-        import_page(&app, "MIR", "c-100", 9, "Imported page", "Upstream moved on", None),
-        (id, ImportOutcome::Detached)
-    );
+    assert_eq!(import_page(&app, "MIR", "c-100", 9, "Imported page", "Upstream moved on", None), (id, ImportOutcome::Detached));
     assert_eq!(admin.get(&path).await["body"], "Ours now");
     let space_id = id_of(&admin.get("/spaces/MIR").await);
-    assert_eq!(
-        app.read(|connection| store::detached_sources(connection, space_id)).unwrap().get("c-100"),
-        Some(&id)
-    );
+    assert_eq!(app.read(|connection| store::detached_sources(connection, space_id)).unwrap().get("c-100"), Some(&id));
     assert!(app.read(|connection| store::imported_versions(connection, space_id)).unwrap().is_empty());
 
     // A local space is never turned into a mirror.
     space(&admin, "LOCAL", None).await;
     let refused = app.write(Actor::system("Confluence"), |tx| {
-        store::upsert_space(
-            tx,
-            &ImportedSpace {
-                key: "LOCAL",
-                name: "x",
-                description: "",
-                source: "confluence",
-                source_ref: &json!({}),
-            },
-        )
+        store::upsert_space(tx, &ImportedSpace { key: "LOCAL", name: "x", description: "", source: "confluence", source_ref: &json!({}) })
     });
     assert_eq!(refused.unwrap_err().status, StatusCode::CONFLICT);
 }
@@ -669,12 +419,7 @@ async fn issue_keys_in_the_body_become_links_and_show_on_the_issue() {
             .as_array()
             .unwrap()
             .iter()
-            .map(|entry| {
-                (
-                    entry["issue"]["key"].as_str().unwrap().to_string(),
-                    entry["relation"].as_str().unwrap().to_string(),
-                )
-            })
+            .map(|entry| (entry["issue"]["key"].as_str().unwrap().to_string(), entry["relation"].as_str().unwrap().to_string()))
             .collect()
     };
     let mentions = |key: &str| (key.to_string(), "mentions".to_string());
@@ -687,19 +432,10 @@ async fn issue_keys_in_the_body_become_links_and_show_on_the_issue() {
     assert_eq!(linked(&outsider.get(&path).await), [mentions(&card), mentions(&blik)]);
 
     // An explicit link is stronger than a mention and survives edits of the body.
-    assert_eq!(
-        linked(&lead.put(&format!("{path}/issues/{}", card.to_lowercase())).await),
-        [mentions(&secret), documents(&card), mentions(&blik)]
-    );
+    assert_eq!(linked(&lead.put(&format!("{path}/issues/{}", card.to_lowercase())).await), [mentions(&secret), documents(&card), mentions(&blik)]);
     lead.put(&format!("{path}/issues/{card}")).await;
-    assert_eq!(
-        outsider.refused(Method::PUT, &format!("{path}/issues/{secret}"), None).await.0,
-        StatusCode::NOT_FOUND
-    );
-    assert_eq!(
-        lead.refused(Method::PUT, &format!("{path}/issues/WEB-99"), None).await.0,
-        StatusCode::NOT_FOUND
-    );
+    assert_eq!(outsider.refused(Method::PUT, &format!("{path}/issues/{secret}"), None).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(lead.refused(Method::PUT, &format!("{path}/issues/WEB-99"), None).await.0, StatusCode::NOT_FOUND);
 
     let edited = lead.patch(&path, json!({ "body": format!("Już tylko {blik}."), "baseVersion": 1 })).await;
     assert_eq!(linked(&edited), [documents(&card), mentions(&blik)]);
@@ -757,14 +493,7 @@ async fn wiki_links_become_backlinks_whatever_the_order_of_writing() {
 
     // The overview links to pages that do not exist yet.
     let overview = id_of(
-        &page(
-            &admin,
-            "DOCS",
-            "Przegląd",
-            "Zobacz [[Płatności]], [[płatności|drugi raz]], [[TEAM:Zasady pracy]] i [[Brak takiej]].",
-            None,
-        )
-        .await,
+        &page(&admin, "DOCS", "Przegląd", "Zobacz [[Płatności]], [[płatności|drugi raz]], [[TEAM:Zasady pracy]] i [[Brak takiej]].", None).await,
     );
     let payments = page(&admin, "DOCS", "Płatności", "Wróć do [[Przegląd]]. Sam do siebie: [[Płatności]].", None).await;
     let rules = page(&admin, "TEAM", "Zasady pracy", "Bez linków.", None).await;
@@ -777,29 +506,14 @@ async fn wiki_links_become_backlinks_whatever_the_order_of_writing() {
     assert_eq!(link_count(&app, overview), 3);
 
     // A rename breaks the links by the old title and picks up those by the new one.
-    let renamed = admin
-        .patch(
-            &format!("/pages/{}", id_of(&payments)),
-            json!({ "title": "Brak takiej", "baseVersion": 1 }),
-        )
-        .await;
+    let renamed = admin.patch(&format!("/pages/{}", id_of(&payments)), json!({ "title": "Brak takiej", "baseVersion": 1 })).await;
     assert_eq!(backlinks(&renamed), ["DOCS:Przegląd"]);
     assert_eq!(link_count(&app, overview), 3);
-    admin
-        .patch(
-            &format!("/pages/{}", id_of(&payments)),
-            json!({ "title": "Rozliczenia", "baseVersion": 2 }),
-        )
-        .await;
+    admin.patch(&format!("/pages/{}", id_of(&payments)), json!({ "title": "Rozliczenia", "baseVersion": 2 })).await;
     assert_eq!(backlinks(&admin.get(&format!("/pages/{}", id_of(&payments))).await), Vec::<String>::new());
 
     // Removing the link from the body removes the backlink; deleting a page removes its links.
-    admin
-        .patch(
-            &format!("/pages/{overview}"),
-            json!({ "body": "Zobacz [[TEAM:Zasady pracy]].", "baseVersion": 1 }),
-        )
-        .await;
+    admin.patch(&format!("/pages/{overview}"), json!({ "body": "Zobacz [[TEAM:Zasady pracy]].", "baseVersion": 1 })).await;
     assert_eq!(backlinks(&admin.get(&format!("/pages/{}", id_of(&rules))).await), ["DOCS:Przegląd"]);
     admin.delete(&format!("/pages/{overview}")).await;
     assert_eq!(backlinks(&admin.get(&format!("/pages/{}", id_of(&rules))).await), Vec::<String>::new());
@@ -812,24 +526,8 @@ async fn search_ignores_diacritics_and_shows_where_the_words_are() {
     let admin = person(&app, "Ada Admin", Role::Admin);
     space(&admin, "DOCS", None).await;
     space(&admin, "TEAM", None).await;
-    let blik = id_of(
-        &page(
-            &admin,
-            "DOCS",
-            "BLIK — kanał powiadomień",
-            "Wstęp.\n\nPłatność BLIK wymaga osobnego kanału powiadomień.",
-            None,
-        )
-        .await,
-    );
-    page(
-        &admin,
-        "DOCS",
-        "Żółta kartka",
-        "Zupełnie o czym innym, choć raz pada słowo płatność.",
-        None,
-    )
-    .await;
+    let blik = id_of(&page(&admin, "DOCS", "BLIK — kanał powiadomień", "Wstęp.\n\nPłatność BLIK wymaga osobnego kanału powiadomień.", None).await);
+    page(&admin, "DOCS", "Żółta kartka", "Zupełnie o czym innym, choć raz pada słowo płatność.", None).await;
     page(&admin, "TEAM", "Zasady", "Płatności za szkolenia zatwierdza lider.", None).await;
 
     let hits = admin.get("/search?q=platnosc%20blik").await;
@@ -848,18 +546,13 @@ async fn search_ignores_diacritics_and_shows_where_the_words_are() {
     assert_eq!(admin.get("/search").await, json!([]));
 
     // An edit is searchable at once, and the old words are gone.
-    admin
-        .patch(&format!("/pages/{blik}"), json!({ "body": "Teraz o przelewach.", "baseVersion": 1 }))
-        .await;
+    admin.patch(&format!("/pages/{blik}"), json!({ "body": "Teraz o przelewach.", "baseVersion": 1 })).await;
     assert_eq!(titles(&admin.get("/search?q=przelewach").await), ["BLIK — kanał powiadomień"]);
     assert_eq!(titles(&admin.get("/search?q=osobnego").await), Vec::<String>::new());
 
     let quick = app.read(|connection| WikiModule.quick_search(connection, &admin.user, "kanal")).unwrap();
     assert_eq!(quick.len(), 1);
-    assert_eq!(
-        (quick[0].kind.as_str(), quick[0].url.clone(), quick[0].subtitle.as_str()),
-        ("page", format!("/wiki/DOCS/{blik}"), "Space DOCS")
-    );
+    assert_eq!((quick[0].kind.as_str(), quick[0].url.clone(), quick[0].subtitle.as_str()), ("page", format!("/wiki/DOCS/{blik}"), "Space DOCS"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -869,12 +562,7 @@ async fn templates_start_a_page() {
     space(&admin, "DOCS", None).await;
 
     let templates = admin.get("/templates").await;
-    let ids: Vec<&str> = templates
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|template| template["id"].as_str().unwrap())
-        .collect();
+    let ids: Vec<&str> = templates.as_array().unwrap().iter().map(|template| template["id"].as_str().unwrap()).collect();
     assert_eq!(ids, ["decision-record", "meeting-notes", "runbook", "technical-spec", "retrospective"]);
     assert!(templates
         .as_array()
@@ -882,25 +570,12 @@ async fn templates_start_a_page() {
         .iter()
         .all(|template| !template["name"].as_str().unwrap().is_empty() && template["body"].as_str().unwrap().contains("## ")));
 
-    let notes = admin
-        .post("/spaces/DOCS/pages", json!({ "title": "Weekly", "templateId": "meeting-notes" }))
-        .await;
+    let notes = admin.post("/spaces/DOCS/pages", json!({ "title": "Weekly", "templateId": "meeting-notes" })).await;
     assert_eq!(notes["body"], templates[1]["body"]);
-    assert_eq!(
-        admin
-            .post(
-                "/spaces/DOCS/pages",
-                json!({ "title": "Own words", "templateId": "runbook", "body": "Mine" })
-            )
-            .await["body"],
-        "Mine"
-    );
+    assert_eq!(admin.post("/spaces/DOCS/pages", json!({ "title": "Own words", "templateId": "runbook", "body": "Mine" })).await["body"], "Mine");
     assert_eq!(admin.post("/spaces/DOCS/pages", json!({ "title": "Empty" })).await["body"], "");
     assert_eq!(
-        admin
-            .refused(Method::POST, "/spaces/DOCS/pages", Some(json!({ "title": "x", "templateId": "nope" })))
-            .await
-            .0,
+        admin.refused(Method::POST, "/spaces/DOCS/pages", Some(json!({ "title": "x", "templateId": "nope" }))).await.0,
         StatusCode::BAD_REQUEST
     );
 }
@@ -926,51 +601,24 @@ async fn task_lines_become_issues() {
         (json!([40]), "The page has no line 41"),
         (json!([]), "Choose at least one task"),
     ] {
-        let (status, message) = viewer
-            .refused(Method::POST, &path, Some(json!({ "projectKey": "WEB", "lines": lines })))
-            .await;
+        let (status, message) = viewer.refused(Method::POST, &path, Some(json!({ "projectKey": "WEB", "lines": lines }))).await;
         assert_eq!((status, message.as_str()), (StatusCode::BAD_REQUEST, expected));
     }
 
-    let (status, message) = viewer
-        .refused(Method::POST, &path, Some(json!({ "projectKey": "WEB", "lines": [2, 5] })))
-        .await;
+    let (status, message) = viewer.refused(Method::POST, &path, Some(json!({ "projectKey": "WEB", "lines": [2, 5] }))).await;
+    assert_eq!((status, message), (StatusCode::BAD_REQUEST, format!("Line 6 already belongs to {existing}")));
+    assert_eq!(viewer.refused(Method::POST, &path, Some(json!({ "projectKey": "OPS", "lines": [2] }))).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(viewer.refused(Method::POST, &path, Some(json!({ "projectKey": "NOPE", "lines": [2] }))).await.0, StatusCode::NOT_FOUND);
     assert_eq!(
-        (status, message),
-        (StatusCode::BAD_REQUEST, format!("Line 6 already belongs to {existing}"))
-    );
-    assert_eq!(
-        viewer
-            .refused(Method::POST, &path, Some(json!({ "projectKey": "OPS", "lines": [2] })))
-            .await
-            .0,
-        StatusCode::FORBIDDEN
-    );
-    assert_eq!(
-        viewer
-            .refused(Method::POST, &path, Some(json!({ "projectKey": "NOPE", "lines": [2] })))
-            .await
-            .0,
-        StatusCode::NOT_FOUND
-    );
-    assert_eq!(
-        viewer
-            .refused(Method::POST, &path, Some(json!({ "projectKey": "WEB", "lines": [2], "baseVersion": 7 })))
-            .await
-            .0,
+        viewer.refused(Method::POST, &path, Some(json!({ "projectKey": "WEB", "lines": [2], "baseVersion": 7 }))).await.0,
         StatusCode::CONFLICT
     );
 
     // Nothing was created by the refused requests, not even by the one that failed on its second line.
-    let count = |app: &App| -> i64 {
-        app.read(|connection| Ok(connection.query_row("SELECT count(*) FROM issue", [], |row| row.get(0))?))
-            .unwrap()
-    };
+    let count = |app: &App| -> i64 { app.read(|connection| Ok(connection.query_row("SELECT count(*) FROM issue", [], |row| row.get(0))?)).unwrap() };
     assert_eq!(count(&app), 1);
 
-    let result = viewer
-        .post(&path, json!({ "projectKey": "web", "lines": [3, 2, 3], "baseVersion": 1 }))
-        .await;
+    let result = viewer.post(&path, json!({ "projectKey": "web", "lines": [3, 2, 3], "baseVersion": 1 })).await;
     assert_eq!(result["keys"], json!(["WEB-2", "WEB-3"]));
     assert_eq!(
         result["page"]["body"],
@@ -978,36 +626,18 @@ async fn task_lines_become_issues() {
     );
     assert_eq!(result["page"]["version"], 2);
 
-    let keys: Vec<&str> = result["page"]["issues"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|entry| entry["issue"]["key"].as_str().unwrap())
-        .collect();
+    let keys: Vec<&str> = result["page"]["issues"].as_array().unwrap().iter().map(|entry| entry["issue"]["key"].as_str().unwrap()).collect();
     assert_eq!(keys, ["WEB-1", "WEB-2", "WEB-3"]);
     assert_eq!(result["page"]["issues"][1]["issue"]["summary"], "Zamówić klucze API");
     assert_eq!(result["page"]["issues"][1]["issue"]["reporterId"], viewer.user.id);
-    assert_eq!(
-        viewer.get(&format!("/pages/{id}/revisions")).await[0]["message"],
-        "Created WEB-2, WEB-3 from tasks"
-    );
+    assert_eq!(viewer.get(&format!("/pages/{id}/revisions")).await[0]["message"], "Created WEB-2, WEB-3 from tasks");
 
-    let description: String = app
-        .read(|connection| Ok(connection.query_row("SELECT description FROM issue WHERE key = 'WEB-3'", [], |row| row.get(0))?))
-        .unwrap();
-    assert_eq!(
-        description,
-        format!("Created from a task on the knowledge base page [Planowanie \\[sprint 2\\]](/wiki/DOCS/{id}).")
-    );
+    let description: String =
+        app.read(|connection| Ok(connection.query_row("SELECT description FROM issue WHERE key = 'WEB-3'", [], |row| row.get(0))?)).unwrap();
+    assert_eq!(description, format!("Created from a task on the knowledge base page [Planowanie \\[sprint 2\\]](/wiki/DOCS/{id})."));
 
     // A line that was converted cannot be converted again.
-    assert_eq!(
-        viewer
-            .refused(Method::POST, &path, Some(json!({ "projectKey": "WEB", "lines": [2] })))
-            .await
-            .0,
-        StatusCode::BAD_REQUEST
-    );
+    assert_eq!(viewer.refused(Method::POST, &path, Some(json!({ "projectKey": "WEB", "lines": [2] }))).await.0, StatusCode::BAD_REQUEST);
 
     // An issue type of the project can be asked for.
     let bug: Id = app
@@ -1022,12 +652,7 @@ async fn task_lines_become_issues() {
         })
         .unwrap();
     let other = id_of(&page(&admin, "DOCS", "Bugs", "- [ ] Koszyk gubi rabat", None).await);
-    let result = admin
-        .post(
-            &format!("/pages/{other}/issues"),
-            json!({ "projectKey": "WEB", "typeId": bug, "lines": [0] }),
-        )
-        .await;
+    let result = admin.post(&format!("/pages/{other}/issues"), json!({ "projectKey": "WEB", "typeId": bug, "lines": [0] })).await;
     assert_eq!(result["page"]["issues"][0]["issue"]["typeId"], bug);
     assert_eq!(result["page"]["body"], "- [ ] WEB-4 Koszyk gubi rabat");
 }
@@ -1043,15 +668,9 @@ async fn changes_are_announced_with_the_project_of_the_space() {
 
     let bound = id_of(&page(&admin, "WEB", "Bound", "", None).await);
     let free = id_of(&page(&admin, "FREE", "Free", "", None).await);
-    admin
-        .patch(&format!("/pages/{bound}"), json!({ "body": "edited", "baseVersion": 1 }))
-        .await;
-    admin
-        .patch(&format!("/pages/{bound}"), json!({ "body": "edited", "baseVersion": 2 }))
-        .await;
-    admin
-        .post(&format!("/pages/{bound}/move"), json!({ "parentId": null, "position": 0 }))
-        .await;
+    admin.patch(&format!("/pages/{bound}"), json!({ "body": "edited", "baseVersion": 1 })).await;
+    admin.patch(&format!("/pages/{bound}"), json!({ "body": "edited", "baseVersion": 2 })).await;
+    admin.post(&format!("/pages/{bound}/move"), json!({ "parentId": null, "position": 0 })).await;
     admin.delete(&format!("/pages/{free}")).await;
     admin.delete(&format!("/pages/{bound}")).await;
 
@@ -1072,10 +691,7 @@ async fn changes_are_announced_with_the_project_of_the_space() {
     assert_eq!(first.payload, json!({ "pageId": bound, "spaceKey": "WEB", "title": "Bound" }));
 
     let edited = stream.next_of_kind("page.updated");
-    assert_eq!(
-        edited,
-        json!({ "pageId": bound, "spaceKey": "WEB", "title": "Bound", "change": "edited" })
-    );
+    assert_eq!(edited, json!({ "pageId": bound, "spaceKey": "WEB", "title": "Bound", "change": "edited" }));
 }
 
 trait NextOfKind {
@@ -1106,64 +722,27 @@ async fn agents_work_through_the_tools_with_the_access_of_their_user() {
 
     let names: Vec<&str> = WikiModule.tools().iter().map(|tool| tool.name).collect();
     assert_eq!(names, ["search_pages", "get_page", "create_page", "update_page"]);
-    assert_eq!(
-        WikiModule.tools().iter().map(|tool| tool.read_only).collect::<Vec<_>>(),
-        [true, true, false, false]
-    );
+    assert_eq!(WikiModule.tools().iter().map(|tool| tool.read_only).collect::<Vec<_>>(), [true, true, false, false]);
     assert!(WikiModule.call_tool(&app, &admin.user, "create_issue", &json!({})).is_none());
 
-    let created = call(
-        &lead,
-        "create_page",
-        json!({ "spaceKey": "sec", "title": "Rotacja kluczy", "body": "Co kwartał." }),
-    )
-    .unwrap();
+    let created = call(&lead, "create_page", json!({ "spaceKey": "sec", "title": "Rotacja kluczy", "body": "Co kwartał." })).unwrap();
     let id = id_of(&created);
-    let child = call(
-        &lead,
-        "create_page",
-        json!({ "spaceKey": "SEC", "title": "Checklist", "body": "", "parentId": id }),
-    )
-    .unwrap();
+    let child = call(&lead, "create_page", json!({ "spaceKey": "SEC", "title": "Checklist", "body": "", "parentId": id })).unwrap();
     assert_eq!(child["parentId"], id);
 
     assert_eq!(call(&lead, "get_page", json!({ "id": id })).unwrap()["children"][0]["title"], "Checklist");
     assert_eq!(call(&lead, "search_pages", json!({ "query": "kwartal" })).unwrap()[0]["pageId"], id);
-    assert_eq!(
-        call(&lead, "search_pages", json!({ "query": "kwartal", "space": "NOPE" })).unwrap(),
-        json!([])
-    );
+    assert_eq!(call(&lead, "search_pages", json!({ "query": "kwartal", "space": "NOPE" })).unwrap(), json!([]));
 
     let updated = call(&lead, "update_page", json!({ "id": id, "body": "Co miesiąc.", "baseVersion": 1 })).unwrap();
     assert_eq!((updated["version"].as_i64(), updated["body"].as_str()), (Some(2), Some("Co miesiąc.")));
-    assert_eq!(
-        call(&lead, "update_page", json!({ "id": id, "body": "Stale.", "baseVersion": 1 }))
-            .unwrap_err()
-            .status,
-        StatusCode::CONFLICT
-    );
-    assert_eq!(
-        call(&lead, "update_page", json!({ "id": id })).unwrap_err().status,
-        StatusCode::BAD_REQUEST
-    );
+    assert_eq!(call(&lead, "update_page", json!({ "id": id, "body": "Stale.", "baseVersion": 1 })).unwrap_err().status, StatusCode::CONFLICT);
+    assert_eq!(call(&lead, "update_page", json!({ "id": id })).unwrap_err().status, StatusCode::BAD_REQUEST);
 
-    assert_eq!(
-        call(&outsider, "get_page", json!({ "id": id })).unwrap_err().status,
-        StatusCode::NOT_FOUND
-    );
+    assert_eq!(call(&outsider, "get_page", json!({ "id": id })).unwrap_err().status, StatusCode::NOT_FOUND);
     assert_eq!(call(&outsider, "search_pages", json!({ "query": "kwartal miesiac" })).unwrap(), json!([]));
-    assert_eq!(
-        call(&outsider, "create_page", json!({ "spaceKey": "SEC", "title": "x", "body": "" }))
-            .unwrap_err()
-            .status,
-        StatusCode::NOT_FOUND
-    );
-    assert_eq!(
-        call(&outsider, "update_page", json!({ "id": id, "body": "x", "baseVersion": 2 }))
-            .unwrap_err()
-            .status,
-        StatusCode::NOT_FOUND
-    );
+    assert_eq!(call(&outsider, "create_page", json!({ "spaceKey": "SEC", "title": "x", "body": "" })).unwrap_err().status, StatusCode::NOT_FOUND);
+    assert_eq!(call(&outsider, "update_page", json!({ "id": id, "body": "x", "baseVersion": 2 })).unwrap_err().status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1177,13 +756,7 @@ async fn the_demo_has_a_knowledge_base_tied_to_its_issues() {
         .as_array()
         .unwrap()
         .iter()
-        .map(|space| {
-            (
-                space["key"].as_str().unwrap(),
-                space["name"].as_str().unwrap(),
-                space["projectKey"].as_str(),
-            )
-        })
+        .map(|space| (space["key"].as_str().unwrap(), space["name"].as_str().unwrap(), space["projectKey"].as_str()))
         .collect();
     assert_eq!(summary, [("WEB", "Sklep — baza wiedzy", Some("WEB")), ("TEAM", "Zespół", None)]);
     assert_eq!((spaces[0]["pageCount"].as_i64(), spaces[1]["pageCount"].as_i64()), (Some(11), Some(2)));
@@ -1212,10 +785,7 @@ async fn the_demo_has_a_knowledge_base_tied_to_its_issues() {
     assert_eq!(titles(&blik["breadcrumbs"]), ["Płatności"]);
     assert_eq!(blik["issues"][0]["issue"]["key"], "WEB-10");
     assert_eq!(blik["issues"][0]["issue"]["summary"], "Płatność BLIK");
-    assert_eq!(
-        admin.get(&format!("/pages/{}/revisions", id_of(&blik))).await.as_array().unwrap().len(),
-        3
-    );
+    assert_eq!(admin.get(&format!("/pages/{}/revisions", id_of(&blik))).await.as_array().unwrap().len(), 3);
     assert!(blik["updatedAt"].as_str().unwrap() < hub_app::db::now_iso().as_str());
     assert!(titles(&blik["backlinks"]).contains(&"Płatności".to_string()));
 
@@ -1251,37 +821,14 @@ async fn the_demo_has_a_knowledge_base_tied_to_its_issues() {
         })
         .unwrap()
         .expect("a panel");
-    let mut on_card: Vec<&str> = panel["pages"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|page| page["title"].as_str().unwrap())
-        .collect();
+    let mut on_card: Vec<&str> = panel["pages"].as_array().unwrap().iter().map(|page| page["title"].as_str().unwrap()).collect();
     on_card.sort_unstable();
-    assert_eq!(
-        on_card,
-        [
-            "ADR-002: Jedna bramka dla kart i BLIK",
-            "Bramka kartowa: sandbox",
-            "Planowanie sprintu 2 — notatki",
-            "Płatności"
-        ]
-    );
+    assert_eq!(on_card, ["ADR-002: Jedna bramka dla kart i BLIK", "Bramka kartowa: sandbox", "Planowanie sprintu 2 — notatki", "Płatności"]);
 
     // The meeting notes have open tasks ready to become issues.
     let notes = admin.get(&format!("/pages/{}", id_named("Planowanie sprintu 2 — notatki"))).await;
-    let task = notes["body"]
-        .as_str()
-        .unwrap()
-        .split('\n')
-        .position(|line| line.starts_with("- [ ] "))
-        .expect("an open task");
-    let converted = admin
-        .post(
-            &format!("/pages/{}/issues", id_of(&notes)),
-            json!({ "projectKey": "WEB", "lines": [task] }),
-        )
-        .await;
+    let task = notes["body"].as_str().unwrap().split('\n').position(|line| line.starts_with("- [ ] ")).expect("an open task");
+    let converted = admin.post(&format!("/pages/{}/issues", id_of(&notes)), json!({ "projectKey": "WEB", "lines": [task] })).await;
     assert_eq!(converted["keys"], json!(["WEB-30"]));
 
     assert_eq!(titles(&admin.get("/search?q=sandbox%20karty").await)[0], "Bramka kartowa: sandbox");

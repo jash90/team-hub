@@ -1,6 +1,8 @@
 use hub_core::keys::is_project_key;
 use hub_core::workflow::{DEFAULT_TYPES, KANBAN_STATUSES, SCRUM_STATUSES};
-use hub_core::{BoardMode, Component, Id, IssueType, Project, ProjectMember, ProjectRole, ProjectSummary, Status, StatusCategory, Transition, TypeLevel};
+use hub_core::{
+    BoardMode, Component, Id, IssueType, Project, ProjectMember, ProjectRole, ProjectSummary, Status, StatusCategory, Transition, TypeLevel,
+};
 use rusqlite::Connection;
 use serde::Deserialize;
 use serde_json::json;
@@ -292,8 +294,12 @@ pub struct StatusInput {
 }
 
 fn reposition(connection: &Connection, table: &str, project_id: Id, id: Id, position: i64) -> ApiResult<()> {
-    let mut ids: Vec<Id> =
-        query_all(connection, &format!("SELECT id FROM {table} WHERE project_id = ?1 AND id != ?2 ORDER BY position, id"), (project_id, id), |row| row.get(0))?;
+    let mut ids: Vec<Id> = query_all(
+        connection,
+        &format!("SELECT id FROM {table} WHERE project_id = ?1 AND id != ?2 ORDER BY position, id"),
+        (project_id, id),
+        |row| row.get(0),
+    )?;
     let index = (position.max(0) as usize).min(ids.len());
     ids.insert(index, id);
 
@@ -372,7 +378,8 @@ pub fn delete_status(tx: &Tx, access: &ProjectAccess, id: Id, move_to: Option<Id
     let in_use: i64 = tx.query_row("SELECT count(*) FROM issue WHERE status_id = ?1", [id], |row| row.get(0))?;
 
     if in_use > 0 {
-        let target = move_to.filter(|target| *target != id).ok_or_else(|| ApiError::conflict("Choose a status for the issues that are in this one"))?;
+        let target =
+            move_to.filter(|target| *target != id).ok_or_else(|| ApiError::conflict("Choose a status for the issues that are in this one"))?;
         owned_by(tx, "status", target, access.id, "Status")?;
         let done: bool = tx.query_row("SELECT category = 'done' FROM status WHERE id = ?1", [target], |row| row.get(0))?;
 

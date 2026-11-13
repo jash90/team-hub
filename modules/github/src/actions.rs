@@ -55,12 +55,10 @@ fn standing(connection: &Connection, issue_id: Id) -> ApiResult<Option<Standing>
 fn apply_rule(app: &App, issue_id: Id, trigger: GithubTrigger, closes: bool) -> ApiResult<Option<String>> {
     app.write(Actor::system("GitHub"), |tx| {
         let Some(issue) = standing(tx, issue_id)? else { return Ok(None) };
-        let ruled: Option<Id> = query_one(
-            tx,
-            "SELECT status_id FROM gh_rule WHERE project_id = ?1 AND trigger = ?2",
-            (issue.project_id, trigger.as_str()),
-            |row| row.get(0),
-        )?;
+        let ruled: Option<Id> =
+            query_one(tx, "SELECT status_id FROM gh_rule WHERE project_id = ?1 AND trigger = ?2", (issue.project_id, trigger.as_str()), |row| {
+                row.get(0)
+            })?;
         let target = match ruled {
             Some(status_id) => Some(status_id),
             None if trigger == GithubTrigger::PrMerged && closes => query_one(

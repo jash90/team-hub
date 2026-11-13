@@ -140,10 +140,8 @@ impl Client {
     }
 
     pub async fn search_keys(&mut self, query: &str) -> Vec<String> {
-        let encoded: String = query
-            .bytes()
-            .map(|byte| if byte.is_ascii_alphanumeric() { (byte as char).to_string() } else { format!("%{byte:02X}") })
-            .collect();
+        let encoded: String =
+            query.bytes().map(|byte| if byte.is_ascii_alphanumeric() { (byte as char).to_string() } else { format!("%{byte:02X}") }).collect();
         let result = self.get(&format!("/api/search?q={encoded}&limit=200")).await;
         assert!(result["error"].is_null(), "query \"{query}\" failed: {}", result["error"]);
 

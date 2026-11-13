@@ -19,7 +19,7 @@ import type { ReviewState } from '@/bindings/ReviewState.ts';
 import { Icon, type IconName } from '@/components/icon.tsx';
 import { IssueKey, IssueLine, canEdit } from '@/components/issue-bits.tsx';
 import { Button, Dialog, Empty, ErrorNote, Field, Picker, Spinner, Tabs, Tag, attempt, copyText, toast, useBusy } from '@/components/ui.tsx';
-import { formatDateTime, t, timeAgo } from '@/i18n/index.ts';
+import { countOf, formatDateTime, t, timeAgo } from '@/i18n/index.ts';
 import type { WebModule } from '@/modules.ts';
 import { useProject, useRemote, useSession, useStored } from '@/session.tsx';
 import { SettingsCard } from '@/views/settings.tsx';
@@ -193,7 +193,7 @@ function IssuePanel({ issue, reload }: { issue: Issue; reload: () => void }) {
       {panel.commits.length > 0 && (
         <details className="commits">
           <summary>
-            {panel.commits.length} {t('commits')}
+            {countOf(panel.commits.length, 'commit', 'commits')}
           </summary>
           {panel.commits.map((commit) => (
             <div key={commit.id} className="pr-row">

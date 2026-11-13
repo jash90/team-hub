@@ -59,15 +59,9 @@ pub fn upsert_space(tx: &Tx, space: &ImportedSpace) -> ApiResult<SpaceRecord> {
         )));
     }
 
-    tx.execute(
-        "UPDATE wiki_space SET source_ref = ?1 WHERE id = ?2",
-        (space.source_ref.to_string(), existing.id),
-    )?;
+    tx.execute("UPDATE wiki_space SET source_ref = ?1 WHERE id = ?2", (space.source_ref.to_string(), existing.id))?;
 
-    Ok(SpaceRecord {
-        source_ref: Some(space.source_ref.clone()),
-        ..existing
-    })
+    Ok(SpaceRecord { source_ref: Some(space.source_ref.clone()), ..existing })
 }
 
 /// What is already here from the source: the stored version of each mirrored page, by its
@@ -85,12 +79,9 @@ pub fn imported_versions(connection: &Connection, space_id: Id) -> ApiResult<Has
 
 /// Source ids of pages that were detached and now live their own life, with the page each became.
 pub fn detached_sources(connection: &Connection, space_id: Id) -> ApiResult<HashMap<String, Id>> {
-    let rows = query_all(
-        connection,
-        "SELECT source_id, page_id FROM wiki_detached WHERE space_id = ?1",
-        [space_id],
-        |row| Ok((row.get::<_, String>(0)?, row.get::<_, Id>(1)?)),
-    )?;
+    let rows = query_all(connection, "SELECT source_id, page_id FROM wiki_detached WHERE space_id = ?1", [space_id], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, Id>(1)?))
+    })?;
 
     Ok(rows.into_iter().collect())
 }
@@ -143,12 +134,10 @@ fn imported_title(title: &str) -> String {
 /// happened. The revision is signed with the transaction's actor (`Actor::system("Confluence")`).
 /// The returned id is the local page, so the importer can hang children under it.
 pub fn upsert_imported_page(tx: &Tx, space: &SpaceRecord, page: &ImportedPage) -> ApiResult<(Id, ImportOutcome)> {
-    let detached: Option<Id> = hub_app::db::query_one(
-        tx,
-        "SELECT page_id FROM wiki_detached WHERE space_id = ?1 AND source_id = ?2",
-        (space.id, page.source_id),
-        |row| row.get(0),
-    )?;
+    let detached: Option<Id> =
+        hub_app::db::query_one(tx, "SELECT page_id FROM wiki_detached WHERE space_id = ?1 AND source_id = ?2", (space.id, page.source_id), |row| {
+            row.get(0)
+        })?;
 
     if let Some(page_id) = detached {
         return Ok((page_id, ImportOutcome::Detached));
@@ -161,17 +150,10 @@ pub fn upsert_imported_page(tx: &Tx, space: &SpaceRecord, page: &ImportedPage) -
         |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
     let title = imported_title(page.title);
-    let source = Source {
-        id: page.source_id,
-        version: page.source_version,
-        url: page.source_url,
-    };
+    let source = Source { id: page.source_id, version: page.source_version, url: page.source_url };
 
     let Some((id, stored_version)) = existing else {
-        return Ok((
-            pages::insert_page(tx, space.id, page.parent_id, &title, page.body, Some(&source))?,
-            ImportOutcome::Created,
-        ));
+        return Ok((pages::insert_page(tx, space.id, page.parent_id, &title, page.body, Some(&source))?, ImportOutcome::Created));
     };
 
     if stored_version == Some(page.source_version) {
@@ -182,17 +164,8 @@ pub fn upsert_imported_page(tx: &Tx, space: &SpaceRecord, page: &ImportedPage) -
 
     let current = pages::load_page(tx, id)?;
 
-    pages::write_version(
-        tx,
-        &current,
-        &title,
-        page.body,
-        &format!("Version {} from {}", page.source_version, space.source),
-    )?;
-    tx.execute(
-        "UPDATE wiki_page SET source_version = ?1, source_url = ?2 WHERE id = ?3",
-        (page.source_version, page.source_url, id),
-    )?;
+    pages::write_version(tx, &current, &title, page.body, &format!("Version {} from {}", page.source_version, space.source))?;
+    tx.execute("UPDATE wiki_page SET source_version = ?1, source_url = ?2 WHERE id = ?3", (page.source_version, page.source_url, id))?;
     pages::place(tx, space.id, id, page.parent_id)?;
 
     Ok((id, ImportOutcome::Updated))
@@ -204,9 +177,8 @@ pub fn refresh_links(tx: &Tx, page_ids: &[Id]) -> ApiResult<()> {
     let mut resolver = Resolver::new(tx)?;
 
     for page_id in page_ids {
-        let (space_id, body): (Id, String) = tx.query_row("SELECT space_id, body FROM wiki_page WHERE id = ?1", [page_id], |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?;
+        let (space_id, body): (Id, String) =
+            tx.query_row("SELECT space_id, body FROM wiki_page WHERE id = ?1", [page_id], |row| Ok((row.get(0)?, row.get(1)?)))?;
 
         links::sync_page(tx, &mut resolver, *page_id, space_id, &body)?;
     }

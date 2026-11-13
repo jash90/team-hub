@@ -54,6 +54,13 @@ fn is_loopback(base_url: &str) -> bool {
     matches!(host_of(authority), "127.0.0.1" | "localhost")
 }
 
+/// Scheme, host and port: what decides which server a token is sent to.
+pub fn origin(base_url: &str) -> String {
+    let (scheme, rest) = base_url.split_once("://").unwrap_or(("", base_url));
+
+    format!("{}://{}", scheme.to_lowercase(), rest.split('/').next().unwrap_or("").to_lowercase())
+}
+
 /// The address without a trailing slash. Only `https://` is accepted, so the token never
 /// crosses the network in the clear; plain `http://` is for this machine only.
 pub fn clean_base_url(text: &str) -> ApiResult<String> {
@@ -67,9 +74,7 @@ pub fn clean_base_url(text: &str) -> ApiResult<String> {
         || url.contains(|character: char| character.is_whitespace() || matches!(character, '?' | '#'));
 
     if malformed {
-        return Err(ApiError::bad_request(
-            "That does not look like a Confluence address, e.g. https://example.atlassian.net/wiki",
-        ));
+        return Err(ApiError::bad_request("That does not look like a Confluence address, e.g. https://example.atlassian.net/wiki"));
     }
 
     match scheme.to_lowercase().as_str() {
@@ -84,10 +89,7 @@ pub fn authorization(email: &str, token: &str) -> String {
     if email.trim().is_empty() {
         format!("Bearer {token}")
     } else {
-        format!(
-            "Basic {}",
-            base64::engine::general_purpose::STANDARD.encode(format!("{}:{token}", email.trim()))
-        )
+        format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(format!("{}:{token}", email.trim())))
     }
 }
 
@@ -139,6 +141,7 @@ impl Client {
         let base = clean_base_url(&settings.base_url)?;
         let mut config = ureq::Agent::config_builder()
             .http_status_as_error(false)
+            .https_only(base.starts_with("https://"))
             .timeout_global(Some(TIMEOUT))
             .user_agent("team-hub");
 
@@ -146,11 +149,7 @@ impl Client {
             config = config.proxy(None);
         }
 
-        Ok(Self {
-            agent: config.build().new_agent(),
-            authorization: authorization(&settings.email, token),
-            base,
-        })
+        Ok(Self { agent: config.build().new_agent(), authorization: authorization(&settings.email, token), base })
     }
 
     pub fn base(&self) -> &str {
@@ -168,19 +167,13 @@ impl Client {
                 pause = BACKOFF * 2u32.pow(attempt);
             }
 
-            let mut request = self
-                .agent
-                .get(url)
-                .header("Authorization", &self.authorization)
-                .header("Accept", "application/json");
+            let mut request = self.agent.get(url).header("Authorization", &self.authorization).header("Accept", "application/json");
 
             for (name, value) in query {
                 request = request.query(*name, value);
             }
 
-            let mut response = request
-                .call()
-                .map_err(|error| ApiError::upstream(format!("Could not reach Confluence: {error}")))?;
+            let mut response = request.call().map_err(|error| ApiError::upstream(format!("Could not reach Confluence: {error}")))?;
             let status = response.status().as_u16();
 
             match status {
@@ -193,16 +186,8 @@ impl Client {
                         .map_err(|error| ApiError::upstream(format!("Confluence sent an answer that is not JSON ({error}); check the address")));
                 }
                 401 => return Err(ApiError::upstream(REJECTED)),
-                403 => {
-                    return Err(ApiError::upstream(
-                        "Confluence refused access; the token's account may not be allowed to see this",
-                    ))
-                }
-                404 => {
-                    return Err(ApiError::upstream(
-                        "Confluence has nothing at that address; check the address and the space key",
-                    ))
-                }
+                403 => return Err(ApiError::upstream("Confluence refused access; the token's account may not be allowed to see this")),
+                404 => return Err(ApiError::upstream("Confluence has nothing at that address; check the address and the space key")),
                 429 | 500..=599 => {
                     last_status = status;
 
@@ -220,20 +205,14 @@ impl Client {
             }
         }
 
-        Err(ApiError::upstream(format!(
-            "Confluence kept answering with status {last_status}; try again later"
-        )))
+        Err(ApiError::upstream(format!("Confluence kept answering with status {last_status}; try again later")))
     }
 
     /// The address of the next page of results, when the answer names one on this server.
     fn next_url(&self, links: &Value) -> Option<String> {
         let next = links["next"].as_str()?;
         let context = links["context"].as_str().unwrap_or("");
-        let relative = if !context.is_empty() && self.base.ends_with(context) && next.starts_with(context) {
-            &next[context.len()..]
-        } else {
-            next
-        };
+        let relative = if !context.is_empty() && self.base.ends_with(context) && next.starts_with(context) { &next[context.len()..] } else { next };
 
         relative.starts_with('/').then(|| format!("{}{relative}", self.base))
     }
@@ -277,8 +256,7 @@ impl Client {
 
     /// The cheapest call that proves the address and the token work.
     pub fn check(&self) -> ApiResult<()> {
-        self.get(&format!("{}/rest/api/space", self.base), &[("limit", "1".to_string())])
-            .map(|_| ())
+        self.get(&format!("{}/rest/api/space", self.base), &[("limit", "1".to_string())]).map(|_| ())
     }
 
     pub fn spaces(&self) -> ApiResult<Vec<RemoteSpace>> {
@@ -286,10 +264,7 @@ impl Client {
 
         self.paged("/rest/api/space", &[], |space| {
             if let Some(key) = space["key"].as_str() {
-                spaces.push(RemoteSpace {
-                    key: key.to_string(),
-                    name: space["name"].as_str().unwrap_or(key).to_string(),
-                });
+                spaces.push(RemoteSpace { key: key.to_string(), name: space["name"].as_str().unwrap_or(key).to_string() });
             }
         })?;
 
@@ -297,10 +272,7 @@ impl Client {
     }
 
     pub fn space_name(&self, key: &str) -> ApiResult<Option<String>> {
-        let spaces = self.get(
-            &format!("{}/rest/api/space", self.base),
-            &[("spaceKey", key.to_string()), ("limit", "1".to_string())],
-        )?;
+        let spaces = self.get(&format!("{}/rest/api/space", self.base), &[("spaceKey", key.to_string()), ("limit", "1".to_string())])?;
 
         Ok(spaces["results"][0]["name"].as_str().map(String::from))
     }
@@ -308,11 +280,7 @@ impl Client {
     /// Every page of a space, with body, version and ancestors.
     pub fn pages(&self, space_key: &str) -> ApiResult<Vec<RemotePage>> {
         let mut pages = Vec::new();
-        let query = [
-            ("spaceKey", space_key.to_string()),
-            ("type", "page".to_string()),
-            ("expand", "body.storage,version,ancestors".to_string()),
-        ];
+        let query = [("spaceKey", space_key.to_string()), ("type", "page".to_string()), ("expand", "body.storage,version,ancestors".to_string())];
 
         self.paged("/rest/api/content", &query, |page| {
             let Some(id) = text_of(&page["id"]) else { return };
@@ -322,10 +290,7 @@ impl Client {
                 .unwrap_or_default()
                 .iter()
                 .filter_map(|ancestor| {
-                    Some(RemoteAncestor {
-                        id: text_of(&ancestor["id"])?,
-                        title: ancestor["title"].as_str().unwrap_or("").to_string(),
-                    })
+                    Some(RemoteAncestor { id: text_of(&ancestor["id"])?, title: ancestor["title"].as_str().unwrap_or("").to_string() })
                 })
                 .collect();
             let url = match page["_links"]["webui"].as_str() {
@@ -353,18 +318,9 @@ mod tests {
 
     #[test]
     fn only_https_addresses_are_accepted_except_on_this_machine() {
-        assert_eq!(
-            clean_base_url(" https://example.atlassian.net/wiki/ ").unwrap(),
-            "https://example.atlassian.net/wiki"
-        );
-        assert_eq!(
-            clean_base_url("https://confluence.example.com:8443").unwrap(),
-            "https://confluence.example.com:8443"
-        );
-        assert_eq!(
-            clean_base_url("http://127.0.0.1:8090/confluence").unwrap(),
-            "http://127.0.0.1:8090/confluence"
-        );
+        assert_eq!(clean_base_url(" https://example.atlassian.net/wiki/ ").unwrap(), "https://example.atlassian.net/wiki");
+        assert_eq!(clean_base_url("https://confluence.example.com:8443").unwrap(), "https://confluence.example.com:8443");
+        assert_eq!(clean_base_url("http://127.0.0.1:8090/confluence").unwrap(), "http://127.0.0.1:8090/confluence");
         assert_eq!(clean_base_url("http://localhost").unwrap(), "http://localhost");
 
         for refused in [
@@ -385,11 +341,16 @@ mod tests {
     }
 
     #[test]
+    fn the_origin_is_what_a_token_is_bound_to() {
+        assert_eq!(origin("https://Example.atlassian.net/wiki"), "https://example.atlassian.net");
+        assert_eq!(origin("https://example.atlassian.net"), origin("https://example.atlassian.net/wiki/x"));
+        assert_ne!(origin("https://example.atlassian.net"), origin("https://example.atlassian.net:8443"));
+        assert_ne!(origin("http://localhost:8090"), origin("https://localhost:8090"));
+    }
+
+    #[test]
     fn the_authorization_header_depends_on_the_e_mail() {
         assert_eq!(authorization("", "pat-123"), "Bearer pat-123");
-        assert_eq!(
-            authorization(" anna@example.com ", "api-token"),
-            "Basic YW5uYUBleGFtcGxlLmNvbTphcGktdG9rZW4="
-        );
+        assert_eq!(authorization(" anna@example.com ", "api-token"), "Basic YW5uYUBleGFtcGxlLmNvbTphcGktdG9rZW4=");
     }
 }

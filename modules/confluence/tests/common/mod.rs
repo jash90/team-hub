@@ -22,11 +22,7 @@ use tower::ServiceExt;
 static NEXT: AtomicU32 = AtomicU32::new(0);
 
 pub fn test_app() -> App {
-    let directory = std::env::temp_dir().join(format!(
-        "team-hub-confluence-test-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
+    let directory = std::env::temp_dir().join(format!("team-hub-confluence-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
     let _ = std::fs::remove_dir_all(&directory);
     let modules: Vec<Arc<dyn Module>> = vec![Arc::new(WikiModule), Arc::new(ConfluenceModule)];
 
@@ -50,27 +46,11 @@ pub struct Client {
 
 pub fn person(app: &App, name: &str, role: Role) -> Client {
     let email = format!("{}@example.com", name.to_lowercase().replace(' ', "."));
-    let new = NewUser {
-        name: name.to_string(),
-        email: email.clone(),
-        password: None,
-        role: Some(role),
-        github_login: None,
-    };
+    let new = NewUser { name: name.to_string(), email: email.clone(), password: None, role: Some(role), github_login: None };
     let user = app.db.write(|tx| create_user(tx, &new)).expect("a user");
     let token = app.db.write(|tx| create_token(tx, user.id, "tests")).expect("a token");
 
-    Client {
-        router: router(app),
-        bearer: Some(token),
-        user: AuthUser {
-            id: user.id,
-            name: user.name,
-            email,
-            role,
-            via_token: true,
-        },
-    }
+    Client { router: router(app), bearer: Some(token), user: AuthUser { id: user.id, name: user.name, email, role, via_token: true } }
 }
 
 impl Client {
@@ -82,9 +62,7 @@ impl Client {
         }
 
         let request = match body {
-            Some(body) => request
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body.to_string())),
+            Some(body) => request.header(header::CONTENT_TYPE, "application/json").body(Body::from(body.to_string())),
             None => request.body(Body::empty()),
         }
         .expect("a valid request");
@@ -163,18 +141,10 @@ pub struct Fake {
 
 impl Fake {
     pub async fn start(accepts: &str) -> Self {
-        let state = Arc::new(Mutex::new(Upstream {
-            accepts: accepts.to_string(),
-            page_size: 2,
-            next_links: true,
-            ..Default::default()
-        }));
+        let state = Arc::new(Mutex::new(Upstream { accepts: accepts.to_string(), page_size: 2, next_links: true, ..Default::default() }));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("a free port");
         let base_url = format!("http://{}/wiki", listener.local_addr().expect("an address"));
-        let routes = Router::new()
-            .route("/wiki/rest/api/space", get(spaces))
-            .route("/wiki/rest/api/content", get(content))
-            .with_state(state.clone());
+        let routes = Router::new().route("/wiki/rest/api/space", get(spaces)).route("/wiki/rest/api/content", get(content)).with_state(state.clone());
 
         tokio::spawn(async move {
             axum::serve(listener, routes).await.expect("the fake Confluence serves");
@@ -220,17 +190,8 @@ fn number(query: &HashMap<String, String>, name: &str, default: usize) -> usize 
 
 /// Records the request; returns the refusal when it is not to be answered properly.
 fn admit(upstream: &mut Upstream, path: &str, query: &HashMap<String, String>, headers: &HeaderMap) -> Option<Response> {
-    let authorization = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    upstream.requests.push((
-        path.to_string(),
-        number(query, "start", 0),
-        number(query, "limit", 25),
-        authorization.clone(),
-    ));
+    let authorization = headers.get(header::AUTHORIZATION).and_then(|value| value.to_str().ok()).unwrap_or("").to_string();
+    upstream.requests.push((path.to_string(), number(query, "start", 0), number(query, "limit", 25), authorization.clone()));
 
     if !upstream.failures.is_empty() {
         let status = StatusCode::from_u16(upstream.failures.remove(0)).expect("a status");
@@ -239,13 +200,7 @@ fn admit(upstream: &mut Upstream, path: &str, query: &HashMap<String, String>, h
     }
 
     if authorization != upstream.accepts {
-        return Some(
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({ "message": "Basic authentication with passwords is deprecated" })),
-            )
-                .into_response(),
-        );
+        return Some((StatusCode::UNAUTHORIZED, Json(json!({ "message": "Basic authentication with passwords is deprecated" }))).into_response());
     }
 
     None
@@ -258,11 +213,8 @@ fn paged(upstream: &Upstream, path: &str, query: &HashMap<String, String>, all: 
     let mut links = json!({ "context": "/wiki", "self": format!("{path}?start={start}") });
 
     if upstream.next_links && start + results.len() < all.len() {
-        let mut next: Vec<String> = query
-            .iter()
-            .filter(|(name, _)| *name != "start" && *name != "limit")
-            .map(|(name, value)| format!("{name}={value}"))
-            .collect();
+        let mut next: Vec<String> =
+            query.iter().filter(|(name, _)| *name != "start" && *name != "limit").map(|(name, value)| format!("{name}={value}")).collect();
         next.sort();
         next.push(format!("limit={limit}"));
         next.push(format!("start={}", start + results.len()));

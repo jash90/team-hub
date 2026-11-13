@@ -72,13 +72,16 @@ pub fn load_page(connection: &Connection, id: Id) -> ApiResult<WikiPage> {
 pub fn page_access(connection: &Connection, user: &AuthUser, id: Id) -> ApiResult<(WikiPage, SpaceAccess)> {
     let page = load_page(connection, id)?;
     let space = space_by_id(connection, page.space_id)?.ok_or_else(|| ApiError::not_found("Page"))?;
-    let access = access_to(connection, user, space).map_err(|error| {
-        if error.status == StatusCode::NOT_FOUND {
-            ApiError::not_found("Page")
-        } else {
-            error
-        }
-    })?;
+    let access =
+        access_to(connection, user, space).map_err(
+            |error| {
+                if error.status == StatusCode::NOT_FOUND {
+                    ApiError::not_found("Page")
+                } else {
+                    error
+                }
+            },
+        )?;
 
     Ok((page, access))
 }
@@ -106,10 +109,7 @@ fn check_body(body: &str) -> ApiResult<()> {
 }
 
 fn parent_of(connection: &Connection, id: Id) -> ApiResult<Option<Id>> {
-    Ok(query_one(connection, "SELECT parent_id FROM wiki_page WHERE id = ?1", [id], |row| {
-        row.get::<_, Option<Id>>(0)
-    })?
-    .flatten())
+    Ok(query_one(connection, "SELECT parent_id FROM wiki_page WHERE id = ?1", [id], |row| row.get::<_, Option<Id>>(0))?.flatten())
 }
 
 fn require_in_space(connection: &Connection, page_id: Id, space_id: Id) -> ApiResult<()> {
@@ -132,10 +132,7 @@ fn next_position(connection: &Connection, space_id: Id, parent_id: Option<Id>) -
 
 pub fn index_page(connection: &Connection, id: Id, title: &str, body: &str) -> ApiResult<()> {
     connection.execute("DELETE FROM wiki_fts WHERE rowid = ?1", [id])?;
-    connection.execute(
-        "INSERT INTO wiki_fts (rowid, title, body) VALUES (?1, ?2, ?3)",
-        (id, fold(title), fold(body)),
-    )?;
+    connection.execute("INSERT INTO wiki_fts (rowid, title, body) VALUES (?1, ?2, ?3)", (id, fold(title), fold(body)))?;
 
     Ok(())
 }
@@ -252,10 +249,7 @@ fn require_current(page: &WikiPage, base_version: i64) -> ApiResult<()> {
     if base_version == page.version {
         Ok(())
     } else {
-        Err(ApiError::conflict(format!(
-            "Someone else saved version {} of this page; reload it to see their changes",
-            page.version
-        )))
+        Err(ApiError::conflict(format!("Someone else saved version {} of this page; reload it to see their changes", page.version)))
     }
 }
 
@@ -290,23 +284,13 @@ pub fn restore_page(tx: &Tx, space: &SpaceRecord, page: &WikiPage, version: i64)
         return Ok(());
     }
 
-    save(
-        tx,
-        space,
-        page,
-        &revision.info.title,
-        &revision.body,
-        &format!("Restored version {version}"),
-        "restored",
-    )
+    save(tx, space, page, &revision.info.title, &revision.body, &format!("Restored version {version}"), "restored")
 }
 
 /// Moves a page under `parent_id` (or to the top level), to index `position` among its new siblings.
 pub fn move_page(tx: &Tx, space: &SpaceRecord, page: &WikiPage, parent_id: Option<Id>, position: i64) -> ApiResult<()> {
     if page.locked {
-        return Err(ApiError::conflict(
-            "This page mirrors Confluence, which decides where it sits; detach it to move it",
-        ));
+        return Err(ApiError::conflict("This page mirrors Confluence, which decides where it sits; detach it to move it"));
     }
 
     if let Some(parent_id) = parent_id {
@@ -371,12 +355,8 @@ pub fn place(tx: &Tx, space_id: Id, page_id: Id, parent_id: Option<Id>) -> ApiRe
 }
 
 fn descendants(connection: &Connection, page: &WikiPage) -> ApiResult<Vec<Id>> {
-    let rows: Vec<(Id, Option<Id>)> = query_all(
-        connection,
-        "SELECT id, parent_id FROM wiki_page WHERE space_id = ?1",
-        [page.space_id],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    )?;
+    let rows: Vec<(Id, Option<Id>)> =
+        query_all(connection, "SELECT id, parent_id FROM wiki_page WHERE space_id = ?1", [page.space_id], |row| Ok((row.get(0)?, row.get(1)?)))?;
     let mut children: HashMap<Id, Vec<Id>> = HashMap::new();
 
     for (id, parent_id) in rows {
@@ -417,12 +397,7 @@ pub fn delete_page(tx: &Tx, space: &SpaceRecord, page: &WikiPage, recursive: boo
         tx.execute("DELETE FROM wiki_page WHERE id = ?1", [id])?;
     }
 
-    tx.emit(
-        "page.deleted",
-        space.project_id,
-        None,
-        json!({ "pageId": page.id, "spaceKey": space.key, "title": page.title, "pages": doomed.len() }),
-    )?;
+    tx.emit("page.deleted", space.project_id, None, json!({ "pageId": page.id, "spaceKey": space.key, "title": page.title, "pages": doomed.len() }))?;
 
     Ok(doomed.len())
 }
@@ -431,16 +406,10 @@ pub fn delete_page(tx: &Tx, space: &SpaceRecord, page: &WikiPage, recursive: boo
 /// is remembered so that the next import leaves it alone.
 pub fn detach_page(tx: &Tx, space: &SpaceRecord, page: &WikiPage) -> ApiResult<()> {
     if let Some(source_id) = &page.source_id {
-        tx.execute(
-            "INSERT OR REPLACE INTO wiki_detached (space_id, source_id, page_id) VALUES (?1, ?2, ?3)",
-            (page.space_id, source_id, page.id),
-        )?;
+        tx.execute("INSERT OR REPLACE INTO wiki_detached (space_id, source_id, page_id) VALUES (?1, ?2, ?3)", (page.space_id, source_id, page.id))?;
     }
 
-    tx.execute(
-        "UPDATE wiki_page SET locked = 0, source_id = NULL, source_version = NULL, source_url = NULL WHERE id = ?1",
-        [page.id],
-    )?;
+    tx.execute("UPDATE wiki_page SET locked = 0, source_id = NULL, source_version = NULL, source_url = NULL WHERE id = ?1", [page.id])?;
 
     announce(tx, "page.updated", space, page.id, &page.title, Some("detached"))
 }
@@ -466,9 +435,7 @@ pub fn tasks_to_issues(
         return Err(ApiError::bad_request("Choose at least one task"));
     }
 
-    let projects: HashSet<String> = query_all(tx, "SELECT key FROM project", [], |row| row.get::<_, String>(0))?
-        .into_iter()
-        .collect();
+    let projects: HashSet<String> = query_all(tx, "SELECT key FROM project", [], |row| row.get::<_, String>(0))?.into_iter().collect();
     let mut body_lines: Vec<String> = page.body.split('\n').map(String::from).collect();
     let mut keys = Vec::new();
     let origin = format!(
@@ -480,13 +447,9 @@ pub fn tasks_to_issues(
 
     for index in wanted {
         let number = index + 1;
-        let line = body_lines
-            .get(index)
-            .cloned()
-            .ok_or_else(|| ApiError::bad_request(format!("The page has no line {number}")))?;
-        let task = parse_task_line(&line)
-            .filter(|task| !task.done)
-            .ok_or_else(|| ApiError::bad_request(format!("Line {number} is not an open task")))?;
+        let line = body_lines.get(index).cloned().ok_or_else(|| ApiError::bad_request(format!("The page has no line {number}")))?;
+        let task =
+            parse_task_line(&line).filter(|task| !task.done).ok_or_else(|| ApiError::bad_request(format!("Line {number} is not an open task")))?;
         let first_word = task.text.split_whitespace().next().unwrap_or("");
 
         if let Some(existing) = extract_issue_keys(first_word, &projects, KeyCase::Exact).first() {
@@ -495,12 +458,7 @@ pub fn tasks_to_issues(
 
         let new = NewIssue {
             project_key: project_key.to_string(),
-            fields: IssuePatch {
-                summary: Some(truncate(task.text, MAX_SUMMARY)),
-                description: Some(origin.clone()),
-                type_id,
-                ..Default::default()
-            },
+            fields: IssuePatch { summary: Some(truncate(task.text, MAX_SUMMARY)), description: Some(origin.clone()), type_id, ..Default::default() },
         };
         let issue_id = create_issue(tx, &new)?;
         let key: String = tx.query_row("SELECT key FROM issue WHERE id = ?1", [issue_id], |row| row.get(0))?;
@@ -509,15 +467,7 @@ pub fn tasks_to_issues(
         keys.push(key);
     }
 
-    save(
-        tx,
-        space,
-        page,
-        &page.title,
-        &body_lines.join("\n"),
-        &format!("Created {} from tasks", keys.join(", ")),
-        "edited",
-    )?;
+    save(tx, space, page, &page.title, &body_lines.join("\n"), &format!("Created {} from tasks", keys.join(", ")), "edited")?;
 
     Ok(keys)
 }
@@ -534,10 +484,7 @@ pub fn tree(connection: &Connection, space_id: Id) -> ApiResult<Vec<WikiTreeNode
     let mut children: HashMap<Option<Id>, Vec<usize>> = HashMap::new();
 
     for (index, node) in nodes.iter().enumerate() {
-        children
-            .entry(node.parent_id.filter(|parent| ids.contains(parent)))
-            .or_default()
-            .push(index);
+        children.entry(node.parent_id.filter(|parent| ids.contains(parent))).or_default().push(index);
     }
 
     let mut ordered = Vec::with_capacity(nodes.len());
@@ -603,18 +550,13 @@ fn linked_issues(app: &App, connection: &Connection, user: &AuthUser, page_id: I
     let mut visible: HashMap<Id, bool> = HashMap::new();
 
     for row in &rows {
-        visible
-            .entry(row.project_id)
-            .or_insert_with(|| project_access_by_id(connection, user, row.project_id).is_ok());
+        visible.entry(row.project_id).or_insert_with(|| project_access_by_id(connection, user, row.project_id).is_ok());
     }
 
     rows.retain(|row| visible.get(&row.project_id).copied().unwrap_or(false));
     rows.sort_by(|left, right| (&left.project_key, left.number).cmp(&(&right.project_key, right.number)));
 
-    Ok(rows
-        .into_iter()
-        .filter_map(|issue| relations.get(&issue.id).cloned().map(|relation| WikiPageIssue { relation, issue }))
-        .collect())
+    Ok(rows.into_iter().filter_map(|issue| relations.get(&issue.id).cloned().map(|relation| WikiPageIssue { relation, issue })).collect())
 }
 
 fn backlinks(connection: &Connection, user: &AuthUser, page_id: Id) -> ApiResult<Vec<WikiBacklink>> {
@@ -631,13 +573,7 @@ fn backlinks(connection: &Connection, user: &AuthUser, page_id: Id) -> ApiResult
              ORDER BY p.title COLLATE NOCASE, p.id"
         ),
         rusqlite::params_from_iter(params),
-        |row| {
-            Ok(WikiBacklink {
-                page_id: row.get(0)?,
-                space_key: row.get(1)?,
-                title: row.get(2)?,
-            })
-        },
+        |row| Ok(WikiBacklink { page_id: row.get(0)?, space_key: row.get(1)?, title: row.get(2)? }),
     )
 }
 
@@ -686,12 +622,7 @@ pub fn load_revision(connection: &Connection, page_id: Id, version: i64) -> ApiR
         connection,
         "SELECT version, title, author_id, author_label, message, created_at, body FROM wiki_revision WHERE page_id = ?1 AND version = ?2",
         (page_id, version),
-        |row| {
-            Ok(WikiRevision {
-                info: map_revision_info(row)?,
-                body: row.get(6)?,
-            })
-        },
+        |row| Ok(WikiRevision { info: map_revision_info(row)?, body: row.get(6)? }),
     )?
     .ok_or_else(|| ApiError::not_found("Version"))
 }
@@ -703,11 +634,5 @@ pub fn diff(connection: &Connection, page: &WikiPage, from: Option<i64>, to: Opt
     let old = load_revision(connection, page.id, from)?;
     let new = load_revision(connection, page.id, to)?;
 
-    Ok(WikiDiff {
-        from,
-        to,
-        lines: diff_lines(&old.body, &new.body),
-        from_title: old.info.title,
-        to_title: new.info.title,
-    })
+    Ok(WikiDiff { from, to, lines: diff_lines(&old.body, &new.body), from_title: old.info.title, to_title: new.info.title })
 }

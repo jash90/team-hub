@@ -277,7 +277,8 @@ fn resolve_parent(connection: &Connection, project_id: Id, own_id: Option<Id>, l
 
         return Ok(None);
     };
-    let (parent_id, parent_project) = issue_id_by_key(connection, parent_key)?.ok_or_else(|| ApiError::bad_request(format!("{parent_key} does not exist")))?;
+    let (parent_id, parent_project) =
+        issue_id_by_key(connection, parent_key)?.ok_or_else(|| ApiError::bad_request(format!("{parent_key} does not exist")))?;
 
     if parent_project != project_id {
         return Err(ApiError::bad_request("The parent must be in the same project"));
@@ -389,10 +390,15 @@ pub fn create_issue(tx: &Tx, new: &NewIssue) -> ApiResult<Id> {
         None => {
             let wanted_level = match &parent_key {
                 Some(parent) => {
-                    let parent_type: Option<Id> = query_one(tx, "SELECT type_id FROM issue WHERE key = ?1 COLLATE NOCASE", [parent.trim()], |row| row.get(0))?;
+                    let parent_type: Option<Id> =
+                        query_one(tx, "SELECT type_id FROM issue WHERE key = ?1 COLLATE NOCASE", [parent.trim()], |row| row.get(0))?;
                     let parent_level = parent_type.map(|type_id| type_level(tx, type_id, project_id)).transpose()?;
 
-                    if parent_level == Some(TypeLevel::Standard) { TypeLevel::Subtask } else { TypeLevel::Standard }
+                    if parent_level == Some(TypeLevel::Standard) {
+                        TypeLevel::Subtask
+                    } else {
+                        TypeLevel::Standard
+                    }
                 }
                 None => TypeLevel::Standard,
             };
@@ -509,11 +515,7 @@ pub fn update_issue(tx: &Tx, id: Id, patch: &IssuePatch) -> ApiResult<Vec<&'stat
     if let Some(description) = &patch.description {
         if *description != current.description {
             tx.execute("UPDATE issue SET description = ?1 WHERE id = ?2", (description, id))?;
-            record_change(
-                tx,
-                id,
-                &FieldChange::text("description", Some(truncate(&current.description, 200)), Some(truncate(description, 200))),
-            )?;
+            record_change(tx, id, &FieldChange::text("description", Some(truncate(&current.description, 200)), Some(truncate(description, 200))))?;
             notify_mentions(tx, id, description, &format!("You were mentioned in {}: {}", current.key, current.summary))?;
             changed.push("description");
         }
@@ -543,7 +545,11 @@ pub fn update_issue(tx: &Tx, id: Id, patch: &IssuePatch) -> ApiResult<Vec<&'stat
         }
 
         tx.execute("UPDATE issue SET type_id = ?1 WHERE id = ?2", (type_id, id))?;
-        record_change(tx, id, &FieldChange::reference("type", name_in(tx, "issue_type", Some(current.type_id))?, name_in(tx, "issue_type", Some(type_id))?))?;
+        record_change(
+            tx,
+            id,
+            &FieldChange::reference("type", name_in(tx, "issue_type", Some(current.type_id))?, name_in(tx, "issue_type", Some(type_id))?),
+        )?;
         changed.push("type");
     }
 
@@ -673,7 +679,11 @@ pub fn update_issue(tx: &Tx, id: Id, patch: &IssuePatch) -> ApiResult<Vec<&'stat
 
     if let Some(points) = patch.points.filter(|points| *points != current.points) {
         tx.execute("UPDATE issue SET points = ?1 WHERE id = ?2", (clean_points(points)?, id))?;
-        record_change(tx, id, &FieldChange::text("points", current.points.map(|points| points.to_string()), points.map(|points| points.to_string())))?;
+        record_change(
+            tx,
+            id,
+            &FieldChange::text("points", current.points.map(|points| points.to_string()), points.map(|points| points.to_string())),
+        )?;
         changed.push("points");
     }
 
@@ -966,8 +976,10 @@ pub fn add_link(tx: &Tx, user: &AuthUser, source_id: Id, link_type: LinkType, ta
 
 pub fn delete_link(tx: &Tx, user: &AuthUser, link_id: Id) -> ApiResult<()> {
     let (source_id, target_id, link_type): (Id, Id, String) =
-        query_one(tx, "SELECT source_id, target_id, type FROM issue_link WHERE id = ?1", [link_id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
-            .ok_or_else(|| ApiError::not_found("Link"))?;
+        query_one(tx, "SELECT source_id, target_id, type FROM issue_link WHERE id = ?1", [link_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?
+        .ok_or_else(|| ApiError::not_found("Link"))?;
     let source = load_current(tx, source_id)?;
     let target = load_current(tx, target_id)?;
     access::project_access_by_id(tx, user, source.project_id)?.require_edit()?;
@@ -1055,14 +1067,7 @@ pub fn load_attachments(connection: &Connection, issue_id: Id) -> ApiResult<Vec<
 }
 
 fn safe_filename(name: &str) -> String {
-    let name: String = name
-        .rsplit(['/', '\\'])
-        .next()
-        .unwrap_or("")
-        .chars()
-        .filter(|character| !character.is_control())
-        .take(120)
-        .collect();
+    let name: String = name.rsplit(['/', '\\']).next().unwrap_or("").chars().filter(|character| !character.is_control()).take(120).collect();
 
     if name.trim_matches('.').trim().is_empty() {
         "file".to_string()

@@ -25,12 +25,7 @@ pub fn diff_lines(old: &str, new: &str) -> Vec<DiffLine> {
     let line = |kind, text: &str| DiffLine { kind, text: text.to_string() };
 
     let prefix = old_lines.iter().zip(&new_lines).take_while(|(left, right)| left == right).count();
-    let suffix = old_lines[prefix..]
-        .iter()
-        .rev()
-        .zip(new_lines[prefix..].iter().rev())
-        .take_while(|(left, right)| left == right)
-        .count();
+    let suffix = old_lines[prefix..].iter().rev().zip(new_lines[prefix..].iter().rev()).take_while(|(left, right)| left == right).count();
     let old_mid = &old_lines[prefix..old_lines.len() - suffix];
     let new_mid = &new_lines[prefix..new_lines.len() - suffix];
     let mut result: Vec<DiffLine> = old_lines[..prefix].iter().map(|text| line(DiffKind::Same, text)).collect();

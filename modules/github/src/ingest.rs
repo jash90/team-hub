@@ -81,7 +81,8 @@ pub fn repo_id(connection: &Connection, full_name: &str) -> ApiResult<Option<Id>
 /// Replaces the issues one pull request, branch or commit is linked to; returns the issues
 /// linked before or after.
 fn set_refs(connection: &Connection, kind: &str, ref_id: Id, keys: &[String]) -> ApiResult<Vec<Id>> {
-    let mut affected: Vec<Id> = query_all(connection, "SELECT issue_id FROM gh_ref WHERE kind = ?1 AND ref_id = ?2", (kind, ref_id), |row| row.get(0))?;
+    let mut affected: Vec<Id> =
+        query_all(connection, "SELECT issue_id FROM gh_ref WHERE kind = ?1 AND ref_id = ?2", (kind, ref_id), |row| row.get(0))?;
     connection.execute("DELETE FROM gh_ref WHERE kind = ?1 AND ref_id = ?2", (kind, ref_id))?;
 
     for key in keys {
@@ -127,7 +128,9 @@ pub fn upsert_pr(connection: &Connection, repo: Id, repo_name: &str, pr: &Value,
     let time = |path: &[&str]| text(pr, path).map(normalize_time);
     let url = owned(pr, &["html_url"]).unwrap_or_else(|| format!("https://github.com/{repo_name}/pull/{number}"));
     let previous: Option<(Id, String)> =
-        query_one(connection, "SELECT id, state FROM gh_pr WHERE repo_id = ?1 AND number = ?2", (repo, number), |row| Ok((row.get(0)?, row.get(1)?)))?;
+        query_one(connection, "SELECT id, state FROM gh_pr WHERE repo_id = ?1 AND number = ?2", (repo, number), |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?;
 
     connection.execute(
         "INSERT INTO gh_pr (repo_id, number, title, body, state, draft, author, head_ref, head_sha, base_ref, url, additions, deletions,
@@ -196,7 +199,9 @@ pub fn upsert_branch(
     projects: &HashSet<String>,
 ) -> ApiResult<(Vec<Id>, bool)> {
     let existing: Option<(Id, bool)> =
-        query_one(connection, "SELECT id, deleted FROM gh_branch WHERE repo_id = ?1 AND name = ?2", (repo, name), |row| Ok((row.get(0)?, row.get(1)?)))?;
+        query_one(connection, "SELECT id, deleted FROM gh_branch WHERE repo_id = ?1 AND name = ?2", (repo, name), |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?;
     let url = format!("https://github.com/{repo_name}/tree/{name}");
 
     connection.execute(
@@ -239,7 +244,8 @@ pub fn upsert_commits(
             continue;
         }
 
-        let known: Option<Id> = query_one(connection, "SELECT id FROM gh_commit WHERE repo_id = ?1 AND sha = ?2", (repo, commit.sha), |row| row.get(0))?;
+        let known: Option<Id> =
+            query_one(connection, "SELECT id FROM gh_commit WHERE repo_id = ?1 AND sha = ?2", (repo, commit.sha), |row| row.get(0))?;
         let url = commit.url.map(String::from).unwrap_or_else(|| format!("https://github.com/{repo_name}/commit/{}", commit.sha));
 
         connection.execute(
@@ -287,7 +293,9 @@ fn check_state(status: Option<&str>, conclusion: Option<&str>) -> Option<&'stati
 /// overwritten by a later success of another suite on the same commit.
 fn set_checks(connection: &Connection, repo: Id, sha: &str, state: &str) -> ApiResult<Vec<Id>> {
     let pulls: Vec<(Id, Option<String>)> =
-        query_all(connection, "SELECT id, checks FROM gh_pr WHERE repo_id = ?1 AND head_sha = ?2", (repo, sha), |row| Ok((row.get(0)?, row.get(1)?)))?;
+        query_all(connection, "SELECT id, checks FROM gh_pr WHERE repo_id = ?1 AND head_sha = ?2", (repo, sha), |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?;
     let mut issues = Vec::new();
 
     for (id, current) in pulls {
@@ -346,7 +354,11 @@ pub fn ingest(tx: &Tx, event: &str, payload: &Value) -> ApiResult<Ingested> {
                 let (issues, is_new) = upsert_branch(tx, repo, repo_name, branch, text(payload, &["after"]), &tx.now, &projects)?;
 
                 if is_new {
-                    result.actions.extend(issues.iter().map(|issue_id| Action::Rule { issue_id: *issue_id, trigger: GithubTrigger::BranchCreated, closes: false }));
+                    result.actions.extend(issues.iter().map(|issue_id| Action::Rule {
+                        issue_id: *issue_id,
+                        trigger: GithubTrigger::BranchCreated,
+                        closes: false,
+                    }));
                 }
 
                 result.touch(&issues);
@@ -389,7 +401,11 @@ pub fn ingest(tx: &Tx, event: &str, payload: &Value) -> ApiResult<Ingested> {
                 let (issues, is_new) = upsert_branch(tx, repo, repo_name, branch, None, &tx.now, &projects)?;
 
                 if is_new {
-                    result.actions.extend(issues.iter().map(|issue_id| Action::Rule { issue_id: *issue_id, trigger: GithubTrigger::BranchCreated, closes: false }));
+                    result.actions.extend(issues.iter().map(|issue_id| Action::Rule {
+                        issue_id: *issue_id,
+                        trigger: GithubTrigger::BranchCreated,
+                        closes: false,
+                    }));
                 }
 
                 result.touch(&issues);

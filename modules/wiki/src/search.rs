@@ -125,12 +125,7 @@ pub fn search_pages(connection: &Connection, user: &AuthUser, text: &str, space_
 
     Ok(rows
         .into_iter()
-        .map(|(page_id, space_key, title, body, highlighted)| WikiSearchHit {
-            page_id,
-            space_key,
-            title,
-            snippet: excerpt(&body, &highlighted),
-        })
+        .map(|(page_id, space_key, title, body, highlighted)| WikiSearchHit { page_id, space_key, title, snippet: excerpt(&body, &highlighted) })
         .collect())
 }
 
@@ -175,10 +170,7 @@ mod tests {
         let body = "Kanał powiadomień\n\nPłatność BLIK wymaga osobnego kanału.";
         let highlighted = "kanal powiadomien\n\n\u{1}platnosc\u{2} blik wymaga osobnego kanalu.";
 
-        assert_eq!(
-            excerpt(body, highlighted),
-            "Kanał powiadomień <mark>Płatność</mark> BLIK wymaga osobnego kanału."
-        );
+        assert_eq!(excerpt(body, highlighted), "Kanał powiadomień <mark>Płatność</mark> BLIK wymaga osobnego kanału.");
     }
 
     #[test]
@@ -200,9 +192,6 @@ mod tests {
 
     #[test]
     fn without_a_match_in_the_body_the_excerpt_is_its_beginning() {
-        assert_eq!(
-            excerpt("Pierwszy akapit.\n\nDrugi.", "pierwszy akapit.\n\ndrugi."),
-            "Pierwszy akapit. Drugi."
-        );
+        assert_eq!(excerpt("Pierwszy akapit.\n\nDrugi.", "pierwszy akapit.\n\ndrugi."), "Pierwszy akapit. Drugi.");
     }
 }

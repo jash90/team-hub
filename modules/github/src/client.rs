@@ -61,8 +61,22 @@ impl GithubClient {
 
         for attempt in 1..=ATTEMPTS {
             let sent = match body {
-                Some(body) => self.agent.post(&url).header("Authorization", format!("Bearer {}", self.token)).header("Accept", "application/vnd.github+json").header("X-GitHub-Api-Version", "2022-11-28").header("User-Agent", "team-hub").send_json(body),
-                None => self.agent.get(&url).header("Authorization", format!("Bearer {}", self.token)).header("Accept", "application/vnd.github+json").header("X-GitHub-Api-Version", "2022-11-28").header("User-Agent", "team-hub").call(),
+                Some(body) => self
+                    .agent
+                    .post(&url)
+                    .header("Authorization", format!("Bearer {}", self.token))
+                    .header("Accept", "application/vnd.github+json")
+                    .header("X-GitHub-Api-Version", "2022-11-28")
+                    .header("User-Agent", "team-hub")
+                    .send_json(body),
+                None => self
+                    .agent
+                    .get(&url)
+                    .header("Authorization", format!("Bearer {}", self.token))
+                    .header("Accept", "application/vnd.github+json")
+                    .header("X-GitHub-Api-Version", "2022-11-28")
+                    .header("User-Agent", "team-hub")
+                    .call(),
             };
             let mut response = match sent {
                 Ok(response) => response,
@@ -144,7 +158,8 @@ impl GithubClient {
             return Ok(None);
         }
 
-        let failed = |run: &Value| matches!(run["conclusion"].as_str(), Some("failure" | "timed_out" | "cancelled" | "action_required" | "startup_failure"));
+        let failed =
+            |run: &Value| matches!(run["conclusion"].as_str(), Some("failure" | "timed_out" | "cancelled" | "action_required" | "startup_failure"));
         let running = |run: &Value| run["status"].as_str() != Some("completed");
 
         Ok(Some(if runs.iter().any(failed) {

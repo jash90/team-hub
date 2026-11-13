@@ -28,8 +28,7 @@ pub fn release_notes(version: &str, release_date: Option<&str>, type_order: &[&s
         }
     }
 
-    let open: Vec<String> =
-        issues.iter().filter(|issue| !issue.done).map(|issue| format!("- {} {}", issue.key, issue.summary)).collect();
+    let open: Vec<String> = issues.iter().filter(|issue| !issue.done).map(|issue| format!("- {} {}", issue.key, issue.summary)).collect();
 
     if !open.is_empty() {
         notes.push_str(&format!("\n## Not finished\n\n{}\n", open.join("\n")));
@@ -51,9 +50,6 @@ mod tests {
         ];
         let notes = release_notes("1.0", Some("2026-11-20"), &["Bug", "Story", "Task"], &issues);
 
-        assert_eq!(
-            notes,
-            "# 1.0\n\n_2026-11-20_\n\n## Bug\n\n- WEB-2 Crash\n\n## Story\n\n- WEB-1 Login\n\n## Not finished\n\n- WEB-3 Later\n"
-        );
+        assert_eq!(notes, "# 1.0\n\n_2026-11-20_\n\n## Bug\n\n- WEB-2 Crash\n\n## Story\n\n- WEB-1 Login\n\n## Not finished\n\n- WEB-3 Later\n");
     }
 }

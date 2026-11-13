@@ -64,7 +64,9 @@ async fn issues_are_created_changed_and_remember_their_history() {
     let done = id_named(&project["statuses"], "Done");
     let me = client.get("/api/bootstrap").await["user"]["id"].as_i64().unwrap();
 
-    let first = client.post("/api/issues", json!({ "projectKey": "WEB", "summary": "  Login   fails ", "typeId": bug, "labels": ["auth", "Auth", "safari bug"] })).await;
+    let first = client
+        .post("/api/issues", json!({ "projectKey": "WEB", "summary": "  Login   fails ", "typeId": bug, "labels": ["auth", "Auth", "safari bug"] }))
+        .await;
     let second = client.post("/api/issues", json!({ "projectKey": "WEB", "summary": "Checkout page" })).await;
 
     assert_eq!(first["key"], "WEB-1");
@@ -186,8 +188,12 @@ async fn a_sprint_is_planned_run_and_completed() {
     client.post("/api/issues/WEB-3/move", json!({ "statusId": in_progress })).await;
 
     let board = client.get("/api/projects/WEB/board").await;
-    let columns: Vec<(String, Vec<String>)> =
-        board["columns"].as_array().unwrap().iter().map(|column| (column["status"]["name"].as_str().unwrap().to_string(), keys(&column["issues"]))).collect();
+    let columns: Vec<(String, Vec<String>)> = board["columns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|column| (column["status"]["name"].as_str().unwrap().to_string(), keys(&column["issues"])))
+        .collect();
 
     assert_eq!(board["sprint"]["state"], "active");
     assert_eq!(columns[0], ("To Do".to_string(), vec!["WEB-1".to_string()]));
@@ -220,8 +226,12 @@ async fn queries_filter_and_order() {
 
     client.post("/api/issues", json!({ "projectKey": "WEB", "summary": "Błąd logowania w Safari", "typeId": bug, "priority": 1, "assigneeId": me, "labels": ["auth"], "points": 2 })).await;
     client.post("/api/issues", json!({ "projectKey": "WEB", "summary": "Koszyk: żółta wstążka promocji", "priority": 4, "assigneeId": anna, "points": 8, "statusId": in_progress })).await;
-    client.post("/api/issues", json!({ "projectKey": "WEB", "summary": "Stopka", "statusId": done, "description": "Zawiera link do logowania" })).await;
-    client.post("/api/issues", json!({ "projectKey": "API", "summary": "Rate limiting", "labels": ["auth", "backend"], "dueDate": "2020-01-01" })).await;
+    client
+        .post("/api/issues", json!({ "projectKey": "WEB", "summary": "Stopka", "statusId": done, "description": "Zawiera link do logowania" }))
+        .await;
+    client
+        .post("/api/issues", json!({ "projectKey": "API", "summary": "Rate limiting", "labels": ["auth", "backend"], "dueDate": "2020-01-01" }))
+        .await;
     client.post("/api/issues/WEB-2/comments", json!({ "body": "Wstążka zasłania przycisk zamówienia" })).await;
 
     let cases: [(&str, &[&str]); 22] = [
@@ -347,7 +357,8 @@ async fn people_hear_about_what_concerns_them() {
     admin.post("/api/issues", json!({ "projectKey": "WEB", "summary": "Other" })).await;
     admin.post("/api/issues/WEB-2/comments", json!({ "body": "@anna.nowak can you look?" })).await;
 
-    let kinds: Vec<String> = anna.get("/api/notifications").await.as_array().unwrap().iter().map(|item| item["kind"].as_str().unwrap().to_string()).collect();
+    let kinds: Vec<String> =
+        anna.get("/api/notifications").await.as_array().unwrap().iter().map(|item| item["kind"].as_str().unwrap().to_string()).collect();
 
     assert_eq!(kinds, ["mention", "comment", "assigned"]);
     assert_eq!(anna.get("/api/bootstrap").await["unreadNotifications"], 3);

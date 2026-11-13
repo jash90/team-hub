@@ -77,7 +77,9 @@ pub fn unread_count(connection: &Connection, user_id: Id) -> ApiResult<i64> {
 /// Marks one notification read, or all of the user's when no id is given.
 pub fn mark_read(connection: &Connection, user_id: Id, id: Option<Id>) -> ApiResult<()> {
     match id {
-        Some(id) => connection.execute("UPDATE notification SET read_at = ?1 WHERE user_id = ?2 AND id = ?3 AND read_at IS NULL", (now_iso(), user_id, id))?,
+        Some(id) => {
+            connection.execute("UPDATE notification SET read_at = ?1 WHERE user_id = ?2 AND id = ?3 AND read_at IS NULL", (now_iso(), user_id, id))?
+        }
         None => connection.execute("UPDATE notification SET read_at = ?1 WHERE user_id = ?2 AND read_at IS NULL", (now_iso(), user_id))?,
     };
 

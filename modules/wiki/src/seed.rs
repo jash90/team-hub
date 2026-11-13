@@ -135,15 +135,8 @@ fn at(day: i64, hour: i64) -> String {
 }
 
 fn page_id(app: &App, space: &SpaceRecord, title: &str) -> ApiResult<Id> {
-    app.read(|connection| {
-        query_one(
-            connection,
-            "SELECT id FROM wiki_page WHERE space_id = ?1 AND title = ?2",
-            (space.id, title),
-            |row| row.get(0),
-        )
-    })?
-    .ok_or_else(|| ApiError::internal(format!("demo data refers to the page \"{title}\", which does not exist")))
+    app.read(|connection| query_one(connection, "SELECT id FROM wiki_page WHERE space_id = ?1 AND title = ?2", (space.id, title), |row| row.get(0)))?
+        .ok_or_else(|| ApiError::internal(format!("demo data refers to the page \"{title}\", which does not exist")))
 }
 
 fn seed_pages(app: &App, space: &SpaceRecord, pages: &[Page], people: &[Id]) -> ApiResult<()> {
@@ -154,17 +147,14 @@ fn seed_pages(app: &App, space: &SpaceRecord, pages: &[Page], people: &[Id]) -> 
         let parent_id = page.parent.map(|title| page_id(app, space, title)).transpose()?;
         let author = people[page.author % people.len()];
 
-        app.write_at(Actor::user(author), at(page.day, index as i64), |tx| {
-            pages::create_page(tx, space, page.title, page.body, parent_id)
-        })?;
+        app.write_at(Actor::user(author), at(page.day, index as i64), |tx| pages::create_page(tx, space, page.title, page.body, parent_id))?;
     }
 
     // Pages were written in the order of their dates; put each level back in the order of the list.
     for (position, page) in pages.iter().enumerate() {
         let id = page_id(app, space, page.title)?;
 
-        app.db
-            .write(|tx| Ok(tx.execute("UPDATE wiki_page SET position = ?1 WHERE id = ?2", (position as i64, id))?))?;
+        app.db.write(|tx| Ok(tx.execute("UPDATE wiki_page SET position = ?1 WHERE id = ?2", (position as i64, id))?))?;
     }
 
     Ok(())
@@ -172,9 +162,7 @@ fn seed_pages(app: &App, space: &SpaceRecord, pages: &[Page], people: &[Id]) -> 
 
 pub fn seed_demo(app: &App) -> ApiResult<()> {
     let (people, project_id, seeded) = app.read(|connection| {
-        let people: Vec<Id> = query_all(connection, "SELECT id FROM user WHERE active = 1 ORDER BY id LIMIT 5", [], |row| {
-            row.get(0)
-        })?;
+        let people: Vec<Id> = query_all(connection, "SELECT id FROM user WHERE active = 1 ORDER BY id LIMIT 5", [], |row| row.get(0))?;
         let project_id: Option<Id> = query_one(connection, "SELECT id FROM project WHERE key = 'WEB'", [], |row| row.get(0))?;
         let seeded = spaces::space_by_key(connection, "WEB")?.is_some() || spaces::space_by_key(connection, "TEAM")?.is_some();
 
@@ -221,17 +209,7 @@ pub fn seed_demo(app: &App) -> ApiResult<()> {
         app.write_at(Actor::user(author), at(*day, 3), |tx| {
             let page = pages::load_page(tx, blik)?;
 
-            pages::update_page(
-                tx,
-                &web,
-                &page,
-                &PageEdit {
-                    title: None,
-                    body: Some(body),
-                    base_version: index as i64 + 1,
-                    message,
-                },
-            )
+            pages::update_page(tx, &web, &page, &PageEdit { title: None, body: Some(body), base_version: index as i64 + 1, message })
         })?;
     }
 

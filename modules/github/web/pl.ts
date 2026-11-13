@@ -17,7 +17,6 @@ export const polish: Record<string, string> = {
     'Nic jeszcze nie powiązano. Wpisz {key} w nazwie gałęzi, opisie commita albo tytule pull requesta, a pojawi się tutaj.',
   branch: 'gałąź',
   'Copy checkout command': 'Kopiuj polecenie checkout',
-  commits: 'commity',
   'Branch created': 'Gałąź utworzona',
   'Create branch for {key}': 'Gałąź dla {key}',
   Repository: 'Repozytorium',

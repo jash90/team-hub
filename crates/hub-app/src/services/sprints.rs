@@ -68,7 +68,13 @@ pub fn create_sprint(tx: &Tx, access: &ProjectAccess, input: &SprintInput) -> Ap
     access.require_edit()?;
 
     let count: i64 = tx.query_row("SELECT count(*) FROM sprint WHERE project_id = ?1", [access.id], |row| row.get(0))?;
-    let name = input.name.as_deref().map(str::trim).filter(|name| !name.is_empty()).map(String::from).unwrap_or_else(|| format!("{} Sprint {}", access.key, count + 1));
+    let name = input
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(String::from)
+        .unwrap_or_else(|| format!("{} Sprint {}", access.key, count + 1));
     let position: i64 = tx.query_row("SELECT coalesce(max(position), 0) + 1 FROM sprint WHERE project_id = ?1", [access.id], |row| row.get(0))?;
 
     tx.execute(
@@ -182,12 +188,10 @@ pub fn complete_sprint(tx: &Tx, user: &AuthUser, id: Id, move_to: Option<Id>) ->
         None => None,
     };
 
-    let open: Vec<Id> = query_all(
-        tx,
-        "SELECT i.id FROM issue i JOIN status s ON s.id = i.status_id WHERE i.sprint_id = ?1 AND s.category != 'done'",
-        [id],
-        |row| row.get(0),
-    )?;
+    let open: Vec<Id> =
+        query_all(tx, "SELECT i.id FROM issue i JOIN status s ON s.id = i.status_id WHERE i.sprint_id = ?1 AND s.category != 'done'", [id], |row| {
+            row.get(0)
+        })?;
     let total: i64 = tx.query_row("SELECT count(*) FROM issue WHERE sprint_id = ?1", [id], |row| row.get(0))?;
 
     for issue_id in &open {

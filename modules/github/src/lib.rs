@@ -162,7 +162,10 @@ impl Module for GithubModule {
                         let negation = if clause.op.is_negative() { "NOT " } else { "" };
                         let list = vec!["?"; words.len()].join(", ");
 
-                        Ok(FieldSql { sql: format!("{negation}EXISTS ({any} AND d.kind IN ({list}))"), params: words.into_iter().map(SqlValue::Text).collect() })
+                        Ok(FieldSql {
+                            sql: format!("{negation}EXISTS ({any} AND d.kind IN ({list}))"),
+                            params: words.into_iter().map(SqlValue::Text).collect(),
+                        })
                     }
                     _ => Err(ApiError::bad_request("That operator cannot be used with \"drift\"")),
                 }

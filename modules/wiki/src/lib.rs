@@ -130,13 +130,7 @@ impl Module for WikiModule {
             ),
             rusqlite::params_from_iter(params),
             |row| {
-                Ok(WikiIssuePage {
-                    page_id: row.get(0)?,
-                    space_key: row.get(1)?,
-                    title: row.get(2)?,
-                    relation: row.get(3)?,
-                    updated_at: row.get(4)?,
-                })
+                Ok(WikiIssuePage { page_id: row.get(0)?, space_key: row.get(1)?, title: row.get(2)?, relation: row.get(3)?, updated_at: row.get(4)? })
             },
         )?;
 

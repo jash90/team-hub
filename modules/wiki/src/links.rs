@@ -51,11 +51,7 @@ pub fn wiki_links(body: &str) -> Vec<WikiLink> {
             _ => (None, whole),
         };
 
-        found.push(WikiLink {
-            whole: whole.to_string(),
-            space,
-            title: title.to_string(),
-        });
+        found.push(WikiLink { whole: whole.to_string(), space, title: title.to_string() });
     }
 
     found
@@ -113,12 +109,7 @@ pub fn parse_task_line(line: &str) -> Option<TaskLine<'_>> {
         return None;
     }
 
-    Some(TaskLine {
-        prefix: &line[..line.len() - text.len()],
-        done,
-        text: text.trim_end(),
-        suffix,
-    })
+    Some(TaskLine { prefix: &line[..line.len() - text.len()], done, text: text.trim_end(), suffix })
 }
 
 fn title_key(title: &str) -> String {
@@ -136,34 +127,20 @@ pub struct Resolver<'a> {
 
 impl<'a> Resolver<'a> {
     pub fn new(connection: &'a Connection) -> ApiResult<Self> {
-        let projects = query_all(connection, "SELECT key FROM project", [], |row| row.get::<_, String>(0))?
-            .into_iter()
-            .collect();
-        let spaces = query_all(connection, "SELECT key, id FROM wiki_space", [], |row| {
-            Ok((row.get::<_, String>(0)?, row.get(1)?))
-        })?
-        .into_iter()
-        .collect();
+        let projects = query_all(connection, "SELECT key FROM project", [], |row| row.get::<_, String>(0))?.into_iter().collect();
+        let spaces =
+            query_all(connection, "SELECT key, id FROM wiki_space", [], |row| Ok((row.get::<_, String>(0)?, row.get(1)?)))?.into_iter().collect();
 
-        Ok(Self {
-            connection,
-            projects,
-            spaces,
-            titles: HashMap::new(),
-        })
+        Ok(Self { connection, projects, spaces, titles: HashMap::new() })
     }
 
     fn titles_of(&mut self, space_id: Id) -> ApiResult<&HashMap<String, Id>> {
         if !self.titles.contains_key(&space_id) {
             // Newest first, so that of two pages with one title the older one wins.
-            let rows = query_all(
-                self.connection,
-                "SELECT title, id FROM wiki_page WHERE space_id = ?1 ORDER BY id DESC",
-                [space_id],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Id>(1)?)),
-            )?;
-            self.titles
-                .insert(space_id, rows.into_iter().map(|(title, id)| (title_key(&title), id)).collect());
+            let rows = query_all(self.connection, "SELECT title, id FROM wiki_page WHERE space_id = ?1 ORDER BY id DESC", [space_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Id>(1)?))
+            })?;
+            self.titles.insert(space_id, rows.into_iter().map(|(title, id)| (title_key(&title), id)).collect());
         }
 
         Ok(&self.titles[&space_id])
@@ -236,20 +213,15 @@ pub fn refresh_referrers(tx: &Tx, resolver: &mut Resolver, page_id: Id, titles: 
     let mut referrers: Vec<Id> = Vec::new();
 
     for title in titles {
-        let words: Vec<String> = fold(title)
-            .split(|character: char| !character.is_alphanumeric())
-            .filter(|word| !word.is_empty())
-            .map(String::from)
-            .collect();
+        let words: Vec<String> =
+            fold(title).split(|character: char| !character.is_alphanumeric()).filter(|word| !word.is_empty()).map(String::from).collect();
 
         if words.is_empty() {
             continue;
         }
 
         let phrase = format!("body : \"{}\"", words.join(" "));
-        let found: Vec<Id> = query_all(tx, "SELECT rowid FROM wiki_fts WHERE wiki_fts MATCH ?1 LIMIT 500", [phrase], |row| {
-            row.get(0)
-        })?;
+        let found: Vec<Id> = query_all(tx, "SELECT rowid FROM wiki_fts WHERE wiki_fts MATCH ?1 LIMIT 500", [phrase], |row| row.get(0))?;
 
         referrers.extend(found.into_iter().filter(|id| *id != page_id));
     }
@@ -258,9 +230,8 @@ pub fn refresh_referrers(tx: &Tx, resolver: &mut Resolver, page_id: Id, titles: 
     referrers.dedup();
 
     for referrer in referrers {
-        let (space_id, body): (Id, String) = tx.query_row("SELECT space_id, body FROM wiki_page WHERE id = ?1", [referrer], |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?;
+        let (space_id, body): (Id, String) =
+            tx.query_row("SELECT space_id, body FROM wiki_page WHERE id = ?1", [referrer], |row| Ok((row.get(0)?, row.get(1)?)))?;
 
         if body.contains("[[") {
             sync_page(tx, resolver, referrer, space_id, &body)?;
@@ -288,24 +259,17 @@ pub fn set_documents(tx: &Tx, page_id: Id, issue_id: Id, linked: bool) -> ApiRes
 
 /// Removes every edge from or to the pages selected by `pages`, a subquery yielding page ids.
 pub fn forget_pages(connection: &Connection, pages: &str, params: impl rusqlite::Params + Clone) -> ApiResult<()> {
-    connection.execute(
-        &format!("DELETE FROM link WHERE from_kind = 'page' AND from_id IN (SELECT CAST(id AS TEXT) FROM ({pages}))"),
-        params.clone(),
-    )?;
-    connection.execute(
-        &format!("DELETE FROM link WHERE to_kind = 'page' AND to_id IN (SELECT CAST(id AS TEXT) FROM ({pages}))"),
-        params,
-    )?;
+    connection
+        .execute(&format!("DELETE FROM link WHERE from_kind = 'page' AND from_id IN (SELECT CAST(id AS TEXT) FROM ({pages}))"), params.clone())?;
+    connection.execute(&format!("DELETE FROM link WHERE to_kind = 'page' AND to_id IN (SELECT CAST(id AS TEXT) FROM ({pages}))"), params)?;
 
     Ok(())
 }
 
 /// Removes edges to issues that no longer exist, so a reused id never inherits them.
 pub fn forget_deleted_issues(connection: &Connection) -> ApiResult<()> {
-    connection.execute(
-        "DELETE FROM link WHERE from_kind = 'page' AND to_kind = 'issue' AND CAST(to_id AS INTEGER) NOT IN (SELECT id FROM issue)",
-        [],
-    )?;
+    connection
+        .execute("DELETE FROM link WHERE from_kind = 'page' AND to_kind = 'issue' AND CAST(to_id AS INTEGER) NOT IN (SELECT id FROM issue)", [])?;
 
     Ok(())
 }
@@ -322,60 +286,27 @@ mod tests {
         assert_eq!(
             links,
             vec![
-                WikiLink {
-                    whole: "Płatności".into(),
-                    space: None,
-                    title: "Płatności".into()
-                },
-                WikiLink {
-                    whole: "TEAM:Zasady pracy".into(),
-                    space: Some("TEAM".into()),
-                    title: "Zasady pracy".into()
-                },
-                WikiLink {
-                    whole: "Bramka kartowa: sandbox".into(),
-                    space: None,
-                    title: "Bramka kartowa: sandbox".into()
-                },
+                WikiLink { whole: "Płatności".into(), space: None, title: "Płatności".into() },
+                WikiLink { whole: "TEAM:Zasady pracy".into(), space: Some("TEAM".into()), title: "Zasady pracy".into() },
+                WikiLink { whole: "Bramka kartowa: sandbox".into(), space: None, title: "Bramka kartowa: sandbox".into() },
             ]
         );
     }
 
     #[test]
     fn an_unclosed_link_does_not_swallow_the_next_one() {
-        assert_eq!(
-            wiki_links("[[a [[Real]]").into_iter().map(|link| link.title).collect::<Vec<_>>(),
-            vec!["Real"]
-        );
+        assert_eq!(wiki_links("[[a [[Real]]").into_iter().map(|link| link.title).collect::<Vec<_>>(), vec!["Real"]);
     }
 
     #[test]
     fn recognises_task_lines() {
         let task = parse_task_line("  - [ ] Zamówić klucze sandboxa  \r").expect("a task");
 
-        assert_eq!(
-            task,
-            TaskLine {
-                prefix: "  - [ ] ",
-                done: false,
-                text: "Zamówić klucze sandboxa",
-                suffix: "\r"
-            }
-        );
+        assert_eq!(task, TaskLine { prefix: "  - [ ] ", done: false, text: "Zamówić klucze sandboxa", suffix: "\r" });
         assert!(parse_task_line("* [x] done").expect("a task").done);
         assert_eq!(parse_task_line("12. [ ] numbered").expect("a task").prefix, "12. [ ] ");
 
-        for line in [
-            "- [ ]",
-            "- [ ]   ",
-            "- [] nothing",
-            "-[ ] glued",
-            "text - [ ] inside",
-            "- [ ]glued",
-            "",
-            "1 [ ] no dot",
-            "- [y] other",
-        ] {
+        for line in ["- [ ]", "- [ ]   ", "- [] nothing", "-[ ] glued", "text - [ ] inside", "- [ ]glued", "", "1 [ ] no dot", "- [y] other"] {
             assert_eq!(parse_task_line(line), None, "{line:?}");
         }
     }

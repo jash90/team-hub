@@ -99,9 +99,7 @@ fn parse<T: DeserializeOwned>(arguments: &Value) -> ApiResult<T> {
 }
 
 fn detail(app: &App, user: &AuthUser, id: Id) -> ApiResult<Value> {
-    Ok(serde_json::to_value(
-        app.read(|connection| pages::page_detail(app, connection, user, id))?,
-    )?)
+    Ok(serde_json::to_value(app.read(|connection| pages::page_detail(app, connection, user, id))?)?)
 }
 
 pub fn call(app: &App, user: &AuthUser, name: &str, arguments: &Value) -> Option<ApiResult<Value>> {
@@ -131,12 +129,7 @@ pub fn call(app: &App, user: &AuthUser, name: &str, arguments: &Value) -> Option
                     tx,
                     &access.space,
                     &page,
-                    &PageEdit {
-                        title: None,
-                        body: Some(&arguments.body),
-                        base_version: arguments.base_version,
-                        message: "",
-                    },
+                    &PageEdit { title: None, body: Some(&arguments.body), base_version: arguments.base_version, message: "" },
                 )
             })?;
 

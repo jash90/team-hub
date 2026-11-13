@@ -46,18 +46,12 @@ pub fn can_transition(strict: bool, transitions: &[Transition], from: Id, to: Id
         return true;
     }
 
-    transitions
-        .iter()
-        .any(|transition| transition.to_status_id == to && transition.from_status_id.is_none_or(|source| source == from))
+    transitions.iter().any(|transition| transition.to_status_id == to && transition.from_status_id.is_none_or(|source| source == from))
 }
 
 /// The statuses reachable from `from`, in the order of `all_statuses`.
 pub fn allowed_targets(strict: bool, transitions: &[Transition], all_statuses: &[Id], from: Id) -> Vec<Id> {
-    all_statuses
-        .iter()
-        .copied()
-        .filter(|status| *status != from && can_transition(strict, transitions, from, *status))
-        .collect()
+    all_statuses.iter().copied().filter(|status| *status != from && can_transition(strict, transitions, from, *status)).collect()
 }
 
 #[cfg(test)]

@@ -12,9 +12,7 @@ const BREAK: char = '\u{e000}';
 /// Elements nested deeper than this are flattened into their parent.
 const MAX_DEPTH: usize = 100;
 
-const VOID: &[&str] = &[
-    "br", "hr", "img", "col", "input", "meta", "link", "wbr", "area", "base", "embed", "source", "track", "param",
-];
+const VOID: &[&str] = &["br", "hr", "img", "col", "input", "meta", "link", "wbr", "area", "base", "embed", "source", "track", "param"];
 const CONTAINERS: &[&str] = &[
     "div",
     "section",
@@ -174,9 +172,7 @@ fn decode_entities(text: &str) -> String {
         decoded.push_str(&rest[..start]);
         rest = &rest[start..];
 
-        let end = rest[1..]
-            .find(|character: char| !(character.is_ascii_alphanumeric() || character == '#'))
-            .map(|index| index + 1);
+        let end = rest[1..].find(|character: char| !(character.is_ascii_alphanumeric() || character == '#')).map(|index| index + 1);
         let replacement = end.filter(|end| rest[*end..].starts_with(';') && *end <= 12).and_then(|end| {
             let name = &rest[1..end];
             let character = if let Some(hex) = name.strip_prefix("#x").or_else(|| name.strip_prefix("#X")) {
@@ -228,9 +224,7 @@ fn parse_attributes(text: &str) -> Vec<(String, String)> {
     let mut rest = text.trim_start();
 
     while !rest.is_empty() {
-        let name_end = rest
-            .find(|character: char| character.is_whitespace() || character == '=')
-            .unwrap_or(rest.len());
+        let name_end = rest.find(|character: char| character.is_whitespace() || character == '=').unwrap_or(rest.len());
         let name = rest[..name_end].trim_end_matches('/').to_lowercase();
         rest = rest[name_end..].trim_start();
 
@@ -309,11 +303,7 @@ fn parse(input: &str) -> Vec<Node> {
             let self_closing = inner.ends_with('/');
             let inner = inner.trim_end_matches('/');
             let name_end = inner.find(char::is_whitespace).unwrap_or(inner.len());
-            let element = Element {
-                name: inner[..name_end].to_lowercase(),
-                attributes: parse_attributes(&inner[name_end..]),
-                children: Vec::new(),
-            };
+            let element = Element { name: inner[..name_end].to_lowercase(), attributes: parse_attributes(&inner[name_end..]), children: Vec::new() };
 
             if self_closing || VOID.contains(&element.name.as_str()) || stack.len() > MAX_DEPTH {
                 push(&mut stack, Node::Element(element));
@@ -323,7 +313,9 @@ fn parse(input: &str) -> Vec<Node> {
 
             rest = &rest[end + 1..];
         } else {
-            let end = rest[1..].find('<').map_or(rest.len(), |index| index + 1);
+            // The first character is text even when it is a `<` that opens no tag.
+            let first = rest.chars().next().map_or(1, char::len_utf8);
+            let end = rest[first..].find('<').map_or(rest.len(), |index| index + first);
             push(&mut stack, Node::Text(decode_entities(&rest[..end])));
             rest = &rest[end..];
         }
@@ -357,10 +349,7 @@ fn plain_text(nodes: &[Node]) -> String {
     let mut text = String::new();
     collect(nodes, &mut text);
 
-    text.split(|character: char| character.is_whitespace() || character == '\u{a0}')
-        .filter(|word| !word.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
+    text.split(|character: char| character.is_whitespace() || character == '\u{a0}').filter(|word| !word.is_empty()).collect::<Vec<_>>().join(" ")
 }
 
 /// The text of the nodes exactly as written, for code.
@@ -379,10 +368,7 @@ fn raw_text(nodes: &[Node]) -> String {
 }
 
 fn looks_like_entity(rest: &str) -> bool {
-    let name = rest
-        .chars()
-        .take_while(|character| character.is_ascii_alphanumeric() || *character == '#')
-        .count();
+    let name = rest.chars().take_while(|character| character.is_ascii_alphanumeric() || *character == '#').count();
 
     name > 0 && rest[name..].starts_with(';')
 }
@@ -466,13 +452,7 @@ fn link_target(href: &str) -> Option<String> {
         return None;
     }
 
-    Some(
-        href.replace(' ', "%20")
-            .replace('(', "%28")
-            .replace(')', "%29")
-            .replace('<', "%3C")
-            .replace('>', "%3E"),
-    )
+    Some(href.replace(' ', "%20").replace('(', "%28").replace(')', "%29").replace('<', "%3C").replace('>', "%3E"))
 }
 
 fn escaped(text: &str) -> String {
@@ -484,10 +464,7 @@ fn escaped(text: &str) -> String {
 
 fn image(source: Option<&str>, alt: Option<&str>, filename: Option<&str>) -> String {
     let name = alt.map(str::trim).filter(|alt| !alt.is_empty()).or(filename).unwrap_or("image");
-    let remote = source
-        .map(str::trim)
-        .filter(|source| source.starts_with("https://") || source.starts_with("http://"))
-        .and_then(link_target);
+    let remote = source.map(str::trim).filter(|source| source.starts_with("https://") || source.starts_with("http://")).and_then(link_target);
 
     match remote {
         Some(url) => format!("![{}]({url})", escaped(name)),
@@ -505,16 +482,10 @@ fn confluence_link(element: &Element) -> String {
         .filter(|label| !label.is_empty());
     let fits = |text: &str| !text.contains("]]") && !text.contains("[[") && !text.contains('|');
 
-    if let Some(title) = element
-        .child("ri:page")
-        .and_then(|page| page.attribute("ri:content-title"))
-        .map(str::trim)
-        .filter(|title| !title.is_empty() && fits(title))
+    if let Some(title) =
+        element.child("ri:page").and_then(|page| page.attribute("ri:content-title")).map(str::trim).filter(|title| !title.is_empty() && fits(title))
     {
-        let space = element
-            .child("ri:page")
-            .and_then(|page| page.attribute("ri:space-key"))
-            .filter(|key| is_project_key(key));
+        let space = element.child("ri:page").and_then(|page| page.attribute("ri:space-key")).filter(|key| is_project_key(key));
         let target = match space {
             Some(space) => format!("{space}:{title}"),
             None => title.to_string(),
@@ -526,12 +497,9 @@ fn confluence_link(element: &Element) -> String {
         };
     }
 
-    let fallback = element.elements().find_map(|target| {
-        target
-            .attribute("ri:content-title")
-            .or_else(|| target.attribute("ri:filename"))
-            .or_else(|| target.attribute("ri:value"))
-    });
+    let fallback = element
+        .elements()
+        .find_map(|target| target.attribute("ri:content-title").or_else(|| target.attribute("ri:filename")).or_else(|| target.attribute("ri:value")));
 
     escaped(&label.or_else(|| fallback.map(String::from)).unwrap_or_default())
 }
@@ -540,11 +508,7 @@ fn emoticon(element: &Element) -> String {
     match element.attribute("ac:name") {
         Some("tick") => "✓".to_string(),
         Some("cross") => "✗".to_string(),
-        _ => element
-            .attribute("ac:emoji-fallback")
-            .filter(|fallback| !fallback.starts_with(':'))
-            .unwrap_or("")
-            .to_string(),
+        _ => element.attribute("ac:emoji-fallback").filter(|fallback| !fallback.starts_with(':')).unwrap_or("").to_string(),
     }
 }
 
@@ -588,10 +552,8 @@ fn inline_element(buffer: &mut String, element: &Element) {
         }
         "img" => {
             let source = element.attribute("src");
-            let filename = source
-                .and_then(|source| source.split(['?', '#']).next())
-                .and_then(|path| path.rsplit('/').next())
-                .filter(|file| !file.is_empty());
+            let filename =
+                source.and_then(|source| source.split(['?', '#']).next()).and_then(|path| path.rsplit('/').next()).filter(|file| !file.is_empty());
 
             buffer.push_str(&image(source, element.attribute("alt").or_else(|| element.attribute("title")), filename));
         }
@@ -599,11 +561,7 @@ fn inline_element(buffer: &mut String, element: &Element) {
             let source = element.child("ri:url").and_then(|url| url.attribute("ri:value"));
             let filename = element.child("ri:attachment").and_then(|attachment| attachment.attribute("ri:filename"));
 
-            buffer.push_str(&image(
-                source,
-                element.attribute("ac:alt").or_else(|| element.attribute("ac:title")),
-                filename,
-            ));
+            buffer.push_str(&image(source, element.attribute("ac:alt").or_else(|| element.attribute("ac:title")), filename));
         }
         "ac:link" => buffer.push_str(&confluence_link(element)),
         "ac:emoticon" => buffer.push_str(&emoticon(element)),
@@ -612,12 +570,9 @@ fn inline_element(buffer: &mut String, element: &Element) {
             // A Jira issue macro names an issue; keeping the key lets the page link to ours.
             Some("jira") => push_text(buffer, &element.parameter("key").unwrap_or_default()),
             Some("status") => push_markdown(buffer, &wrap(&escaped(&element.parameter("title").unwrap_or_default()), "**")),
-            Some("code" | "noformat") => buffer.push_str(&code_span(
-                &element
-                    .child("ac:plain-text-body")
-                    .map(|body| raw_text(&body.children))
-                    .unwrap_or_default(),
-            )),
+            Some("code" | "noformat") => {
+                buffer.push_str(&code_span(&element.child("ac:plain-text-body").map(|body| raw_text(&body.children)).unwrap_or_default()))
+            }
             _ => {
                 if let Some(body) = element.child("ac:rich-text-body") {
                     push_markdown(buffer, &inline_of(&body.children));
@@ -629,10 +584,7 @@ fn inline_element(buffer: &mut String, element: &Element) {
         _ => {
             let inner = inline_of(&element.children);
             let block = CONTAINERS.contains(&name)
-                || matches!(
-                    name,
-                    "p" | "ul" | "ol" | "table" | "blockquote" | "pre" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
-                );
+                || matches!(name, "p" | "ul" | "ol" | "table" | "blockquote" | "pre" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6");
 
             if block && !buffer.is_empty() && !buffer.ends_with(' ') && !buffer.ends_with(BREAK) {
                 buffer.push(' ');
@@ -691,13 +643,7 @@ fn guard_line(line: &str) -> String {
 
 /// Inline Markdown as a paragraph: line breaks written out, nothing mistaken for block syntax.
 fn paragraph(inline: &str) -> String {
-    inline
-        .split(BREAK)
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(guard_line)
-        .collect::<Vec<_>>()
-        .join("\\\n")
+    inline.split(BREAK).map(str::trim).filter(|line| !line.is_empty()).map(guard_line).collect::<Vec<_>>().join("\\\n")
 }
 
 fn join(blocks: &[Block]) -> String {
@@ -705,19 +651,12 @@ fn join(blocks: &[Block]) -> String {
 }
 
 fn quote(text: &str) -> String {
-    text.lines()
-        .map(|line| if line.is_empty() { ">".to_string() } else { format!("> {line}") })
-        .collect::<Vec<_>>()
-        .join("\n")
+    text.lines().map(|line| if line.is_empty() { ">".to_string() } else { format!("> {line}") }).collect::<Vec<_>>().join("\n")
 }
 
 fn language_name(language: &str) -> String {
-    let language: String = language
-        .trim()
-        .to_lowercase()
-        .chars()
-        .filter(|character| character.is_ascii_alphanumeric() || "+#-_.".contains(*character))
-        .collect();
+    let language: String =
+        language.trim().to_lowercase().chars().filter(|character| character.is_ascii_alphanumeric() || "+#-_.".contains(*character)).collect();
 
     match language.as_str() {
         "none" | "text" | "plain" | "plaintext" => String::new(),
@@ -796,11 +735,7 @@ fn list(element: &Element, ordered: bool) -> String {
             "ul" | "ol" => {
                 let nested = list(child, child.name == "ol");
                 let indent = if ordered { 3 } else { 2 };
-                let nested = nested
-                    .lines()
-                    .map(|line| format!("{}{line}", " ".repeat(indent)))
-                    .collect::<Vec<_>>()
-                    .join("\n");
+                let nested = nested.lines().map(|line| format!("{}{line}", " ".repeat(indent))).collect::<Vec<_>>().join("\n");
 
                 match items.last_mut() {
                     Some(last) => {
@@ -822,9 +757,7 @@ fn task_list(element: &Element) -> String {
         .elements()
         .filter(|task| task.name == "ac:task")
         .map(|task| {
-            let done = task
-                .child("ac:task-status")
-                .is_some_and(|status| plain_text(&status.children) == "complete");
+            let done = task.child("ac:task-status").is_some_and(|status| plain_text(&status.children) == "complete");
             let blocks = task.child("ac:task-body").map(|body| blocks_of(&body.children)).unwrap_or_default();
 
             list_item(if done { "- [x] " } else { "- [ ] " }, 2, &blocks).trim_end().to_string()
@@ -857,11 +790,7 @@ fn table(element: &Element) -> String {
             header |= cell.name == "th";
 
             let blocks = blocks_of(&cell.children);
-            let text = blocks
-                .iter()
-                .map(|block| block.text.replace("\\\n", "<br>").replace('\n', "<br>"))
-                .collect::<Vec<_>>()
-                .join("<br>");
+            let text = blocks.iter().map(|block| block.text.replace("\\\n", "<br>").replace('\n', "<br>")).collect::<Vec<_>>().join("<br>");
             texts.push(text.replace('|', "\\|"));
 
             let span = cell.attribute("colspan").and_then(|span| span.parse::<usize>().ok()).unwrap_or(1).min(50);
@@ -891,11 +820,7 @@ fn table(element: &Element) -> String {
 
         line
     };
-    let header = if cells.first().is_some_and(|(header, _)| *header) {
-        cells.remove(0).1
-    } else {
-        Vec::new()
-    };
+    let header = if cells.first().is_some_and(|(header, _)| *header) { cells.remove(0).1 } else { Vec::new() };
     let mut lines = vec![line(&header), format!("|{}", " --- |".repeat(width))];
     lines.extend(cells.iter().map(|(_, texts)| line(texts)));
 
@@ -974,14 +899,7 @@ impl Flow {
                 let text = inline_of(&element.children).replace(BREAK, " ");
                 let text = text.split(' ').filter(|word| !word.is_empty()).collect::<Vec<_>>().join(" ");
 
-                self.block(
-                    Kind::Other,
-                    if text.is_empty() {
-                        text
-                    } else {
-                        format!("{} {text}", "#".repeat(level))
-                    },
-                );
+                self.block(Kind::Other, if text.is_empty() { text } else { format!("{} {text}", "#".repeat(level)) });
             }
             "p" => self.container(&element.children),
             "hr" => self.block(Kind::Other, "---".to_string()),
@@ -1009,10 +927,7 @@ impl Flow {
         let title = element.parameter("title");
 
         match name.as_str() {
-            "code" => self.block(
-                Kind::Other,
-                fence(&plain.unwrap_or_default(), &element.parameter("language").unwrap_or_default()),
-            ),
+            "code" => self.block(Kind::Other, fence(&plain.unwrap_or_default(), &element.parameter("language").unwrap_or_default())),
             "noformat" => self.block(Kind::Other, fence(&plain.unwrap_or_default(), "")),
             "info" | "note" | "warning" | "tip" => self.block(Kind::Other, callout(panel_label(&name), title.as_deref(), rich.unwrap_or_default())),
             "panel" => self.block(Kind::Other, callout(None, title.as_deref(), rich.unwrap_or_default())),
@@ -1039,10 +954,7 @@ impl Flow {
 
             return;
         };
-        let content = node
-            .child("ac:adf-content")
-            .map(|content| content.children.as_slice())
-            .unwrap_or_default();
+        let content = node.child("ac:adf-content").map(|content| content.children.as_slice()).unwrap_or_default();
         let kind = node
             .elements()
             .find(|attribute| attribute.name == "ac:adf-attribute" && attribute.attribute("key") == Some("panel-type"))
@@ -1084,10 +996,7 @@ mod tests {
         );
         assert_eq!(md("<h2>Two<br/>lines</h2>"), "## Two lines");
         assert_eq!(md("<h2></h2><p>Alone</p>"), "Alone");
-        assert_eq!(
-            md("loose text<p>then a paragraph</p>and more"),
-            "loose text\n\nthen a paragraph\n\nand more"
-        );
+        assert_eq!(md("loose text<p>then a paragraph</p>and more"), "loose text\n\nthen a paragraph\n\nand more");
     }
 
     #[test]
@@ -1146,10 +1055,7 @@ mod tests {
         let storage = "<ul><li>one</li><li><p>two</p><ol><li>first</li><li>second<ul><li>deep</li></ul></li></ol></li><li>three<br/>continued</li><li></li></ul>";
 
         assert_eq!(md(storage), "- one\n- two\n  1. first\n  2. second\n     - deep\n- three\\\n  continued");
-        assert_eq!(
-            md("<ol start=\"3\"><li>c</li><li><p>d</p><p>more d</p></li></ol>"),
-            "3. c\n4. d\n\n   more d"
-        );
+        assert_eq!(md("<ol start=\"3\"><li>c</li><li><p>d</p><p>more d</p></li></ol>"), "3. c\n4. d\n\n   more d");
         assert_eq!(md("<ul><li>a</li><ul><li>stray</li></ul><li>b</li></ul>"), "- a\n  - stray\n- b");
         assert_eq!(md("<p>Before</p><ul><li>item</li></ul><p>After</p>"), "Before\n\n- item\n\nAfter");
     }
@@ -1167,10 +1073,7 @@ mod tests {
     fn tables_become_gfm_tables() {
         let storage = "<table><colgroup><col/><col/></colgroup><tbody><tr><th>Name</th><th><p>Value</p></th></tr><tr><td>a|b</td><td><p>one</p><p>two<br/>three</p></td></tr><tr><td colspan=\"2\">wide</td></tr><tr><td>short</td></tr></tbody></table>";
 
-        assert_eq!(
-            md(storage),
-            "| Name | Value |\n| --- | --- |\n| a\\|b | one<br>two<br>three |\n| wide | |\n| short | |"
-        );
+        assert_eq!(md(storage), "| Name | Value |\n| --- | --- |\n| a\\|b | one<br>two<br>three |\n| wide | |\n| short | |");
         assert_eq!(
             md("<table><tr><td>no</td><td>header</td></tr><tr><td><ul><li>x</li><li>y</li></ul></td><td></td></tr></table>"),
             "| | |\n| --- | --- |\n| no | header |\n| - x<br>- y | |"
@@ -1180,26 +1083,11 @@ mod tests {
 
     #[test]
     fn images_keep_their_alt_text_or_file_name() {
-        assert_eq!(
-            md("<p><img src=\"https://example.com/a.png\" alt=\"A diagram\"/></p>"),
-            "![A diagram](https://example.com/a.png)"
-        );
-        assert_eq!(
-            md("<p><img src=\"/download/attachments/1/shot.png?version=2\"/></p>"),
-            "*(image: shot.png)*"
-        );
-        assert_eq!(
-            md("<p><ac:image ac:alt=\"Flow\"><ri:attachment ri:filename=\"flow.png\"/></ac:image></p>"),
-            "*(image: Flow)*"
-        );
-        assert_eq!(
-            md("<ac:image ac:width=\"200\"><ri:attachment ri:filename=\"my_flow.png\" /></ac:image>"),
-            "*(image: my_flow.png)*"
-        );
-        assert_eq!(
-            md("<ac:image><ri:url ri:value=\"https://example.com/x.png\"/></ac:image>"),
-            "![image](https://example.com/x.png)"
-        );
+        assert_eq!(md("<p><img src=\"https://example.com/a.png\" alt=\"A diagram\"/></p>"), "![A diagram](https://example.com/a.png)");
+        assert_eq!(md("<p><img src=\"/download/attachments/1/shot.png?version=2\"/></p>"), "*(image: shot.png)*");
+        assert_eq!(md("<p><ac:image ac:alt=\"Flow\"><ri:attachment ri:filename=\"flow.png\"/></ac:image></p>"), "*(image: Flow)*");
+        assert_eq!(md("<ac:image ac:width=\"200\"><ri:attachment ri:filename=\"my_flow.png\" /></ac:image>"), "*(image: my_flow.png)*");
+        assert_eq!(md("<ac:image><ri:url ri:value=\"https://example.com/x.png\"/></ac:image>"), "![image](https://example.com/x.png)");
     }
 
     #[test]
@@ -1238,10 +1126,7 @@ mod tests {
 
     #[test]
     fn other_macros_keep_their_content_and_drop_their_parameters() {
-        assert_eq!(
-            md("<ac:structured-macro ac:name=\"toc\"><ac:parameter ac:name=\"maxLevel\">2</ac:parameter></ac:structured-macro><p>x</p>"),
-            "x"
-        );
+        assert_eq!(md("<ac:structured-macro ac:name=\"toc\"><ac:parameter ac:name=\"maxLevel\">2</ac:parameter></ac:structured-macro><p>x</p>"), "x");
         assert_eq!(md("<ac:structured-macro ac:name=\"expand\"><ac:parameter ac:name=\"title\">Details</ac:parameter><ac:rich-text-body><p>Hidden</p></ac:rich-text-body></ac:structured-macro>"), "**Details**\n\nHidden");
         assert_eq!(md("<ac:structured-macro ac:name=\"excerpt\"><ac:parameter ac:name=\"hidden\">true</ac:parameter><ac:rich-text-body><p>Kept</p></ac:rich-text-body></ac:structured-macro>"), "Kept");
         assert_eq!(md("<p>Tracked in <ac:structured-macro ac:name=\"jira\"><ac:parameter ac:name=\"server\">Jira</ac:parameter><ac:parameter ac:name=\"key\">WEB-12</ac:parameter></ac:structured-macro> <ac:structured-macro ac:name=\"status\"><ac:parameter ac:name=\"colour\">Green</ac:parameter><ac:parameter ac:name=\"title\">DONE</ac:parameter></ac:structured-macro></p>"), "Tracked in WEB-12 **DONE**");
@@ -1250,10 +1135,7 @@ mod tests {
 
     #[test]
     fn page_links_become_wiki_links() {
-        assert_eq!(
-            md("<p>See <ac:link><ri:page ri:content-title=\"Release plan\"/></ac:link>.</p>"),
-            "See [[Release plan]]."
-        );
+        assert_eq!(md("<p>See <ac:link><ri:page ri:content-title=\"Release plan\"/></ac:link>.</p>"), "See [[Release plan]].");
         assert_eq!(md("<p><ac:link><ri:page ri:content-title=\"Release plan\" ri:space-key=\"OPS\"/><ac:plain-text-link-body><![CDATA[the plan]]></ac:plain-text-link-body></ac:link></p>"), "[[OPS:Release plan|the plan]]");
         assert_eq!(md("<p><ac:link><ri:page ri:content-title=\"Płatności\"/><ac:link-body>płatności</ac:link-body></ac:link> <ac:link><ri:page ri:content-title=\"Home\" ri:space-key=\"~jan\"/></ac:link></p>"), "[[Płatności]] [[Home]]");
         assert_eq!(md("<p><ac:link><ri:page ri:content-title=\"A | B\"/></ac:link>, <ac:link><ri:attachment ri:filename=\"spec_v2.pdf\"/></ac:link>, <ac:link ac:anchor=\"top\"><ac:plain-text-link-body><![CDATA[up]]></ac:plain-text-link-body></ac:link>, <ac:link><ri:user ri:account-id=\"42\"/></ac:link>!</p>"), "A | B, spec_v2.pdf, up, !");
@@ -1284,10 +1166,94 @@ mod tests {
         assert_eq!(md("<![CDATA[unterminated"), "unterminated");
         assert_eq!(md(""), "");
         assert_eq!(md(&"<div>".repeat(5000)), "");
-        assert_eq!(
-            md(&format!("{}deep{}", "<ul><li>".repeat(300), "</li></ul>".repeat(300))).lines().count(),
-            1
-        );
+        assert_eq!(md(&format!("{}deep{}", "<ul><li>".repeat(300), "</li></ul>".repeat(300))).lines().count(), 1);
+    }
+
+    #[test]
+    fn text_in_any_alphabet_right_after_a_tag() {
+        assert_eq!(md("<p>Żółta kartka</p><p><strong>ąę</strong>ść</p>€<br/>→ koniec"), "Żółta kartka\n\n**ąę**ść\n\n€\\\n→ koniec");
+    }
+
+    /// Markup glued together at random: whatever comes in, the converter answers.
+    #[test]
+    fn random_markup_never_panics() {
+        let pieces = [
+            "<p>",
+            "</p>",
+            "<ul>",
+            "<li>",
+            "</li>",
+            "</ul>",
+            "<ol>",
+            "<table>",
+            "<tr>",
+            "<td>",
+            "<th colspan=\"3\">",
+            "</table>",
+            "<br/>",
+            "<strong>",
+            "</strong>",
+            "<a href=\"x y\">",
+            "</a>",
+            "<![CDATA[",
+            "]]>",
+            "<ac:structured-macro ac:name=\"code\">",
+            "<ac:plain-text-body>",
+            "</ac:structured-macro>",
+            "<ac:parameter ac:name=\"language\">",
+            "<ac:task-list>",
+            "<ac:task>",
+            "<ac:task-body>",
+            "<ac:link>",
+            "<ri:page ri:content-title=\"Zażółć\"/>",
+            "<",
+            ">",
+            "&",
+            "&amp;",
+            "&#x;",
+            "\"",
+            "'",
+            "=",
+            "/",
+            "żółć ",
+            "text ",
+            "\n",
+            "*",
+            "_",
+            "`",
+            "[[",
+            "]]",
+            "|",
+            "# ",
+            "- ",
+            "1. ",
+            "<!--",
+            "-->",
+            "<h2>",
+            "</h2>",
+            "<blockquote>",
+            "<pre>",
+            "</pre>",
+            "<ac:structured-macro ac:name=\"info\"><ac:rich-text-body>",
+            "</ac:rich-text-body>",
+            "<img src=\"ż\"",
+            "🙂",
+        ];
+        let mut state: u64 = 0x2545_f491_4f6c_dd1d;
+
+        for _ in 0..3000 {
+            let mut storage = String::new();
+
+            for _ in 0..40 {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                storage.push_str(pieces[(state % pieces.len() as u64) as usize]);
+            }
+
+            let markdown = md(&storage);
+            assert!(!markdown.contains(BREAK), "{storage}");
+        }
     }
 
     #[test]

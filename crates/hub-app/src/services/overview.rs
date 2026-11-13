@@ -111,13 +111,7 @@ pub fn dashboard(app: &App, user: &AuthUser) -> ApiResult<Dashboard> {
 }
 
 /// Recent events the caller may see, newest first, optionally for one project or one issue.
-pub fn activity(
-    connection: &Connection,
-    user: &AuthUser,
-    project_key: Option<&str>,
-    before: Option<Id>,
-    limit: i64,
-) -> ApiResult<Vec<ActivityItem>> {
+pub fn activity(connection: &Connection, user: &AuthUser, project_key: Option<&str>, before: Option<Id>, limit: i64) -> ApiResult<Vec<ActivityItem>> {
     let (visible, mut params) = visible_projects(user, "e.project_id");
     let mut condition = format!("e.project_id IS NOT NULL AND {visible} AND e.kind NOT IN ('issue.ranked', 'project.updated')");
 
@@ -269,7 +263,12 @@ pub fn save_filter(connection: &Connection, user: &AuthUser, id: Option<Id>, inp
             id
         }
         None => {
-            let name = input.name.as_deref().map(str::trim).filter(|name| !name.is_empty()).ok_or_else(|| ApiError::bad_request("The filter needs a name"))?;
+            let name = input
+                .name
+                .as_deref()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .ok_or_else(|| ApiError::bad_request("The filter needs a name"))?;
 
             connection.execute(
                 "INSERT INTO filter (owner_id, name, query, shared, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",

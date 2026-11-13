@@ -144,7 +144,11 @@ async fn code_moves_the_issue_through_the_workflow() {
     let mut review = pull(7, "WEB-1 Card payments", "feature/web-1-card-payments", "submitted", json!({}));
     review["review"] = json!({ "state": "changes_requested" });
     hub.deliver("pull_request_review", review).await;
-    hub.deliver("check_suite", json!({ "repository": { "full_name": "acme/web" }, "check_suite": { "head_sha": "sha-7", "status": "completed", "conclusion": "failure" } })).await;
+    hub.deliver(
+        "check_suite",
+        json!({ "repository": { "full_name": "acme/web" }, "check_suite": { "head_sha": "sha-7", "status": "completed", "conclusion": "failure" } }),
+    )
+    .await;
 
     let issue = hub.client.get(&format!("/api/issues/{key}")).await;
     let dev = &issue["ext"]["github"];
@@ -156,7 +160,17 @@ async fn code_moves_the_issue_through_the_workflow() {
     assert_eq!(issue["panels"]["github"]["suggestedBranch"], "feature/WEB-1-card-payments");
     assert_eq!(issue["panels"]["github"]["commits"][0]["committedAt"], "2026-11-12T10:00:00.000Z");
 
-    hub.deliver("pull_request", pull(7, "WEB-1 Card payments", "feature/web-1-card-payments", "closed", json!({ "state": "closed", "merged": true, "merged_at": "2026-11-12T12:00:00Z" }))).await;
+    hub.deliver(
+        "pull_request",
+        pull(
+            7,
+            "WEB-1 Card payments",
+            "feature/web-1-card-payments",
+            "closed",
+            json!({ "state": "closed", "merged": true, "merged_at": "2026-11-12T12:00:00Z" }),
+        ),
+    )
+    .await;
 
     assert_eq!(hub.status(&key).await, "Done");
     assert!(hub.client.get(&format!("/api/issues/{key}")).await["ext"]["github"]["drift"].as_array().unwrap().is_empty());
@@ -189,7 +203,8 @@ async fn rules_can_be_changed_and_a_closing_phrase_works_without_one() {
     let key = hub.issue("Typos").await;
 
     let code = hub.client.get("/api/m/github/projects/WEB").await;
-    let triggers: Vec<&str> = code["rules"].as_array().unwrap().iter().filter(|rule| !rule["statusId"].is_null()).map(|rule| rule["trigger"].as_str().unwrap()).collect();
+    let triggers: Vec<&str> =
+        code["rules"].as_array().unwrap().iter().filter(|rule| !rule["statusId"].is_null()).map(|rule| rule["trigger"].as_str().unwrap()).collect();
     assert_eq!(triggers, ["branch_created", "pr_opened", "pr_merged"], "sensible defaults when the first repository is connected");
 
     hub.client.put("/api/m/github/projects/WEB/rules", json!([])).await;
@@ -322,7 +337,11 @@ async fn the_api_backfills_what_webhooks_missed_and_creates_branches() {
     let api = fake_github().await;
     let repo = hub.client.get("/api/m/github/projects/WEB").await["repos"][0]["id"].as_i64().unwrap();
 
-    assert_eq!(hub.client.refused(Method::POST, &format!("/api/m/github/repos/{repo}/sync"), Some(json!({}))).await, StatusCode::CONFLICT, "no token yet");
+    assert_eq!(
+        hub.client.refused(Method::POST, &format!("/api/m/github/repos/{repo}/sync"), Some(json!({}))).await,
+        StatusCode::CONFLICT,
+        "no token yet"
+    );
     assert_eq!(
         hub.client.refused(Method::PUT, "/api/m/github/settings", Some(json!({ "apiUrl": "http://evil.example.com" }))).await,
         StatusCode::BAD_REQUEST,
@@ -354,7 +373,10 @@ async fn the_api_backfills_what_webhooks_missed_and_creates_branches() {
     let panel = hub.client.post("/api/m/github/issues/WEB-2/branch", json!({ "repoId": repo })).await;
     assert_eq!(panel["branches"][0]["name"], "feature/WEB-2-old-work");
     assert_eq!(hub.status("WEB-2").await, "In Progress");
-    assert_eq!(hub.client.refused(Method::POST, "/api/m/github/issues/WEB-2/branch", Some(json!({ "repoId": repo, "name": "bad name" }))).await, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        hub.client.refused(Method::POST, "/api/m/github/issues/WEB-2/branch", Some(json!({ "repoId": repo, "name": "bad name" }))).await,
+        StatusCode::BAD_REQUEST
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -363,7 +385,8 @@ async fn the_demo_shows_code_next_to_issues() {
     client.setup(true).await;
 
     let code = client.get("/api/m/github/projects/WEB").await;
-    let open: Vec<i64> = code["pulls"].as_array().unwrap().iter().filter(|pull| pull["state"] == "open").map(|pull| pull["number"].as_i64().unwrap()).collect();
+    let open: Vec<i64> =
+        code["pulls"].as_array().unwrap().iter().filter(|pull| pull["state"] == "open").map(|pull| pull["number"].as_i64().unwrap()).collect();
 
     assert_eq!(code["repos"][0]["fullName"], "acme/sklep-web");
     assert_eq!(open.len(), 5);

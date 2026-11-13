@@ -16,4 +16,4 @@ targetSpaceKey?: string,
 /**
  * Titles or ids of pages to leave out, together with everything under them.
  */
-exclude: Array<string>, };
+exclude?: Array<string>, };

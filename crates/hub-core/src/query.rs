@@ -408,9 +408,7 @@ impl Parser {
                 }
 
                 match word.parse::<f64>() {
-                    Ok(number) if word.chars().all(|character| character.is_ascii_digit() || character == '.') => {
-                        Ok(QueryValue::Number(number))
-                    }
+                    Ok(number) if word.chars().all(|character| character.is_ascii_digit() || character == '.') => Ok(QueryValue::Number(number)),
                     _ => Ok(QueryValue::Text(word)),
                 }
             }
@@ -470,8 +468,7 @@ impl QueryFieldInfo {
     }
 }
 
-pub const QUERY_FUNCTIONS: [&str; 6] =
-    ["currentUser()", "openSprints()", "now()", "startOfDay()", "startOfWeek()", "startOfMonth()"];
+pub const QUERY_FUNCTIONS: [&str; 6] = ["currentUser()", "openSprints()", "now()", "startOfDay()", "startOfWeek()", "startOfMonth()"];
 
 #[cfg(test)]
 mod tests {
@@ -486,18 +483,13 @@ mod tests {
 
     #[test]
     fn parses_clauses_lists_and_order() {
-        let query = parse_query(
-            "project = WEB AND status in (\"In Progress\", Done) AND assignee = currentUser() ORDER BY priority DESC, created",
-        )
-        .unwrap();
+        let query =
+            parse_query("project = WEB AND status in (\"In Progress\", Done) AND assignee = currentUser() ORDER BY priority DESC, created").unwrap();
         let QueryNode::And(items) = query.filter.unwrap() else { panic!("expected AND") };
 
         assert_eq!(items.len(), 3);
         assert_eq!(clause(&items[1]).op, ClauseOp::In);
-        assert_eq!(
-            clause(&items[1]).values,
-            vec![QueryValue::Text("In Progress".into()), QueryValue::Text("Done".into())]
-        );
+        assert_eq!(clause(&items[1]).values, vec![QueryValue::Text("In Progress".into()), QueryValue::Text("Done".into())]);
         assert_eq!(clause(&items[2]).values, vec![QueryValue::Func("currentuser".into())]);
         assert_eq!(query.order_by.len(), 2);
         assert!(query.order_by[0].descending && !query.order_by[1].descending);

@@ -48,7 +48,8 @@ pub fn setup_required(connection: &Connection) -> ApiResult<bool> {
 
 fn clean_email(email: &str) -> ApiResult<String> {
     let email = email.trim().to_lowercase();
-    let valid = email.split_once('@').is_some_and(|(local, domain)| !local.is_empty() && domain.contains('.') && !email.contains(char::is_whitespace));
+    let valid =
+        email.split_once('@').is_some_and(|(local, domain)| !local.is_empty() && domain.contains('.') && !email.contains(char::is_whitespace));
 
     if valid {
         Ok(email)
@@ -191,7 +192,9 @@ pub fn resolve_user(connection: &Connection, text: &str) -> ApiResult<Option<Id>
 
     Ok(users
         .into_iter()
-        .find(|(_, name, email)| fold(email) == wanted || fold(name) == wanted || handle_of(name) == wanted || fold(email.split('@').next().unwrap_or("")) == wanted)
+        .find(|(_, name, email)| {
+            fold(email) == wanted || fold(name) == wanted || handle_of(name) == wanted || fold(email.split('@').next().unwrap_or("")) == wanted
+        })
         .map(|(id, _, _)| id))
 }
 

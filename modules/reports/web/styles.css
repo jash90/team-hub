@@ -1,0 +1,448 @@
+/* The reports' own colours: one hue per thing measured, the same in every chart.
+   Checked for colour-blind separation against the application's light and dark surfaces. */
+.reports {
+  --reports-work: #2a78d6;
+  --reports-work-pale: #9ec5f4;
+  --reports-new: #eb6834;
+  --reports-done: #1baf7a;
+  --reports-context: #8a93a3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .reports {
+    --reports-work: #3987e5;
+    --reports-work-pale: #184f95;
+    --reports-new: #d95926;
+    --reports-done: #199e70;
+    --reports-context: #5c6677;
+  }
+}
+
+:root[data-theme='dark'] .reports {
+  --reports-work: #3987e5;
+  --reports-work-pale: #184f95;
+  --reports-new: #d95926;
+  --reports-done: #199e70;
+  --reports-context: #5c6677;
+}
+
+.reports-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--sunk);
+  color: var(--muted);
+  max-width: 100ch;
+}
+
+.reports-note .icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.reports-panel {
+  min-width: 0;
+}
+
+.reports-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px 0;
+}
+
+.reports-head p {
+  max-width: 100ch;
+}
+
+.reports-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 16px;
+  min-width: 0;
+  transition: opacity 0.15s;
+}
+
+.reports-stale {
+  opacity: 0.5;
+}
+
+.reports-panel > .spinner-row,
+.reports-panel > .note {
+  margin: 16px;
+}
+
+/* ---------- controls ---------- */
+
+.reports-switch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--sunk);
+}
+
+.reports-switch button {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.reports-switch button:hover {
+  color: var(--ink);
+}
+
+.reports-switch .reports-switch-on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(16 24 40 / 14%);
+}
+
+/* ---------- figures ---------- */
+
+.reports-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  margin: 0;
+}
+
+.reports-stats dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.reports-stats dd {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.reports-stats small {
+  margin-left: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.reports-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.reports-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reports-legend strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.reports-swatch {
+  flex: none;
+  width: 14px;
+  height: 0;
+}
+
+.reports-swatch-line {
+  border-top: 2px solid currentcolor;
+  border-radius: 1px;
+}
+
+.reports-swatch-dash {
+  border-top: 2px dashed currentcolor;
+}
+
+.reports-swatch-box {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: currentcolor;
+}
+
+.reports-swatch-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+/* ---------- charts ---------- */
+
+.reports-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reports-chart {
+  position: relative;
+  min-width: 0;
+  min-height: 280px;
+  border-radius: var(--radius-sm);
+  outline-offset: 2px;
+}
+
+.reports-chart svg {
+  display: block;
+  overflow: visible;
+  touch-action: pan-y;
+}
+
+.reports-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.reports-axis {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.reports-tick,
+.reports-guide {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.reports-cap,
+.reports-mark {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.reports-guide,
+.reports-mark,
+.reports-cap {
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.reports-line {
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.reports-line-dashed {
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  stroke-linecap: butt;
+}
+
+.reports-wash {
+  fill: currentcolor;
+  fill-opacity: 0.1;
+}
+
+.reports-band {
+  fill: currentcolor;
+  fill-opacity: 0.3;
+}
+
+.reports-bar {
+  fill: currentcolor;
+}
+
+.reports-dot {
+  fill: currentcolor;
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.reports-mark-dot {
+  fill: var(--surface);
+  stroke: var(--reports-new);
+  stroke-width: 2;
+}
+
+.reports-cross,
+.reports-reference {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.reports-slot {
+  fill: transparent;
+}
+
+.reports-slot-on {
+  fill: var(--sunk);
+}
+
+.reports-group {
+  outline: none;
+}
+
+.reports-group:focus-visible .reports-slot {
+  fill: var(--sunk);
+  stroke: var(--accent);
+}
+
+.reports-pointing {
+  cursor: pointer;
+}
+
+.reports-tip {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 12.5px;
+  pointer-events: none;
+  transform: translateX(12px);
+}
+
+.reports-tip-before {
+  transform: translateX(calc(-100% - 12px));
+}
+
+.reports-tip-title {
+  font-weight: 600;
+}
+
+.reports-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.reports-tip-row strong {
+  min-width: 2ch;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- tables ---------- */
+
+.reports-data summary {
+  width: max-content;
+  color: var(--muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.reports-data[open] summary {
+  margin-bottom: 8px;
+}
+
+.reports-data-scroll {
+  max-height: 360px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+}
+
+.reports-data-scroll th {
+  position: sticky;
+  top: 0;
+}
+
+.reports-data-scroll tr:last-child td {
+  border-bottom: 0;
+}
+
+.reports .reports-number {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- workload ---------- */
+
+.reports-load {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) minmax(80px, 1fr) max-content;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.reports-load-row {
+  display: contents;
+}
+
+.reports-load-name span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reports-load-track {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+}
+
+.reports-load-doing,
+.reports-load-waiting {
+  min-width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--reports-work);
+}
+
+.reports-load-waiting {
+  background: var(--reports-work-pale);
+}
+
+.reports-load-doing:not(:last-child) {
+  border-radius: 0;
+}
+
+.reports-load-figures {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+  .reports-load {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .reports-load-track {
+    grid-column: 1 / -1;
+    order: 1;
+  }
+
+  .reports-load-row {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    gap: 4px 14px;
+  }
+}

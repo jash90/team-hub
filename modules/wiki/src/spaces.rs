@@ -50,12 +50,7 @@ fn map_space(row: &rusqlite::Row) -> rusqlite::Result<SpaceRecord> {
 }
 
 pub fn space_by_key(connection: &Connection, key: &str) -> ApiResult<Option<SpaceRecord>> {
-    query_one(
-        connection,
-        &format!("{SPACE_SELECT} WHERE s.key = ?1 COLLATE NOCASE"),
-        [key.trim()],
-        map_space,
-    )
+    query_one(connection, &format!("{SPACE_SELECT} WHERE s.key = ?1 COLLATE NOCASE"), [key.trim()], map_space)
 }
 
 pub fn space_by_id(connection: &Connection, id: Id) -> ApiResult<Option<SpaceRecord>> {
@@ -63,12 +58,7 @@ pub fn space_by_id(connection: &Connection, id: Id) -> ApiResult<Option<SpaceRec
 }
 
 pub fn spaces_by_source(connection: &Connection, source: &str) -> ApiResult<Vec<SpaceRecord>> {
-    query_all(
-        connection,
-        &format!("{SPACE_SELECT} WHERE s.source = ?1 ORDER BY s.key"),
-        [source],
-        map_space,
-    )
+    query_all(connection, &format!("{SPACE_SELECT} WHERE s.source = ?1 ORDER BY s.key"), [source], map_space)
 }
 
 /// A space the caller may see, with their role in the project it is bound to.
@@ -120,11 +110,7 @@ pub fn access_to(connection: &Connection, user: &AuthUser, space: SpaceRecord) -
         None => None,
     };
 
-    Ok(SpaceAccess {
-        space,
-        project,
-        instance_admin: user.is_admin(),
-    })
+    Ok(SpaceAccess { space, project, instance_admin: user.is_admin() })
 }
 
 pub fn space_access(connection: &Connection, user: &AuthUser, key: &str) -> ApiResult<SpaceAccess> {
@@ -168,10 +154,7 @@ pub fn list_spaces(connection: &Connection, user: &AuthUser) -> ApiResult<Vec<Wi
         map_space,
     )?;
 
-    records
-        .into_iter()
-        .map(|space| describe(connection, &access_to(connection, user, space)?))
-        .collect()
+    records.into_iter().map(|space| describe(connection, &access_to(connection, user, space)?)).collect()
 }
 
 pub fn clean_key(key: &str) -> ApiResult<String> {
@@ -198,9 +181,7 @@ fn clean_description(description: &str) -> ApiResult<String> {
     let description = description.trim();
 
     if description.chars().count() > MAX_DESCRIPTION {
-        return Err(ApiError::bad_request(format!(
-            "The description is longer than {MAX_DESCRIPTION} characters"
-        )));
+        return Err(ApiError::bad_request(format!("The description is longer than {MAX_DESCRIPTION} characters")));
     }
 
     Ok(description.to_string())
@@ -227,15 +208,7 @@ pub fn create_space(tx: &Tx, new: &NewSpace) -> ApiResult<SpaceRecord> {
 
     tx.execute(
         "INSERT INTO wiki_space (key, name, description, project_id, source, source_ref, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        (
-            &key,
-            &name,
-            &description,
-            new.project_id,
-            new.source,
-            new.source_ref.map(serde_json::Value::to_string),
-            &tx.now,
-        ),
+        (&key, &name, &description, new.project_id, new.source, new.source_ref.map(serde_json::Value::to_string), &tx.now),
     )?;
 
     space_by_id(tx, tx.last_insert_rowid())?.ok_or_else(|| ApiError::not_found("Space"))
@@ -252,10 +225,7 @@ pub fn update_space(tx: &Tx, user: &AuthUser, access: &SpaceAccess, patch: &Wiki
     }
 
     if let Some(description) = &patch.description {
-        tx.execute(
-            "UPDATE wiki_space SET description = ?1 WHERE id = ?2",
-            (clean_description(description)?, space.id),
-        )?;
+        tx.execute("UPDATE wiki_space SET description = ?1 WHERE id = ?2", (clean_description(description)?, space.id))?;
     }
 
     if let Some(project_key) = &patch.project_key {
@@ -272,10 +242,7 @@ pub fn update_space(tx: &Tx, user: &AuthUser, access: &SpaceAccess, patch: &Wiki
                 None => user.require_admin()?,
             }
 
-            tx.execute(
-                "UPDATE wiki_space SET project_id = ?1 WHERE id = ?2",
-                (project_id.map(|project| project.id), space.id),
-            )?;
+            tx.execute("UPDATE wiki_space SET project_id = ?1 WHERE id = ?2", (project_id.map(|project| project.id), space.id))?;
         }
     }
 
@@ -285,10 +252,7 @@ pub fn update_space(tx: &Tx, user: &AuthUser, access: &SpaceAccess, patch: &Wiki
 /// Deletes a space with its pages, their history and their links.
 pub fn delete_space(tx: &Tx, space: &SpaceRecord) -> ApiResult<()> {
     links::forget_pages(tx, "SELECT id FROM wiki_page WHERE space_id = ?1", [space.id])?;
-    tx.execute(
-        "DELETE FROM wiki_fts WHERE rowid IN (SELECT id FROM wiki_page WHERE space_id = ?1)",
-        [space.id],
-    )?;
+    tx.execute("DELETE FROM wiki_fts WHERE rowid IN (SELECT id FROM wiki_page WHERE space_id = ?1)", [space.id])?;
     tx.execute("DELETE FROM wiki_space WHERE id = ?1", [space.id])?;
 
     Ok(())
