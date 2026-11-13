@@ -192,7 +192,9 @@ away from the server opens in your browser.
 On Linux Tauri stacks a window's webviews one under another and ignores positions, so
 `stage.rs` lays the two out itself with a GTK overlay; on macOS and Windows it uses Tauri's
 own placement (the `unstable` feature of the `tauri` crate, which is what Tauri calls more
-than one webview in a window).
+than one webview in a window). On macOS that placement counts from the top of the window's
+frame, title bar included, so the page sends its own height along and the title bar is
+added to where the tracker goes.
 
 ## Connecting to a server
 
@@ -518,22 +520,26 @@ Actions. Its first run is its first test.
 
 ## What is not done
 
-- **The window with the tracker in it has run on Linux only**, on a virtual screen: the two
-  webviews side by side, signing in to the tracker and staying signed in after a restart,
-  opening an issue from the panel, resizing, hiding the panel, the language switch, and a
-  page of the server trying every command of the app and being refused each one. On macOS
-  and Windows the same code places the tracker with Tauri's own calls, which compile and
-  have not been run by anybody.
+- **The window with the tracker in it has run on Linux and on macOS, not on Windows.** On
+  Linux on a virtual screen; on macOS 27 (Apple silicon) in a development build, driven
+  through the accessibility interface against a local server with demo data: the two
+  webviews side by side, resizing, hiding the panel, the app's own views in place of the
+  tracker and the tracker back on the page it showed. On macOS that found the tracker lying
+  a title bar too high, which is fixed (`title_bar` in `stage.rs`). On Windows the same
+  code places the tracker with Tauri's own calls, which compile and have not been run by
+  anybody.
 - **Signing in, the thread link on a run's card, and the tracker's place while the server
-  is away have run on Linux only**, on a virtual screen with GNOME Keyring: signing in with
-  e-mail and password on browser data wiped clean, with the tracker signed in by the same
-  sign-in and still signed in after a restart; a wrong password; signing in at the tracker
-  with a code; a keychain that refuses the token (the token is taken back on the server);
-  **Open the thread in the app**; the tracker leaving and returning with the server; and
-  disconnecting removing the token on the server. The **Try again** button was not pressed
-  there: the app noticed the server by itself first. On macOS and Windows nobody has seen
-  any of it; handing the session to the tracker uses each system's own cookie store, which
-  is the part most likely to differ.
+  is away have run on Linux and on macOS, not on Windows.** On both: signing in with e-mail
+  and password, with the tracker signed in by the same sign-in and still signed in after a
+  restart; a wrong password; signing in at the tracker with a code; **Open the thread in
+  the app** and the way back; the tracker leaving and returning with the server; and
+  disconnecting removing the token on the server. On macOS **Try again** was pressed and
+  brought the tracker back; the session reaches the tracker through WKWebView's cookie
+  store. On Linux only: a keychain that refuses the token. Not seen on macOS: a link that
+  leads away from the server opening in the browser (a press made through the
+  accessibility interface does not count as a person's click for a link that asks for a
+  new window), and the installed, signed app rather than a development build. On Windows
+  nobody has seen any of it.
 - Where the tracker's own pages and the panel show the same thing (runners, tests), they
   are still two lists.
 - What the core says in its own words (for example "Working tree ready…") is English in the
