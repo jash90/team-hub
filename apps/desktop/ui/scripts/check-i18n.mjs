@@ -26,10 +26,16 @@ const unescape = (text) => text.replace(/\\(['"\\])/g, '$1').replace(/\\n/g, '\n
 const used = new Set();
 const plurals = new Set();
 // t('…'), and phrases kept in tables for t() to read later: label, hint, and the *_TEXT maps.
-const patterns = [/\bt\(\s*'((?:[^'\\]|\\.)*)'/g, /\bt\(\s*"((?:[^"\\]|\\.)*)"/g, /\b(?:label|hint): '((?:[^'\\]|\\.)*)'/g, /^\s+[a-z_]+: '((?:[^'\\]|\\.)*)',?$/gm];
+const patterns = [/\bt\(\s*'((?:[^'\\]|\\.)*)'/g, /\bt\(\s*"((?:[^"\\]|\\.)*)"/g, /\b(?:label|hint): '((?:[^'\\]|\\.)*)'/g];
 
 for (const file of files(join(root, 'src'))) {
   const source = readFileSync(file, 'utf8');
+
+  for (const table of source.matchAll(/const [A-Z_]+_TEXT\b[^=]*= \{([^}]*)\}/g)) {
+    for (const match of table[1].matchAll(/: '((?:[^'\\]|\\.)*)'/g)) {
+      used.add(unescape(match[1]));
+    }
+  }
 
   for (const pattern of patterns) {
     for (const match of source.matchAll(pattern)) {
