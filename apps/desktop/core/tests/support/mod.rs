@@ -573,18 +573,27 @@ async fn heartbeat(State(state): Shared, headers: HeaderMap, Json(body): Json<Va
 async fn create_run(State(state): Shared, headers: HeaderMap, UrlPath(key): UrlPath<String>, Json(body): Json<Value>) -> Response {
     let mut state = guard!(runs state, headers);
     let Some(issue) = state.issues.get(&key).cloned() else { return error(StatusCode::NOT_FOUND, "No such issue") };
+    // Like the server: a run that names the caller's runner is born claimed by it.
+    let runner = body["runnerId"].as_str().map(String::from);
+    let name = runner.as_ref().and_then(|id| state.runners.iter().find(|runner| runner["runnerId"] == id.as_str()).map(|runner| runner["name"].clone()));
+
+    if runner.is_some() && name.is_none() {
+        return error(StatusCode::BAD_REQUEST, "That runner has not announced itself yet; send a heartbeat first");
+    }
+
     let id = state.id();
     let run = json!({
         "id": id, "issueKey": key, "issueSummary": issue.row.summary, "projectKey": issue.row.project_key, "kind": body["kind"],
-        "instructions": body["instructions"].as_str().unwrap_or_default(), "state": "queued", "requestedBy": 1, "shared": body["shared"].as_bool().unwrap_or(false),
-        "runnerId": null, "runnerName": null, "model": body["model"], "repo": body["repo"], "branch": null, "pullRequestUrl": null, "summary": null,
+        "instructions": body["instructions"].as_str().unwrap_or_default(), "state": if runner.is_some() { "claimed" } else { "queued" },
+        "requestedBy": 1, "shared": body["shared"].as_bool().unwrap_or(false),
+        "runnerId": runner, "runnerName": name, "model": body["model"], "repo": body["repo"], "branch": null, "pullRequestUrl": null, "summary": null,
         "inputTokens": null, "outputTokens": null, "costUsd": null, "cancelRequested": false, "pendingProposals": 0, "pendingQuestion": false,
         "createdAt": NOW, "startedAt": null, "finishedAt": null,
     });
 
     state.writes.push(("POST".into(), format!("/issues/{key}/runs"), body));
     state.runs.push(run.clone());
-    state.announce("agent.run", json!({ "runId": id, "state": "queued", "issueKey": key }));
+    state.announce("agent.run", json!({ "runId": id, "state": run["state"], "issueKey": key }));
 
     Json(run).into_response()
 }

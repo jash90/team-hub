@@ -130,14 +130,17 @@ A runner authenticates with an API token and acts as that person.
 | Request | Answer |
 |---|---|
 | `POST /runners/heartbeat` `{ runnerId, name, kinds, projects?, version }` | `{ ok: true }`; call every 30–60 s |
-| `POST /runs/claim` `{ runnerId, kinds, projects? }` | `AgentRunDetail` of the oldest matching queued run, now `claimed` by this runner; `null` when there is none. A run is offered to the requester's own runners, or to anyone's when it is `shared`. |
+| `POST /runs/claim` `{ runnerId, kinds, projects?, runId? }` | `AgentRunDetail` of the oldest matching queued run, now `claimed` by this runner; `null` when there is none. With `runId`, that run or nothing. A run is offered to the requester's own runners, or to anyone's when it is `shared`. |
+| `POST /issues/{key}/runs` `{ …, runnerId }` | `AgentRun` created already `claimed` by the caller's own runner (which must have sent a heartbeat), for a runner that starts its own work: no other runner can take it in between. |
 | `POST /runs/{id}/events` `{ kind, text, data? }` | `{ id }` — a `question` puts the run in `waiting` |
 | `POST /runs/{id}/proposals` `{ kind, payload }` | `AgentProposal` |
 | `PATCH /runs/{id}` `{ state?, summary?, branch?, pullRequestUrl?, model?, inputTokens?, outputTokens?, costUsd? }` | `AgentRun` — read `cancelRequested` from the answer and stop when it is set |
 | `GET /runs/{id}` | `AgentRunDetail` — where answers and decisions show up |
 
 Only the runner that claimed a run may write to it. A claimed run whose runner has not been
-heard from for ten minutes goes back to `queued`.
+heard from for ten minutes goes back to `queued`. Once a run has ended, writes answer 409,
+with one exception: its runner may still `PATCH` `branch` and `pullRequestUrl`, because the
+push and the pull request usually happen after a person has looked at the result.
 
 ## Live
 

@@ -164,5 +164,5 @@ async fn add_proposal(State(app): State<App>, user: AuthUser, Path(id): Path<Id>
 }
 
 async fn patch_run(State(app): State<App>, user: AuthUser, Path(id): Path<Id>, Json(patch): Json<RunPatch>) -> Reply<AgentRun> {
-    app.run(move |app| app.write(agent(), |tx| runs::update(tx, &runs::held(tx, &user, id)?, &patch))).await.map(Json)
+    app.run(move |app| app.write(agent(), |tx| runs::report(tx, &user, id, &patch))).await.map(Json)
 }

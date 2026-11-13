@@ -220,6 +220,10 @@ pub struct NewRun {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repo: Option<String>,
     pub shared: bool,
+    /// This app's runner: the run is created already claimed by it, so that no other
+    /// runner of the same person can take it first.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runner_id: Option<String>,
 }
 
 /// `PATCH /runs/{id}`: only what changed is sent.

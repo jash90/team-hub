@@ -718,7 +718,7 @@ impl Core {
 
         match run {
             Ok(run) => {
-                lock(&self.runner).attach.insert(run.id, thread.id);
+                self.tie(&run, thread.id);
                 self.claim_runs();
             }
             Err(error) => {
@@ -747,12 +747,17 @@ impl Core {
 
     fn create_run(&self, key: &str, kind: ThreadKind, instructions: &str, model: &str, repo: &str) -> CoreResult<AgentRun> {
         let client = self.client()?;
+
+        // The server gives a run only to a runner it has heard from.
+        self.heartbeat(&client);
+
         let new = NewRun {
             kind: RunKind::of_thread(kind),
             instructions: instructions.to_string(),
             model: Some(model.to_string()),
             repo: Some(repo.to_string()),
             shared: false,
+            runner_id: self.identity().ok().map(|identity| identity.id),
         };
         let run = self.seen(client.create_run(key, &new));
 
@@ -761,6 +766,16 @@ impl Core {
         }
 
         run
+    }
+
+    /// Ties a run this app created to its thread. The server hands the run over already
+    /// claimed; an older server leaves it queued, and it is claimed like any other.
+    fn tie(&self, run: &AgentRun, thread_id: i64) {
+        if run.state == RunState::Queued {
+            lock(&self.runner).attach.insert(run.id, thread_id);
+        } else if self.store.set_run(thread_id, Some(run.id)).is_ok() {
+            self.emit(AppEvent::ThreadChanged { thread_id });
+        }
     }
 
     /// Says something to a thread: the answer to its question, or a follow-up. A thread whose
@@ -791,7 +806,7 @@ impl Core {
             let repo = self.store.repo(thread.repo_id).map(|repo| Self::repo_name(&repo)).unwrap_or_else(|_| "local/unknown".to_string());
 
             if let Ok(run) = self.create_run(&thread.issue_key, thread.kind, instructions, &thread.model, &repo) {
-                lock(&self.runner).attach.insert(run.id, thread_id);
+                self.tie(&run, thread_id);
             }
         }
 

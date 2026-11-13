@@ -735,6 +735,61 @@ async fn a_run_goes_to_its_requesters_runner_and_a_shared_one_to_exactly_one_of_
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_runner_keeps_the_run_it_started_itself_and_can_name_the_pull_request_after_the_end() {
+    let world = world();
+    let beat = |runner: &str| json!({ "runnerId": runner, "name": runner, "kinds": ["implement"], "version": "1" });
+    let start = |runner: &str| json!({ "kind": "implement", "runnerId": runner });
+
+    // A runner nobody has heard of cannot be given a run.
+    assert_eq!(world.send(&world.token, Method::POST, "/issues/WEB-1/runs", Some(start("app"))).await.0, StatusCode::BAD_REQUEST);
+
+    world.post("/runners/heartbeat", beat("app")).await;
+    world.post("/runners/heartbeat", beat("cli")).await;
+
+    let (_, other_token) = person(&world.app, "Piotr Runner", "piotr@example.com", Role::Member);
+    assert_eq!(world.send(&other_token, Method::POST, "/issues/WEB-1/runs", Some(start("app"))).await.0, StatusCode::CONFLICT, "not Piotr's runner");
+
+    // Born claimed: the same person's second runner finds nothing to take.
+    let own = world.post("/issues/WEB-1/runs", start("app")).await;
+    let id = own["id"].as_i64().expect("a run id");
+    assert_eq!((&own["state"], &own["runnerId"]), (&json!("claimed"), &json!("app")));
+    assert_eq!(claim(&world, &world.token, "cli", json!(["implement"])).await, Value::Null);
+
+    // Claiming by id takes that run and no older one.
+    let older = world.start("WEB-1", "implement", "").await;
+    let newer = world.start("WEB-2", "implement", "").await;
+    let by_id = |run: i64| json!({ "runnerId": "cli", "kinds": ["implement"], "runId": run });
+    assert_eq!(world.post("/runs/claim", by_id(newer)).await["run"]["id"], newer);
+    assert_eq!(world.post("/runs/claim", by_id(newer)).await, Value::Null, "already taken");
+    assert_eq!(world.post("/runs/claim", by_id(id)).await, Value::Null, "held by the other runner");
+    assert_eq!(world.run(older).await["run"]["state"], "queued");
+
+    // After the end only the branch and the pull request can still be recorded.
+    let path = format!("/runs/{id}");
+    world.send(&world.token, Method::PATCH, &path, Some(json!({ "state": "succeeded", "summary": "Done on a branch." }))).await;
+    assert_eq!(world.send(&world.token, Method::PATCH, &path, Some(json!({ "summary": "Rewritten" }))).await.0, StatusCode::CONFLICT);
+    assert_eq!(world.send(&world.token, Method::PATCH, &path, Some(json!({ "state": "running" }))).await.0, StatusCode::CONFLICT);
+    assert_eq!(
+        world.send(&world.token, Method::POST, &format!("{path}/events"), Some(json!({ "kind": "message", "text": "Late" }))).await.0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        world.send(&other_token, Method::PATCH, &path, Some(json!({ "branch": "stolen" }))).await.0,
+        StatusCode::FORBIDDEN,
+        "still only its own runner"
+    );
+
+    let (status, named) = world
+        .send(&world.token, Method::PATCH, &path, Some(json!({ "branch": "feature/WEB-1", "pullRequestUrl": "https://github.com/acme/shop/pull/7" })))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{named}");
+    assert_eq!(
+        (&named["state"], &named["summary"], &named["branch"], &named["pullRequestUrl"]),
+        (&json!("succeeded"), &json!("Done on a branch."), &json!("feature/WEB-1"), &json!("https://github.com/acme/shop/pull/7"))
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn a_claimed_run_whose_runner_went_silent_for_ten_minutes_returns_to_the_queue() {
     let world = world();
     world.post("/runners/heartbeat", json!({ "runnerId": "desk-1", "name": "Desktop", "kinds": ["implement"], "version": "1" })).await;

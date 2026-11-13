@@ -210,6 +210,9 @@ pub struct NewRun {
     pub repo: Option<String>,
     #[serde(default)]
     pub shared: bool,
+    /// The caller's own runner that carries the run out. The run is created already claimed
+    /// by it, so no other runner can take it in between.
+    pub runner_id: Option<String>,
 }
 
 fn optional(text: Option<&str>, what: &str, max: usize) -> ApiResult<Option<String>> {
@@ -246,7 +249,16 @@ pub fn create(tx: &Tx, user: &AuthUser, key: &str, new: &NewRun) -> ApiResult<Ag
         ),
     )?;
     let id = tx.last_insert_rowid();
-    announce(tx, id)?;
+
+    match &new.runner_id {
+        Some(runner) => {
+            let runner = runner_id(runner)?;
+            let name = own_runner(tx, user, runner)?.ok_or_else(|| ApiError::bad_request("That runner has not announced itself yet; send a heartbeat first"))?;
+
+            hold(tx, id, runner, &name, Some(user.id))?;
+        }
+        None => announce(tx, id)?,
+    }
 
     Ok(load(tx, id)?.run)
 }
@@ -348,13 +360,20 @@ pub fn answer(tx: &Tx, user: &AuthUser, id: Id, text: &str) -> ApiResult<AgentRu
 
 // ---------- the runner's side ----------
 
-/// The run, for the runner that claimed it; nobody else may write to it.
-pub fn held(tx: &Tx, user: &AuthUser, id: Id) -> ApiResult<RunRow> {
+/// The run, for the runner that claimed it, whether or not it has ended.
+fn holder(tx: &Tx, user: &AuthUser, id: Id) -> ApiResult<RunRow> {
     let (row, _) = run_access(tx, user, id)?;
 
     if row.on_server() || row.runner_user_id != Some(user.id) {
         return Err(ApiError::forbidden("Only the runner that claimed this run may write to it"));
     }
+
+    Ok(row)
+}
+
+/// The run, for the runner that claimed it; nobody else may write to it.
+pub fn held(tx: &Tx, user: &AuthUser, id: Id) -> ApiResult<RunRow> {
+    let row = holder(tx, user, id)?;
 
     if row.run.state.is_finished() {
         return Err(ApiError::conflict("The run has already ended"));
@@ -412,6 +431,35 @@ pub struct RunPatch {
     pub input_tokens: Option<i64>,
     pub output_tokens: Option<i64>,
     pub cost_usd: Option<f64>,
+}
+
+impl RunPatch {
+    /// True when the patch only says where the code went, which often becomes known after
+    /// the run has ended: the person pushes and opens the pull request afterwards.
+    fn only_names_the_code(&self) -> bool {
+        self.state.is_none()
+            && self.summary.is_none()
+            && self.model.is_none()
+            && self.input_tokens.is_none()
+            && self.output_tokens.is_none()
+            && self.cost_usd.is_none()
+    }
+}
+
+/// What the runner reports about a run it holds. A run that has ended still takes its
+/// branch and its pull request, and nothing else.
+pub fn report(tx: &Tx, user: &AuthUser, id: Id, patch: &RunPatch) -> ApiResult<AgentRun> {
+    let row = holder(tx, user, id)?;
+
+    if row.run.state.is_finished() && !patch.only_names_the_code() {
+        return Err(ApiError::conflict("The run has already ended; only its branch and pull request can still be recorded"));
+    }
+
+    if !row.run.state.is_finished() {
+        tx.execute("UPDATE agent_run SET runner_seen_at = ?1 WHERE id = ?2", (&tx.now, id))?;
+    }
+
+    update(tx, &row, patch)
 }
 
 /// What the runner reports about the run as a whole: its state, its result, what it cost.
@@ -521,19 +569,27 @@ pub struct Claim {
     pub runner_id: String,
     pub kinds: Vec<AgentRunKind>,
     pub projects: Option<Vec<String>>,
+    /// Claim this run and no other.
+    pub run_id: Option<Id>,
 }
 
-/// Hands the oldest queued run that fits to this runner. A run is offered to its requester's
-/// own runners, or to anyone who can see the project when it is shared. Transactions are
-/// serialised, so two runners never get the same run.
-pub fn claim(tx: &Tx, user: &AuthUser, wanted: &Claim) -> ApiResult<Option<Id>> {
-    let runner = runner_id(&wanted.runner_id)?;
+/// The name of the caller's runner with this id; none when it has not announced itself.
+fn own_runner(tx: &Tx, user: &AuthUser, runner: &str) -> ApiResult<Option<String>> {
     let owner: Option<(Id, String)> =
         query_one(tx, "SELECT user_id, name FROM agent_runner WHERE id = ?1", [runner], |row| Ok((row.get(0)?, row.get(1)?)))?;
 
-    if owner.as_ref().is_some_and(|(owner, _)| *owner != user.id) {
-        return Err(ApiError::conflict("That runner id belongs to somebody else's runner"));
+    match owner {
+        Some((owner, _)) if owner != user.id => Err(ApiError::conflict("That runner id belongs to somebody else's runner")),
+        other => Ok(other.map(|(_, name)| name)),
     }
+}
+
+/// Hands the oldest queued run that fits to this runner, or the one it names. A run is
+/// offered to its requester's own runners, or to anyone who can see the project when it is
+/// shared. Transactions are serialised, so two runners never get the same run.
+pub fn claim(tx: &Tx, user: &AuthUser, wanted: &Claim) -> ApiResult<Option<Id>> {
+    let runner = runner_id(&wanted.runner_id)?;
+    let owner = own_runner(tx, user, runner)?;
 
     if wanted.kinds.is_empty() {
         return Ok(None);
@@ -556,8 +612,13 @@ pub fn claim(tx: &Tx, user: &AuthUser, wanted: &Claim) -> ApiResult<Option<Id>> 
         params.extend(projects.iter().map(|key| SqlValue::Text(key.trim().to_string())));
     }
 
+    if let Some(run_id) = wanted.run_id {
+        conditions.push("r.id = ?".to_string());
+        params.push(SqlValue::Integer(run_id));
+    }
+
     let Some(row) = rows(tx, &format!("WHERE {} ORDER BY r.id LIMIT 1", conditions.join(" AND ")), params)?.pop() else { return Ok(None) };
-    let name = owner.map(|(_, name)| name).unwrap_or_else(|| runner.to_string());
+    let name = owner.unwrap_or_else(|| runner.to_string());
 
     hold(tx, row.run.id, runner, &name, Some(user.id))?;
 

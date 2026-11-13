@@ -149,7 +149,10 @@ AgentSettings = {
 `POST /runners/heartbeat`, `POST /runs/claim`, `POST /runs/{id}/events`,
 `POST /runs/{id}/proposals`, `PATCH /runs/{id}`, `GET /runs/{id}`: bodies and answers as in the
 contract. A runner is whoever's API token it sends; only the person whose runner claimed a run
-may write to it (403 otherwise, 409 once the run has ended).
+may write to it (403 otherwise, 409 once the run has ended, except that its branch and its
+pull request can still be recorded). A runner that starts work itself sends its `runnerId`
+with `POST /issues/{key}/runs` and gets the run already claimed; `POST /runs/claim` with a
+`runId` takes that run or nothing.
 
 ### How it behaves (where the contract leaves room)
 
