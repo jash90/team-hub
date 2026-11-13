@@ -1,0 +1,1037 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>team-hub — tracker zadań na własnym serwerze, spięty z kodem</title>
+    <meta
+      name="description"
+      content="team-hub to tracker zadań dla zespołów programistycznych uruchamiany na własnym serwerze: rdzeń Jiry spięty z kodem i z bazą wiedzy. Pokazuje, gdzie status zadania nie zgadza się z kodem."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)" />
+
+    <!-- Adresy względne celowo, żeby strona działała na dowolnej domenie.
+         README.md, „The site's address”: cztery wiersze, które chcą adresu bezwzględnego. -->
+    <link rel="canonical" href="./" />
+    <link rel="alternate" hreflang="en" href="../" />
+    <link rel="alternate" hreflang="pl" href="./" />
+    <link rel="alternate" hreflang="x-default" href="../" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="team-hub" />
+    <meta property="og:locale" content="pl_PL" />
+    <meta property="og:locale:alternate" content="en_GB" />
+    <meta property="og:title" content="Zadanie ma status Done. Pull request wciąż jest otwarty." />
+    <meta
+      property="og:description"
+      content="team-hub to tracker zadań dla zespołów programistycznych uruchamiany na własnym serwerze: rdzeń Jiry spięty z kodem i z bazą wiedzy."
+    />
+    <meta property="og:url" content="./" />
+    <meta property="og:image" content="../assets/og-pl.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="team-hub: zadanie ma status Done, pull request wciąż jest otwarty. Poniżej tablica sprintu z trackera."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Zadanie ma status Done. Pull request wciąż jest otwarty." />
+    <meta
+      name="twitter:description"
+      content="team-hub to tracker zadań dla zespołów programistycznych uruchamiany na własnym serwerze: rdzeń Jiry spięty z kodem i z bazą wiedzy."
+    />
+    <meta name="twitter:image" content="../assets/og-pl.png" />
+
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+
+    <link
+      rel="preload"
+      href="../assets/fonts/newsreader-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="../assets/site.css?v=1" />
+    <script src="../assets/site.js?v=1" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Przejdź do treści</a>
+
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="./" aria-label="team-hub, początek strony">
+          <img src="../assets/favicon.svg" width="24" height="24" alt="" />
+          team-hub
+        </a>
+        <nav class="site-nav" aria-label="Sekcje">
+          <a href="#code">Kod</a>
+          <a href="#agents">Agenci</a>
+          <a href="#desktop">Aplikacja desktopowa</a>
+          <a href="#run">Uruchomienie</a>
+          <a href="#not-yet">Czego nie ma</a>
+        </nav>
+        <div class="site-tools">
+          <p class="lang">
+            <span class="visually-hidden">Język:</span>
+            <a href="../" hreflang="en" lang="en" aria-label="English">EN</a
+            ><span aria-hidden="true">/</span><span aria-current="true">PL</span>
+          </p>
+          <a class="ext" href="https://github.com/jash90/team-hub">GitHub</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap">
+          <p class="kicker">Tracker zadań na własnym serwerze</p>
+          <h1>
+            <span class="claim">Zadanie ma status Done.</span>
+            <span>Pull request wciąż jest otwarty.</span>
+          </h1>
+
+          <div class="pair hero-top">
+            <div>
+              <p class="lede">
+                team-hub to tracker zadań dla zespołów programistycznych, który uruchamiasz na
+                własnym serwerze: rdzeń Jiry spięty z&nbsp;kodem i&nbsp;z&nbsp;bazą wiedzy, a&nbsp;nie do nich
+                doklejony. Gdy status zadania i&nbsp;jego kod mówią co innego, team-hub to pokazuje.
+              </p>
+              <p class="lede">
+                Dla programistów i&nbsp;liderów zespołów, którzy wolą mieć tracker u&nbsp;siebie, niż go
+                wynajmować.
+              </p>
+              <div class="actions">
+                <a class="button primary" href="#run"
+                  >Uruchom u&nbsp;siebie <span class="arrow" aria-hidden="true">↓</span></a
+                >
+                <a class="button" href="#desktop">Pobierz aplikację desktopową</a>
+              </div>
+            </div>
+            <dl class="facts">
+              <div>
+                <dt>Działa jako</dt>
+                <dd>jeden plik binarny serwera, jeden plik SQLite</dd>
+              </div>
+              <div>
+                <dt>Potrzebuje obok</dt>
+                <dd>niczego</dd>
+              </div>
+              <div>
+                <dt>Interfejs</dt>
+                <dd>polski i&nbsp;angielski, jasny i&nbsp;ciemny</dd>
+              </div>
+              <div>
+                <dt>Kod źródłowy</dt>
+                <dd><a href="https://github.com/jash90/team-hub">github.com/jash90/team-hub</a></dd>
+              </div>
+            </dl>
+          </div>
+
+          <figure class="shot hero-shot">
+            <a
+              class="frame"
+              href="../assets/img/board-light-1600.webp"
+              data-dark="../assets/img/board-dark-1600.webp"
+            >
+              <picture>
+                <!-- On a phone the whole board is too small to read: show one column. -->
+                <source
+                  media="(max-width: 40em) and (prefers-color-scheme: dark)"
+                  srcset="../assets/img/board-dark-phone.webp"
+                  width="600"
+                  height="664"
+                />
+                <source
+                  media="(max-width: 40em)"
+                  srcset="../assets/img/board-light-phone.webp"
+                  width="600"
+                  height="664"
+                />
+                <source
+                  media="(prefers-color-scheme: dark)"
+                  srcset="
+                    ../assets/img/board-dark-800.webp   800w,
+                    ../assets/img/board-dark-1600.webp 1600w
+                  "
+                  sizes="(min-width: 87em) 1280px, 92vw"
+                />
+                <img
+                  src="../assets/img/board-light-1600.webp"
+                  srcset="
+                    ../assets/img/board-light-800.webp   800w,
+                    ../assets/img/board-light-1600.webp 1600w
+                  "
+                  sizes="(min-width: 87em) 1280px, 92vw"
+                  width="1600"
+                  height="800"
+                  alt="Tablica sprintu w&nbsp;przykładowym projekcie sklepu internetowego: cztery kolumny, To Do, In Progress, In Review i&nbsp;Done, a&nbsp;w&nbsp;nich dwanaście kart zadań. Na części kart widać numer pull requesta z&nbsp;ptaszkiem albo krzyżykiem, liczbę zaliczonych testów i&nbsp;pomarańczowy trójkąt ostrzegawczy."
+                  fetchpriority="high"
+                  decoding="async"
+                />
+              </picture>
+            </a>
+            <figcaption>
+              Tablica sprintu. Obok klucza zadania widać jego pull request ze stanem testów, wynik
+              testów e2e, zlecenie dla agenta, które czeka na człowieka, oraz trójkąt tam, gdzie
+              status nie zgadza się z&nbsp;kodem. Interfejs jest po polsku i&nbsp;po angielsku; zrzuty na tej
+              stronie pokazują projekt przykładowy.
+            </figcaption>
+          </figure>
+
+          <div class="pair tracker">
+            <h2 class="kicker label">Sam tracker</h2>
+            <p class="lede">
+              Projekty, typy zadań, epiki i&nbsp;podzadania, konfigurowalne workflow, tablice scrum
+              i&nbsp;kanban z&nbsp;przeciąganiem kart, backlog z&nbsp;planowaniem sprintów, wydania z&nbsp;notatkami,
+              komentarze ze wzmiankami, załączniki, powiązania, czas pracy, obserwujący
+              i&nbsp;powiadomienia, język zapytań, zapisane filtry, zmiany zbiorcze, strumień aktywności
+              oraz aktualizacje na żywo w&nbsp;każdej otwartej przeglądarce.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="code" aria-labelledby="code-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">01</span>Kod</p>
+            <h2 id="code-title">Status i&nbsp;kod nie rozjadą się po cichu.</h2>
+            <p class="intro">
+              Podłącz repozytorium z&nbsp;GitHuba, a&nbsp;tracker będzie czytał, co się w&nbsp;nim dzieje.
+              Wystarczy klucz zadania w&nbsp;nazwie gałęzi, w&nbsp;opisie commita albo w&nbsp;tytule pull
+              requesta.
+            </p>
+          </div>
+
+          <figure class="shot plate">
+            <a class="frame" href="../assets/img/drift-1600.webp">
+              <img
+                class="light-only"
+                src="../assets/img/drift-1600.webp"
+                srcset="../assets/img/drift-800.webp 800w, ../assets/img/drift-1600.webp 1600w"
+                sizes="(min-width: 87em) 1280px, 92vw"
+                width="1600"
+                height="439"
+                alt="Panel „Status nie zgadza się z&nbsp;kodem” z&nbsp;czterema zadaniami. Pod każdym pomarańczowy wiersz z&nbsp;powodem: w&nbsp;review poproszono o&nbsp;poprawki; kod już jest, a&nbsp;zadanie nie zostało rozpoczęte; testy nie przechodzą; od kilku dni w&nbsp;toku, bez gałęzi i&nbsp;commitów."
+                loading="lazy"
+                decoding="async"
+              />
+            </a>
+            <figcaption>
+              Projekt → Kod: cztery zadania, których status nie zgadza się z&nbsp;kodem, każde
+              z&nbsp;powodem.
+            </figcaption>
+          </figure>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Rozjazd</h3>
+              <p>
+                Rozjazd to miejsce, w&nbsp;którym status zadania mówi co innego niż jego kod. Zadanie
+                jest w&nbsp;review, ale poproszono w&nbsp;nim o&nbsp;poprawki. Wciąż czeka w&nbsp;„To Do”, choć kod już
+                jest. Testy nie przechodzą. Od kilku dni w&nbsp;toku, bez gałęzi i&nbsp;commitów.
+              </p>
+              <p>
+                Ten sam trójkąt widać na tablicy, w&nbsp;backlogu i&nbsp;w&nbsp;wyszukiwaniu,
+                a <code>drift is not empty</code> to zapytanie jak każde inne.
+              </p>
+              <h3>Kod widać w&nbsp;zadaniu</h3>
+              <p>
+                Gałęzie, commity i&nbsp;pull requesty pojawiają się w&nbsp;zadaniu, o&nbsp;którym wspominają,
+                razem ze stanem review i&nbsp;testów. Polecenie, które tworzy gałąź zadania, kopiujesz
+                jednym kliknięciem.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/issue-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/issue-1600.webp"
+                  srcset="../assets/img/issue-800.webp 800w, ../assets/img/issue-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="1470"
+                  alt="Zadanie „Płatność kartą przez bramkę” w&nbsp;statusie In Review: opis z&nbsp;kryteriami akceptacji, trzy podzadania, dwa powiązane zadania oraz sekcja Kod z&nbsp;ostrzeżeniem „W&nbsp;review poproszono o&nbsp;poprawki”, otwartym pull requestem z&nbsp;oznaczeniami „do poprawy” i&nbsp;„testy przechodzą”, jego gałęzią i&nbsp;trzema commitami."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Zadanie otwarte z&nbsp;tablicy: podzadania, powiązane zadania, a&nbsp;w&nbsp;sekcji Kod pull
+                request, gałąź i&nbsp;trzy commity, nad nimi ostrzeżenie o&nbsp;rozjeździe.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Kod przesuwa zadanie</h3>
+              <p>
+                Nowa gałąź rozpoczyna zadanie, pull request przenosi je do review, ostatni merge je
+                kończy. Każdą regułę ustawia się osobno dla projektu i&nbsp;każda może znaczyć „nic nie
+                rób”. Ukończona praca nie jest otwierana ponownie, a&nbsp;merge kończy zadanie dopiero
+                wtedy, gdy żaden jego pull request nie jest już otwarty.
+              </p>
+              <p>Opisy commitów mogą komentować, zapisywać czas pracy i&nbsp;przesuwać zadania:</p>
+              <div class="code">
+                <pre
+                  class="soft"
+                  tabindex="0"
+                  aria-label="Przykładowy opis commita"
+                ><code>WEB-12 #comment fixed the redirect #time 1h 30m #in-review</code></pre>
+              </div>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/rules-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/rules-1600.webp"
+                  srcset="../assets/img/rules-800.webp 800w, ../assets/img/rules-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="644"
+                  alt="Panel ustawień „Reguły workflow” z&nbsp;pięcioma wierszami: powstaje gałąź, zadanie przechodzi do In Progress; pull request zostaje otwarty, do In Review; review prosi o&nbsp;poprawki, nic nie rób; review zatwierdza, nic nie rób; ostatni otwarty pull request zostaje zmergowany, do Done."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Ustawienia projektu → GitHub: co dzieje się z&nbsp;zadaniem, gdy coś dzieje się z&nbsp;jego
+                kodem.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="knowledge" aria-labelledby="knowledge-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">02</span>Wiedza i&nbsp;testy</p>
+            <h2 id="knowledge-title">
+              To, co zespół zapisał, i&nbsp;to, co mówią testy, przy tym samym zadaniu.
+            </h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Baza wiedzy powiązana w&nbsp;obie strony</h3>
+              <p>
+                Przestrzenie stron w&nbsp;Markdownie ułożonych w&nbsp;drzewo, z&nbsp;historią, porównaniem wersji
+                i&nbsp;wyszukiwaniem pełnotekstowym. Strona, która wspomni <code>WEB-10</code>, sama
+                pojawi się w&nbsp;tym zadaniu, a&nbsp;zadanie pokazuje swoje strony.
+              </p>
+              <p>
+                Z&nbsp;listy zadań na stronie można utworzyć zadania w&nbsp;trackerze. Przestrzenie
+                z&nbsp;Confluence można zaimportować jako kopię, która nadąża za oryginałem.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/wiki-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/wiki-1600.webp"
+                  srcset="../assets/img/wiki-800.webp 800w, ../assets/img/wiki-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="910"
+                  alt="Strona bazy wiedzy „BLIK — kanał powiadomień”. Po lewej drzewo stron przestrzeni: architektura, płatności, decyzje, spotkania. W&nbsp;tekście linki do zadania WEB-10 i&nbsp;do zapisu decyzji architektonicznej, po prawej spis treści."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Strona w&nbsp;przestrzeni projektu. Linkuje do zadania, które opisuje, i&nbsp;do decyzji,
+                z&nbsp;której wynika; oba powiązania widać też z&nbsp;drugiej strony.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Testy wiedzą, które zadanie sprawdzają</h3>
+              <p>
+                Przebiegi frameworka testowego
+                <a href="https://github.com/e2e-inc/e2e">e2e</a> trafiają do trackera przez
+                reporter. Test, który ma klucz zadania w&nbsp;tytule albo w&nbsp;tagach, jest z&nbsp;tym zadaniem
+                powiązany, więc w&nbsp;zadaniu widać, czy to, co ono opisuje, naprawdę działa.
+              </p>
+              <p>Niezaliczony test przy zadaniu oznaczonym jako Done też widać.</p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/tests-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/tests-1600.webp"
+                  srcset="../assets/img/tests-800.webp 800w, ../assets/img/tests-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="759"
+                  alt="Strona Testy w&nbsp;projekcie. Ostatni przebieg, CI #236 na gałęzi main, jest niezaliczony: dziewięć testów zaliczonych, jeden niezaliczony, jeden niestabilny, jeden pominięty. Niżej tabela testów, każdy z&nbsp;zadaniem, które sprawdza, i&nbsp;paskami ostatnich przebiegów; niezaliczony test sprawdza zadanie WEB-14 oznaczone jako Done."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Projekt → Testy: ostatni przebieg, a&nbsp;pod nim każdy test z&nbsp;zadaniem, które sprawdza,
+                i&nbsp;z&nbsp;wynikami ostatnich przebiegów. Tutaj niezaliczony test wskazuje na zadanie
+                oznaczone jako Done.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="agents" aria-labelledby="agents-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">03</span>Agenci AI</p>
+            <h2 id="agents-title">Agent proponuje, człowiek decyduje.</h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <p>
+                Pracę nad zadaniem można zlecić agentowi prosto ze strony zadania: dopracować opis,
+                rozbić zadanie na podzadania, przejrzeć pull request, zaimplementować je w&nbsp;kodzie
+                albo wykonać własne polecenie.
+              </p>
+              <p>
+                Zlecenie pokazuje, co agent zrobił, pyta, gdy potrzebuje decyzji, i&nbsp;kończy się
+                <em>propozycjami</em>: komentarzem, zmianą statusu, podzadaniami. Nic się nie
+                zmienia, dopóki ktoś tego nie zatwierdzi, chyba że administrator projektu uznał
+                dany rodzaj zmiany za zaufany.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/proposals-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/proposals-1600.webp"
+                  srcset="
+                    ../assets/img/proposals-800.webp   800w,
+                    ../assets/img/proposals-1600.webp 1600w
+                  "
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="870"
+                  alt="Koniec zlecenia dla agenta w&nbsp;zadaniu, z&nbsp;dwiema propozycjami oznaczonymi „do decyzji”: dodaj komentarz podsumowujący zmianę oraz zmień status z&nbsp;In Progress na In Review. Przy każdej pole na uwagę i&nbsp;przyciski Zatwierdź oraz Odrzuć. Wiersz niżej podaje gałąź, model oraz liczbę tokenów i&nbsp;koszt zlecenia."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Koniec zlecenia w&nbsp;zadaniu: komentarz i&nbsp;zmiana statusu, każde czeka na „Zatwierdź”
+                albo „Odrzuć”. Wiersz pod nimi mówi, ile zlecenie kosztowało.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="notes">
+            <div class="text">
+              <h3>Kto wykonuje zlecenie</h3>
+              <p>
+                Zlecenia, które nie wymagają kodu, wykonuje sam serwer, z&nbsp;Twoim kluczem do dostawcy
+                modelu. Te, które wymagają repozytorium, trafiają do runnera: aplikacji
+                desktopowej, polecenia <code>hub</code> albo dowolnego programu, który zna
+                <a href="https://github.com/jash90/team-hub/blob/main/docs/agent-runs.md"
+                  >kontrakt zleceń</a
+                >.
+              </p>
+            </div>
+            <div class="text">
+              <h3>Moduł jest też serwerem MCP</h3>
+              <p>
+                Agent programistyczny pracujący w&nbsp;repozytorium może przeczytać swoje zadanie,
+                skomentować je, zmienić mu status i&nbsp;zajrzeć do bazy wiedzy, z&nbsp;uprawnieniami osoby,
+                której tokenu używa.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="band" id="desktop" aria-labelledby="desktop-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">04</span>Aplikacja desktopowa</p>
+            <h2 id="desktop-title">Nic nie opuszcza Twojego komputera bez kliknięcia.</h2>
+            <p class="intro">
+              Kokpit programisty na macOS, Windows i&nbsp;Linuksa. Zadania przypisane do Ciebie stają
+              się wątkami agentów: agent pracuje nad zadaniem w&nbsp;Twoim lokalnym klonie, we własnym
+              drzewie roboczym gita i&nbsp;na własnej gałęzi, a&nbsp;wszystko, co miałoby opuścić komputer
+              (komentarz, zmiana statusu, wypchnięcie gałęzi, pull request), czeka na Twoje
+              kliknięcie. Ta sama aplikacja jest runnerem dla pracy zleconej w&nbsp;przeglądarce.
+            </p>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Model bezpieczeństwa prostymi słowami</h3>
+              <ul class="checks">
+                <li>
+                  Jedno drzewo robocze i&nbsp;jedna gałąź na wątek. Twojego checkoutu, indeksu i&nbsp;gałęzi
+                  nikt nie rusza.
+                </li>
+                <li>
+                  Powłoka agenta działa w&nbsp;piaskownicy systemu operacyjnego: bez sieci, z&nbsp;zapisem
+                  tylko we własnym drzewie roboczym. Gdzie system piaskownicy nie ma, wątek pracuje
+                  bez powłoki, chyba że sam na nią pozwolisz.
+                </li>
+                <li>
+                  Agent nigdy nie dostaje Twojego tokenu. Token leży w&nbsp;systemowym pęku kluczy,
+                  a&nbsp;kopia danych trackera do pracy offline jest zaszyfrowana.
+                </li>
+                <li>
+                  Przed wypchnięciem widzisz dokładnie te commity i&nbsp;ten diff, które wyjdą. Wypychany
+                  jest dokładnie commit z&nbsp;podglądu, nigdy z&nbsp;wymuszeniem.
+                </li>
+              </ul>
+              <p>
+                <a
+                  class="ext"
+                  href="https://github.com/jash90/team-hub/blob/main/apps/desktop/README.md#the-safety-model-in-plain-words"
+                  >Cała lista i&nbsp;to, co sprawdzono na prawdziwym modelu</a
+                >
+              </p>
+            </div>
+            <figure class="shot">
+              <a
+                class="frame"
+                href="../assets/img/desktop-pl-light-1600.webp"
+                data-dark="../assets/img/desktop-pl-dark-1600.webp"
+              >
+                <picture>
+                  <source
+                    media="(prefers-color-scheme: dark)"
+                    srcset="
+                      ../assets/img/desktop-pl-dark-800.webp   800w,
+                      ../assets/img/desktop-pl-dark-1600.webp 1296w
+                    "
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1296"
+                    height="950"
+                  />
+                  <img
+                    src="../assets/img/desktop-pl-light-1600.webp"
+                    srcset="
+                      ../assets/img/desktop-pl-light-800.webp   800w,
+                      ../assets/img/desktop-pl-light-1600.webp 1280w
+                    "
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1280"
+                    height="900"
+                    alt="Aplikacja desktopowa. Po lewej lista rzeczy do decyzji i&nbsp;cztery wątki agentów. Pośrodku wątek zadania „Reset hasła”: agent zadaje pytanie, człowiek odpowiada, agent commituje i&nbsp;proponuje komentarz, wypchnięcie gałęzi oraz pull request; na końcu wiersze o&nbsp;wypchniętej gałęzi i&nbsp;adresie pull requesta."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
+              </a>
+              <figcaption>
+                Wątek zadania. Agent zadał jedno pytanie, dostał odpowiedź, zacommitował na swojej
+                gałęzi i&nbsp;zaproponował komentarz, wypchnięcie gałęzi oraz pull request. Gałąź
+                wyszła z&nbsp;komputera dopiero po zatwierdzeniu.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Pobieranie</h3>
+              <p>
+                Instalatory dla macOS, Windows i&nbsp;Linuksa trafiają na stronę wydań w&nbsp;repozytorium.
+                Pierwsze wydanie jest w&nbsp;przygotowaniu; jeśli strona jest jeszcze pusta, zbuduj
+                aplikację ze źródeł w <code>apps/desktop</code>.
+              </p>
+              <p>
+                Paczki nie są na razie podpisane, więc macOS i&nbsp;Windows ostrzegą przed pierwszym
+                uruchomieniem. Aplikacja potrzebuje serwera team-hub, z&nbsp;którym się połączy. Do
+                pracy z&nbsp;prawdziwym modelem używa Claude Code zalogowanego na tym samym komputerze
+                albo klucza API Anthropic.
+              </p>
+              <div class="actions">
+                <a class="button primary" href="https://github.com/jash90/team-hub/releases/latest"
+                  >Wydania na GitHubie</a
+                >
+                <a
+                  class="button"
+                  href="https://github.com/jash90/team-hub/blob/main/apps/desktop/README.md#building-and-running"
+                  >Budowanie ze źródeł</a
+                >
+              </div>
+              <p class="honest">
+                Jak dotąd aplikacja była uruchamiana tylko na Linuksie. Piaskownice na macOS
+                i&nbsp;Windows, ikona w&nbsp;zasobniku, powiadomienia i&nbsp;instalatory nie zostały jeszcze
+                sprawdzone.
+              </p>
+            </div>
+            <figure class="shot narrow">
+              <a class="frame" href="../assets/img/desktop-push-800.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/desktop-push-800.webp"
+                  width="800"
+                  height="528"
+                  alt="Okno dialogowe „Push the branch” w&nbsp;angielskiej wersji interfejsu: gałąź i&nbsp;adres repozytorium, do którego trafi, zdanie o&nbsp;tym, że wypychany jest dokładnie ten commit, a&nbsp;wszystko, co wątek zacommituje później, zostaje na komputerze, jeden commit, diff jednego dodanego pliku oraz przyciski Cancel i&nbsp;„Push 1 commits”."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Podgląd przed wypchnięciem, tu w&nbsp;angielskiej wersji interfejsu: jeden commit, jego
+                diff i&nbsp;adres, pod który trafi. Oba zrzuty aplikacji pochodzą z&nbsp;jej własnego testu
+                end-to-end, w&nbsp;którym model zastępuje skryptowany agent testowy; stąd angielskie
+                wypowiedzi agenta i&nbsp;autor commita „Fake Agent”.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="everyday" aria-labelledby="everyday-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">05</span>Szukanie, raporty, plany</p>
+            <h2 id="everyday-title">Język zapytań, raporty i&nbsp;oś czasu na tych samych danych.</h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Język zapytań</h3>
+              <p>
+                Zwykłe słowa przeszukują tekst, sam klucz otwiera zadanie. Moduły dodają własne
+                pola: <code>pr</code> i <code>drift</code> pochodzą z&nbsp;modułu kodu. Zapytanie można
+                zapisać jako filtr, a&nbsp;wynik wyeksportować do CSV.
+              </p>
+              <p>
+                Wyszukiwanie nie przejmuje się ogonkami: <code>zolta</code> znajdzie
+                <code>żółta</code>.
+              </p>
+            </div>
+            <div>
+              <div class="code">
+                <pre tabindex="0" aria-label="Przykładowe zapytania"><code>project = WEB AND sprint in openSprints() AND assignee = currentUser()
+type = Bug AND priority >= High AND created >= -7d ORDER BY priority DESC
+text ~ "kod pocztowy" AND category != done
+category = done AND pr = open            <span class="c">-- z modułem github</span>
+drift is not empty                        <span class="c">-- status nie zgadza się z kodem</span></code></pre>
+              </div>
+            </div>
+          </div>
+
+          <figure class="shot plate">
+            <a class="frame" href="../assets/img/query-1600.webp">
+              <img
+                class="light-only"
+                src="../assets/img/query-1600.webp"
+                srcset="../assets/img/query-800.webp 800w, ../assets/img/query-1600.webp 1600w"
+                sizes="(min-width: 87em) 1280px, 92vw"
+                width="1600"
+                height="516"
+                alt="Strona Szukaj z&nbsp;zapytaniem „project = WEB AND drift is not empty ORDER BY priority DESC” i&nbsp;czterema wynikami w&nbsp;tabeli: klucz, tytuł, status, wykonawca, priorytet, punkty i&nbsp;czas ostatniej zmiany. Nad tabelą przyciski „Zapisz filtr” i&nbsp;„CSV”."
+                loading="lazy"
+                decoding="async"
+              />
+            </a>
+            <figcaption>
+              Wyszukiwanie: zadania projektu WEB, w&nbsp;których status nie zgadza się z&nbsp;kodem, od
+              najwyższego priorytetu.
+            </figcaption>
+          </figure>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Raporty odtwarzane z&nbsp;historii</h3>
+              <p>
+                Wykres spalania, prędkość, przepływ skumulowany, czas realizacji i&nbsp;obciążenie
+                powstają na żądanie z&nbsp;zapisanej historii zadań. Niczego nie przechowuje się osobno,
+                więc raport zawsze zgadza się z&nbsp;tym, co dziś mówi historia.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/flow-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/flow-1600.webp"
+                  srcset="../assets/img/flow-800.webp 800w, ../assets/img/flow-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="772"
+                  alt="Strona Raporty na karcie „Przepływ skumulowany”: wykres warstwowy z&nbsp;trzydziestu dni z&nbsp;trzema pasami, do zrobienia, w&nbsp;toku i&nbsp;gotowe; wszystkie rosną, a&nbsp;ostatniego dnia mają dwanaście, sześć i&nbsp;osiem zadań."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Przepływ skumulowany: ile zadań było na każdym etapie na koniec każdego dnia.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Oś czasu epików</h3>
+              <p>
+                Epiki projektu jako paski od daty rozpoczęcia do terminu, na tle sprintów i&nbsp;wydań.
+                Przeciągnij pasek, żeby zaplanować; epik, któremu nikt nie ustawił dat, pokazuje
+                okres wynikający z&nbsp;jego zadań.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/timeline-pl-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/timeline-pl-1600.webp"
+                  srcset="
+                    ../assets/img/timeline-pl-800.webp   800w,
+                    ../assets/img/timeline-pl-1600.webp 1600w
+                  "
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="596"
+                  alt="Strona „Oś czasu” w&nbsp;widoku miesięcy, od października do stycznia. Trzy epiki jako paski, wypełniona część oznacza zrobione zadania. W&nbsp;tle dwa sprinty, trzy znaczniki wydań i&nbsp;czerwona linia dzisiejszego dnia."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Oś czasu: trzy epiki, dwa sprinty, trzy wydania i&nbsp;linia dzisiejszego dnia.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="modules" aria-labelledby="modules-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">06</span>Moduły i&nbsp;import</p>
+            <h2 id="modules-title">Weź to, czego potrzebujesz. Przenieś to, co już masz.</h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Moduły, które można wyłączyć</h3>
+              <p>
+                Wszystko poza samym trackerem to moduły: kod, baza wiedzy, oś czasu, raporty,
+                testy, agenci, importy. Moduł można wyłączyć dla całej instancji albo dla jednego
+                projektu. Dane zostają, ale moduł niczego nie pokazuje i&nbsp;niczego nie odbiera,
+                dopóki nie włączysz go ponownie.
+              </p>
+              <p>Można też w&nbsp;ogóle go nie budować i&nbsp;wymienić tylko te, które mają zostać:</p>
+              <div class="code">
+                <pre
+                  tabindex="0"
+                  aria-label="Polecenie budujące serwer z dwoma modułami"
+                ><code><span class="p">$ </span>cargo build --release -p hub-server \
+    --no-default-features --features github,wiki</code></pre>
+              </div>
+              <p>
+                Nowe moduły podłącza się tak samo:
+                <a class="ext" href="https://github.com/jash90/team-hub/blob/main/docs/modules.md"
+                  >jak napisać moduł</a
+                >
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/modules-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/modules-1600.webp"
+                  srcset="
+                    ../assets/img/modules-800.webp   800w,
+                    ../assets/img/modules-1600.webp 1600w
+                  "
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="1013"
+                  alt="Ustawienia projektu, karta Moduły: siedem modułów, każdy z&nbsp;jednozdaniowym opisem po angielsku i&nbsp;przełącznikiem, wszystkie włączone. GitHub, Knowledge base, Confluence import, Jira import, Reports, Tests (e2e) oraz AI agents (MCP)."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Ustawienia projektu → Moduły. Moduł wyłączony tutaj zachowuje dane, ale jego
+                nawigacja, panel w&nbsp;zadaniach i&nbsp;oznaczenia na kartach znikają z&nbsp;tego projektu.
+                Opisy modułów przychodzą z&nbsp;serwera, a&nbsp;ten pisze po angielsku.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Import z&nbsp;Jiry i&nbsp;Confluence</h3>
+              <p>
+                Jira Cloud oraz Server i&nbsp;Data Center przez API albo z&nbsp;eksportu CSV: z&nbsp;zachowaniem
+                kluczy zadań, z&nbsp;historią, komentarzami, czasem pracy, sprintami, wersjami
+                i&nbsp;powiązaniami. Statusy, typy i&nbsp;osoby mapujesz na podglądzie, zanim cokolwiek
+                zostanie zapisane, a&nbsp;zaimportowany projekt można później zaktualizować ponownie.
+              </p>
+              <p>Przestrzenie Confluence trafiają do bazy wiedzy jako kopia oryginału.</p>
+              <p class="honest">
+                Oba importy były dotąd testowane tylko na lokalnych atrapach, jeszcze nie na
+                prawdziwej Jirze ani prawdziwym Confluence.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="../assets/img/jira-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/jira-1600.webp"
+                  srcset="../assets/img/jira-800.webp 800w, ../assets/img/jira-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="938"
+                  alt="Ustawienia, karta „Import z&nbsp;Jiry”: formularz połączenia z&nbsp;adresem Jiry, e-mailem i&nbsp;tokenem, informacja, że token jest przechowywany zaszyfrowany, a&nbsp;import tylko czyta z&nbsp;Jiry, oraz drugi panel do importu pliku CSV."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Ustawienia → Import z&nbsp;Jiry: połączenie przez API albo plik CSV. Import tylko czyta
+                z&nbsp;Jiry.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="built" aria-labelledby="built-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">07</span>Jak to jest zbudowane</p>
+            <h2 id="built-title">Jeden plik binarny, jeden katalog danych.</h2>
+          </div>
+
+          <dl class="spec entry">
+            <div>
+              <dt>Serwer</dt>
+              <dd>
+                <strong>Rust.</strong> Jeden plik binarny, <code>team-hub</code>: API HTTP,
+                strumień zdarzeń na żywo i&nbsp;serwowanie zbudowanego interfejsu.
+              </dd>
+            </div>
+            <div>
+              <dt>Dane</dt>
+              <dd>
+                <strong>SQLite w&nbsp;jednym pliku</strong> w&nbsp;katalogu danych, z&nbsp;wyszukiwaniem
+                pełnotekstowym FTS5. Obok leżą załączniki i&nbsp;klucz instancji; kopię zapasową robi
+                się z&nbsp;tego katalogu.
+              </dd>
+            </div>
+            <div>
+              <dt>Obok</dt>
+              <dd>
+                <strong>Nic do uruchamiania.</strong> Bez serwera bazy danych, bez kolejki, bez
+                cache’u. GitHub, Jirę, Confluence i&nbsp;dostawcę modelu podłączasz, jeśli ich używasz.
+              </dd>
+            </div>
+            <div>
+              <dt>Interfejs</dt>
+              <dd>
+                React i&nbsp;TypeScript, budowane Vite’em. Po polsku i&nbsp;po angielsku, jasny i&nbsp;ciemny.
+              </dd>
+            </div>
+            <div>
+              <dt>Moduły</dt>
+              <dd>
+                Każdy w&nbsp;swoim folderze: crate w&nbsp;Ruście i&nbsp;jego ekrany, włączane przez feature
+                w&nbsp;Cargo. Moduł
+                pominięty przy budowaniu nie ma tabel, tras ani pozycji w&nbsp;Ustawieniach.
+              </dd>
+            </div>
+            <div>
+              <dt>Logowanie</dt>
+              <dd>
+                Hasła są haszowane algorytmem Argon2, a&nbsp;liczba prób logowania jest ograniczana.
+                Tokeny API są przechowywane
+                jako skróty i&nbsp;pokazywane raz. Tokeny innych systemów są szyfrowane kluczem
+                instancji i&nbsp;żadna trasa ich nie zwraca.
+              </dd>
+            </div>
+            <div>
+              <dt>Aplikacja desktopowa</dt>
+              <dd>
+                Okno Tauri nad rdzeniem w&nbsp;Ruście, który jest też poleceniem <code>hub</code>. Turę
+                agenta wykonuje Claude Agent SDK.
+              </dd>
+            </div>
+            <div>
+              <dt>Więcej</dt>
+              <dd>
+                <a
+                  class="ext"
+                  href="https://github.com/jash90/team-hub/blob/main/docs/architecture.md"
+                  >docs/architecture.md</a
+                >
+                (po angielsku, jak cała dokumentacja)
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="chapter" id="run" aria-labelledby="run-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">08</span>Uruchomienie</p>
+            <h2 id="run-title">Trzy polecenia albo jeden kontener.</h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <p>
+                Budowanie ze źródeł wymaga Rusta (stable) i&nbsp;Node 22; kontener wymaga tylko Dockera.
+              </p>
+              <p>
+                Otwórz <code>http://localhost:8080</code>. Pierwsza wizyta tworzy konto
+                administratora, a&nbsp;jeśli chcesz, także przykładowe projekty, zespół i&nbsp;kilka tygodni
+                historii, żeby było po czym się rozejrzeć.
+              </p>
+              <p>
+                Serwer domyślnie nasłuchuje na <code>127.0.0.1</code>; zanim wystawisz go na
+                świat, postaw przed nim proxy z&nbsp;TLS. Jeśli adres jest dostępny dla innych, zanim
+                skonfigurujesz instancję, ustaw <code>TEAM_HUB_SETUP_TOKEN</code>: założenie
+                pierwszego konta będzie wtedy wymagało jego podania.
+              </p>
+              <p>
+                Na Railway repozytorium wdraża się tak, jak jest: wolumen pod <code>/data</code>,
+                domena publiczna i&nbsp;dwie zmienne.
+              </p>
+              <p class="links">
+                <a class="ext" href="https://github.com/jash90/team-hub#running-it"
+                  >README: Running it</a
+                >
+                <a class="ext" href="https://github.com/jash90/team-hub#in-a-container"
+                  >README: In a&nbsp;container</a
+                >
+              </p>
+            </div>
+            <div>
+              <div class="code">
+                <h3 class="code-title">Ze źródeł, w&nbsp;klonie repozytorium</h3>
+                <pre
+                  tabindex="0"
+                  aria-label="Polecenia budujące i uruchamiające serwer ze źródeł"
+                ><code><span class="p">$ </span>cargo build --release
+<span class="p">$ </span>(cd web &amp;&amp; npm install &amp;&amp; npm run build)
+<span class="p">$ </span>./target/release/team-hub</code></pre>
+              </div>
+              <div class="code">
+                <h3 class="code-title">W&nbsp;kontenerze</h3>
+                <pre
+                  tabindex="0"
+                  aria-label="Polecenia budujące i uruchamiające kontener"
+                ><code><span class="p">$ </span>docker build -t team-hub .
+<span class="p">$ </span>docker run -p 8080:8080 -v team-hub-data:/data \
+    -e TEAM_HUB_SETUP_TOKEN=choose-one team-hub</code></pre>
+              </div>
+              <p>
+                Obraz zawiera serwer i&nbsp;zbudowany interfejs, nasłuchuje na wszystkich interfejsach
+                i&nbsp;wszystko trzyma w <code>/data</code>. Rób kopie zapasowe tego katalogu.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="not-yet" aria-labelledby="not-yet-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">09</span>Czego jeszcze nie ma</p>
+            <h2 id="not-yet-title">Czego team-hub jeszcze nie robi.</h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <p>
+                To lista z&nbsp;README, a&nbsp;nie plan z&nbsp;datami. Jest tutaj po to, żeby było to wiadomo od
+                razu, a&nbsp;nie dopiero po instalacji.
+              </p>
+            </div>
+            <div class="notyet">
+              <h3>Brakuje; każda z&nbsp;tych rzeczy ma przyjść jako moduł</h3>
+              <ul>
+                <li>Powiadomienia e-mail</li>
+                <li>Pola niestandardowe</li>
+                <li>Reguły automatyzacji inne niż te sterowane kodem</li>
+                <li>
+                  GitLab jako drugi hosting kodu
+                  <span>(reguły rozjazdu i&nbsp;oznaczenia już nie zależą od hostingu)</span>
+                </li>
+                <li>Logowanie jednokrotne (SSO)</li>
+              </ul>
+              <h3>Znane braki w&nbsp;tym, co już jest</h3>
+              <ul>
+                <li>
+                  Testowane tylko na lokalnych atrapach, nigdy na prawdziwych systemach: importy
+                  z&nbsp;Jiry i&nbsp;Confluence, wywołania API GitHuba oraz zlecenia wykonywane przez serwer
+                  <span>(na udawanym modelu)</span>.
+                </li>
+                <li>
+                  Aplikacja desktopowa działała dotąd tylko na Linuksie. Piaskownice na macOS
+                  i&nbsp;Windows, zasobnik, powiadomienia i&nbsp;instalatory nie są sprawdzone.
+                </li>
+                <li>
+                  Serwer pisze po angielsku. Interfejs na bieżąco tłumaczy na polski jego błędy,
+                  powiadomienia i&nbsp;komunikaty o&nbsp;stanie; opisy narzędzi agenta, które czyta sam
+                  agent, zostają po angielsku.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <div class="pair">
+          <div>
+            <a class="brand" href="./">
+              <img src="../assets/favicon.svg" width="24" height="24" alt="" loading="lazy" />
+              team-hub
+            </a>
+          </div>
+          <div>
+            <ul>
+              <li>
+                <a class="ext" href="https://github.com/jash90/team-hub">Kod źródłowy na GitHubie</a>
+              </li>
+              <li>
+                <a class="ext" href="https://github.com/jash90/team-hub#readme">README</a>
+              </li>
+              <li>
+                <a class="ext" href="https://github.com/jash90/team-hub/releases/latest"
+                  >Wydania aplikacji desktopowej</a
+                >
+              </li>
+              <li>
+                <a class="ext" href="https://github.com/jash90/team-hub/blob/main/docs/modules.md"
+                  >Jak napisać moduł</a
+                >
+              </li>
+              <li>
+                <a
+                  class="ext"
+                  href="https://github.com/jash90/team-hub/blob/main/docs/agent-runs.md"
+                  >Kontrakt zleceń dla agentów</a
+                >
+              </li>
+              <li><a href="../" hreflang="en" lang="en">In English</a></li>
+            </ul>
+            <p>
+              Ta strona nie wysyła zapytań do nikogo innego: bez analityki, bez skryptów
+              śledzących, bez czcionek i&nbsp;skryptów z&nbsp;cudzych serwerów.
+            </p>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

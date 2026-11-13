@@ -1,0 +1,1008 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>team-hub — a self-hosted issue tracker tied to the code</title>
+    <meta
+      name="description"
+      content="team-hub is a self-hosted issue tracker for software teams: the core of Jira, tied to the code and to the knowledge base. It shows where an issue's status and its code disagree."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)" />
+
+    <!-- Relative on purpose, so the page works on any domain. See README.md,
+         "The site's address", for the four lines that want an absolute URL. -->
+    <link rel="canonical" href="./" />
+    <link rel="alternate" hreflang="en" href="./" />
+    <link rel="alternate" hreflang="pl" href="pl/" />
+    <link rel="alternate" hreflang="x-default" href="./" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="team-hub" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:locale:alternate" content="pl_PL" />
+    <meta property="og:title" content="The issue says Done. The pull request is still open." />
+    <meta
+      property="og:description"
+      content="team-hub is a self-hosted issue tracker for software teams: the core of Jira, tied to the code and to the knowledge base."
+    />
+    <meta property="og:url" content="./" />
+    <meta property="og:image" content="assets/og-en.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="team-hub: the issue says Done, the pull request is still open. Below, the sprint board of the tracker."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="The issue says Done. The pull request is still open." />
+    <meta
+      name="twitter:description"
+      content="team-hub is a self-hosted issue tracker for software teams: the core of Jira, tied to the code and to the knowledge base."
+    />
+    <meta name="twitter:image" content="assets/og-en.png" />
+
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+
+    <link
+      rel="preload"
+      href="assets/fonts/newsreader-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="assets/site.css?v=1" />
+    <script src="assets/site.js?v=1" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the content</a>
+
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="./" aria-label="team-hub, top of the page">
+          <img src="assets/favicon.svg" width="24" height="24" alt="" />
+          team-hub
+        </a>
+        <nav class="site-nav" aria-label="Sections">
+          <a href="#code">Code</a>
+          <a href="#agents">Agents</a>
+          <a href="#desktop">Desktop app</a>
+          <a href="#run">Run it</a>
+          <a href="#not-yet">Not yet</a>
+        </nav>
+        <div class="site-tools">
+          <p class="lang">
+            <span class="visually-hidden">Language:</span>
+            <span aria-current="true">EN</span><span aria-hidden="true">/</span
+            ><a href="pl/" hreflang="pl" lang="pl" aria-label="Polski">PL</a>
+          </p>
+          <a class="ext" href="https://github.com/jash90/team-hub">GitHub</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="wrap">
+          <p class="kicker">Self-hosted issue tracker</p>
+          <h1>
+            <span class="claim">The issue says Done.</span>
+            <span>The pull request is still open.</span>
+          </h1>
+
+          <div class="pair hero-top">
+            <div>
+              <p class="lede">
+                team-hub is a self-hosted issue tracker for software teams: the core of Jira, tied
+                to the code and to the knowledge base instead of bolted onto them. Where an issue’s
+                status and its code disagree, it says so.
+              </p>
+              <p class="lede">
+                For developers and team leads who would rather run their own tracker than rent one.
+              </p>
+              <div class="actions">
+                <a class="button primary" href="#run"
+                  >Self-host it <span class="arrow" aria-hidden="true">↓</span></a
+                >
+                <a class="button" href="#desktop">Get the desktop app</a>
+              </div>
+            </div>
+            <dl class="facts">
+              <div>
+                <dt>Runs as</dt>
+                <dd>one server binary, one SQLite file</dd>
+              </div>
+              <div>
+                <dt>Needs beside it</dt>
+                <dd>nothing</dd>
+              </div>
+              <div>
+                <dt>Interface</dt>
+                <dd>English and Polish, light and dark</dd>
+              </div>
+              <div>
+                <dt>Source</dt>
+                <dd><a href="https://github.com/jash90/team-hub">github.com/jash90/team-hub</a></dd>
+              </div>
+            </dl>
+          </div>
+
+          <figure class="shot hero-shot">
+            <a
+              class="frame"
+              href="assets/img/board-light-1600.webp"
+              data-dark="assets/img/board-dark-1600.webp"
+            >
+              <picture>
+                <!-- On a phone the whole board is too small to read: show one column. -->
+                <source
+                  media="(max-width: 40em) and (prefers-color-scheme: dark)"
+                  srcset="assets/img/board-dark-phone.webp"
+                  width="600"
+                  height="664"
+                />
+                <source
+                  media="(max-width: 40em)"
+                  srcset="assets/img/board-light-phone.webp"
+                  width="600"
+                  height="664"
+                />
+                <source
+                  media="(prefers-color-scheme: dark)"
+                  srcset="assets/img/board-dark-800.webp 800w, assets/img/board-dark-1600.webp 1600w"
+                  sizes="(min-width: 87em) 1280px, 92vw"
+                />
+                <img
+                  src="assets/img/board-light-1600.webp"
+                  srcset="assets/img/board-light-800.webp 800w, assets/img/board-light-1600.webp 1600w"
+                  sizes="(min-width: 87em) 1280px, 92vw"
+                  width="1600"
+                  height="800"
+                  alt="The sprint board of a demo web shop project: four columns, To Do, In Progress, In Review and Done, with twelve issue cards. Several cards carry a pull request number with a tick or a cross, a count of passing tests and an orange warning triangle."
+                  fetchpriority="high"
+                  decoding="async"
+                />
+              </picture>
+            </a>
+            <figcaption>
+              The sprint board. Next to an issue’s key sit its pull request with the state of the
+              checks, the result of its tests, an agent run that waits for a person, and a triangle
+              where status and code disagree. The interface comes in English and Polish; most
+              screenshots on this page show the Polish one, with a demo project.
+            </figcaption>
+          </figure>
+
+          <div class="pair tracker">
+            <h2 class="kicker label">The tracker itself</h2>
+            <p class="lede">
+              Projects, issue types, epics and subtasks, configurable workflows, scrum and kanban
+              boards with drag and drop, a backlog with sprint planning, releases with release
+              notes, comments with mentions, attachments, links, time tracking, watchers and
+              notifications, a query language, saved filters, bulk changes, an activity feed, and
+              live updates in every open browser.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="code" aria-labelledby="code-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">01</span>Code</p>
+            <h2 id="code-title">Status and code cannot silently disagree.</h2>
+            <p class="intro">
+              Connect a GitHub repository and the tracker reads what happens there. An issue key in
+              a branch name, a commit message or a pull request title is enough to tie them
+              together.
+            </p>
+          </div>
+
+          <figure class="shot plate">
+            <a class="frame" href="assets/img/drift-1600.webp">
+              <img
+                class="light-only"
+                src="assets/img/drift-1600.webp"
+                srcset="assets/img/drift-800.webp 800w, assets/img/drift-1600.webp 1600w"
+                sizes="(min-width: 87em) 1280px, 92vw"
+                width="1600"
+                height="439"
+                alt="A panel headed “Status and code disagree” listing four issues. Under each one an orange line gives the reason: changes were requested in review; code exists, but the issue has not been started; checks are failing; in progress for days with no branch or commit."
+                loading="lazy"
+                decoding="async"
+              />
+            </a>
+            <figcaption>
+              Project → Code: four issues whose status does not match their code, each with the
+              reason under it.
+            </figcaption>
+          </figure>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Drift</h3>
+              <p>
+                Drift is where an issue’s status and its code tell different stories. In review,
+                but changes were requested. Still to do, though the code exists. Checks are
+                failing. In progress for days with no branch or commit.
+              </p>
+              <p>
+                The same triangle shows on the board, in the backlog and in search, and
+                <code>drift is not empty</code> is a query like any other.
+              </p>
+              <h3>The code is on the issue</h3>
+              <p>
+                Branches, commits and pull requests appear on the issue they mention, with the
+                state of the review and of the checks. The command that creates the issue’s branch
+                is one click to copy.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/issue-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/issue-1600.webp"
+                  srcset="assets/img/issue-800.webp 800w, assets/img/issue-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="1470"
+                  alt="An issue, “Card payment through the gateway”, in status In Review: description with acceptance criteria, three subtasks, two linked issues, and a Code section with the warning “Changes were requested in review”, an open pull request marked “changes requested” and “checks pass”, its branch and three commits."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                An issue opened from the board: subtasks, linked issues, and under Code its pull
+                request, branch and three commits, with the drift warning above them.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>The code moves the issue</h3>
+              <p>
+                A branch starts the issue, a pull request puts it in review, the last merge
+                finishes it. Each rule is set per project and can be “do nothing”. Finished work is
+                not reopened, and a merge finishes an issue only when none of its pull requests is
+                still open.
+              </p>
+              <p>Commit messages can comment, log time and move issues:</p>
+              <div class="code">
+                <pre
+                  class="soft"
+                  tabindex="0"
+                  aria-label="Example commit message"
+                ><code>WEB-12 #comment fixed the redirect #time 1h 30m #in-review</code></pre>
+              </div>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/rules-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/rules-1600.webp"
+                  srcset="assets/img/rules-800.webp 800w, assets/img/rules-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="644"
+                  alt="A settings panel, “Workflow rules”, with five rows: a branch is created, moves to In Progress; a pull request is opened, moves to In Review; a review requests changes, do nothing; a review approves, do nothing; the last open pull request is merged, moves to Done."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Project settings → GitHub: what happens to an issue when something happens to its
+                code.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="knowledge" aria-labelledby="knowledge-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">02</span>Knowledge and tests</p>
+            <h2 id="knowledge-title">
+              What the team wrote down and what the tests say, on the same issue.
+            </h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>A knowledge base linked both ways</h3>
+              <p>
+                Spaces of Markdown pages in a tree, with history, diff and full-text search. A page
+                that mentions <code>WEB-10</code> shows up on that issue by itself, and the issue
+                lists its pages.
+              </p>
+              <p>
+                A task list on a page can become issues. Confluence spaces can be imported as a
+                mirror that is kept up to date.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/wiki-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/wiki-1600.webp"
+                  srcset="assets/img/wiki-800.webp 800w, assets/img/wiki-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="910"
+                  alt="A knowledge base page about a payment notification channel. On the left the page tree of the space: architecture, payments, decisions, meetings. The text links to issue WEB-10 and to a decision record, and has a table of contents on the right."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                A page in the project’s space. It links to the issue it describes and to the
+                decision record behind it; both links are followed back from the other side.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Tests that know which issue they verify</h3>
+              <p>
+                Runs of the <a href="https://github.com/e2e-inc/e2e">e2e</a> testing framework
+                arrive through a reporter. A test that carries an issue key in its title or tags is
+                linked to that issue, so the issue shows whether what it describes actually works.
+              </p>
+              <p>A failing test on an issue that is marked Done is shown for what it is.</p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/tests-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/tests-1600.webp"
+                  srcset="assets/img/tests-800.webp 800w, assets/img/tests-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="759"
+                  alt="The Tests page of a project. The last run, CI #236 on main, failed: nine tests passed, one failed, one was flaky, one skipped. Below, a table of tests, each with the issue it verifies and bars for its recent runs; the failing test verifies WEB-14, which is marked Done."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Project → Tests: the last run, then each test with the issue it verifies and its
+                recent history. Here a failing test points at an issue marked Done.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="agents" aria-labelledby="agents-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">03</span>AI agents</p>
+            <h2 id="agents-title">An agent proposes, a person decides.</h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <p>
+                Work on an issue can be handed to an agent from the issue’s page: refine the
+                description, break it into subtasks, review the pull request, implement it in code,
+                or a task in your own words.
+              </p>
+              <p>
+                A run shows what the agent did, asks when it needs a decision, and ends in
+                <em>proposals</em>: a comment, a status change, subtasks. Nothing changes until
+                someone approves it, unless the project’s administrator chose to trust a kind of
+                change.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/proposals-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/proposals-1600.webp"
+                  srcset="assets/img/proposals-800.webp 800w, assets/img/proposals-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="870"
+                  alt="The end of an agent run on an issue, with two proposals marked “to decide”: add a comment summarising the change, and change the status from In Progress to In Review. Each has an optional note field and the buttons Approve and Reject. A line below shows the branch, the model, and the tokens and cost of the run."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                The end of a run on an issue: a comment and a status change, each waiting for
+                Approve or Reject. The line below them says what the run cost.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="notes">
+            <div class="text">
+              <h3>Who carries a run out</h3>
+              <p>
+                The server carries out the runs that need no code, with your own model provider
+                key. Runs that need the repository go to a runner: the desktop app, the
+                <code>hub</code> command line, or anything that speaks
+                <a href="https://github.com/jash90/team-hub/blob/main/docs/agent-runs.md"
+                  >the run contract</a
+                >.
+              </p>
+            </div>
+            <div class="text">
+              <h3>Also an MCP server</h3>
+              <p>
+                A coding agent working in the repository can read its issue, comment, move it and
+                look things up in the knowledge base, with the permissions of the person whose
+                token it uses.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="band" id="desktop" aria-labelledby="desktop-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">04</span>Desktop app</p>
+            <h2 id="desktop-title">Nothing leaves your computer without a click.</h2>
+            <p class="intro">
+              A developer’s cockpit for macOS, Windows and Linux. The issues assigned to you become
+              agent threads: an agent works on an issue in your local clone, in a git working tree
+              and branch of its own, and whatever should leave your computer (a comment, a status
+              change, a push, a pull request) waits for your click. The same app is a runner for
+              work delegated on the web.
+            </p>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>The safety model, in plain words</h3>
+              <ul class="checks">
+                <li>
+                  One working tree and branch per thread. Your checkout, index and branch are never
+                  touched.
+                </li>
+                <li>
+                  The agent’s shell runs in the operating system’s sandbox: no network, writes only
+                  inside its working tree. Where the system has no sandbox, the thread gets no
+                  shell at all unless you allow one.
+                </li>
+                <li>
+                  The agent never holds your token. It lives in the system keychain, and the
+                  offline copy of your tracker is encrypted.
+                </li>
+                <li>
+                  A push shows exactly the commits and the diff, pushes exactly the commit you
+                  looked at, and is never forced.
+                </li>
+              </ul>
+              <p>
+                <a
+                  class="ext"
+                  href="https://github.com/jash90/team-hub/blob/main/apps/desktop/README.md#the-safety-model-in-plain-words"
+                  >The whole list, and what was tried against a real model</a
+                >
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/desktop-en-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/desktop-en-1600.webp"
+                  srcset="assets/img/desktop-en-800.webp 800w, assets/img/desktop-en-1600.webp 1296w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1296"
+                  height="778"
+                  alt="The desktop app. On the left, a list of things to decide and four agent threads. In the middle, one thread: proposals to push the branch and to open a pull request, each with Review and Reject buttons, and below them the conversation, in which the agent asks one question, the person answers, and the agent commits and makes its proposals."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                A thread on an issue. The agent asked one question, got an answer, committed on its
+                branch and proposed a comment, a push and a pull request. None of them has happened
+                yet.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Download</h3>
+              <p>
+                Installers for macOS, Windows and Linux go to the repository’s releases page. The
+                first release is being prepared; if the page is still empty, build the app from
+                <code>apps/desktop</code>.
+              </p>
+              <p>
+                The builds are not signed yet, so macOS and Windows will warn before the first
+                start. The app needs a team-hub server to connect to. For real agents it uses
+                Claude Code signed in on the same machine, or an Anthropic API key.
+              </p>
+              <div class="actions">
+                <a class="button primary" href="https://github.com/jash90/team-hub/releases/latest"
+                  >Releases on GitHub</a
+                >
+                <a
+                  class="button"
+                  href="https://github.com/jash90/team-hub/blob/main/apps/desktop/README.md#building-and-running"
+                  >Build from source</a
+                >
+              </div>
+              <p class="honest">
+                So far the app has run on Linux only. Its macOS and Windows sandboxes, the tray,
+                notifications and installers are unverified.
+              </p>
+            </div>
+            <figure class="shot narrow">
+              <a class="frame" href="assets/img/desktop-push-800.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/desktop-push-800.webp"
+                  width="800"
+                  height="528"
+                  alt="A dialog, “Push the branch”: the branch and the remote it goes to, the sentence “Exactly this commit is pushed. Anything the thread commits after you looked stays here”, one commit, the diff of one added file, and the buttons Cancel and “Push 1 commits”."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                The push preview: one commit, its diff, and the remote it goes to. Both desktop
+                screenshots come from the app’s own end-to-end check, where a scripted test agent
+                stands in for the model; that is why the commit is signed “Fake Agent”.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="everyday" aria-labelledby="everyday-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">05</span>Search, reports, plans</p>
+            <h2 id="everyday-title">A query language, reports and a timeline over the same data.</h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>The query language</h3>
+              <p>
+                Plain words search the text; a bare key opens the issue. Modules add fields of
+                their own: <code>pr</code> and <code>drift</code> come with the code module. A
+                query can be saved as a filter, and its result exported as CSV.
+              </p>
+              <p>
+                Search folds accents, so <code>zolta</code> finds <code lang="pl">żółta</code>.
+              </p>
+            </div>
+            <div>
+              <div class="code">
+                <pre tabindex="0" aria-label="Example queries"><code>project = WEB AND sprint in openSprints() AND assignee = currentUser()
+type = Bug AND priority >= High AND created >= -7d ORDER BY priority DESC
+text ~ "kod pocztowy" AND category != done
+category = done AND pr = open            <span class="c">-- with the github module</span>
+drift is not empty                        <span class="c">-- status and code disagree</span></code></pre>
+              </div>
+            </div>
+          </div>
+
+          <figure class="shot plate">
+            <a class="frame" href="assets/img/query-1600.webp">
+              <img
+                class="light-only"
+                src="assets/img/query-1600.webp"
+                srcset="assets/img/query-800.webp 800w, assets/img/query-1600.webp 1600w"
+                sizes="(min-width: 87em) 1280px, 92vw"
+                width="1600"
+                height="516"
+                alt="The Search page with the query “project = WEB AND drift is not empty ORDER BY priority DESC” and four results in a table: key, title, status, assignee, priority, points and when the issue changed. Buttons above offer to save the filter and to export CSV."
+                loading="lazy"
+                decoding="async"
+              />
+            </a>
+            <figcaption>
+              Search: the issues of project WEB whose status and code disagree, highest
+              priority first.
+            </figcaption>
+          </figure>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Reports reconstructed from history</h3>
+              <p>
+                Burndown, velocity, cumulative flow, cycle time and workload are computed on
+                request from the issues’ recorded history. Nothing is stored, so a report always
+                agrees with what the history says today.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/flow-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/flow-1600.webp"
+                  srcset="assets/img/flow-800.webp 800w, assets/img/flow-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="772"
+                  alt="The Reports page on the cumulative flow tab: a stacked area chart over thirty days with three bands, to do, in progress and done, all growing; twelve, six and eight issues on the last day."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Cumulative flow: how many issues sat at each stage at the end of each day.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>A timeline of epics</h3>
+              <p>
+                A project’s epics as bars from start date to due date, with sprints and releases
+                behind them. Drag a bar to plan; an epic nobody has dated shows the span its
+                issues suggest.
+              </p>
+            </div>
+            <figure class="shot">
+              <a
+                class="frame"
+                href="assets/img/timeline-en-light-1600.webp"
+                data-dark="assets/img/timeline-en-dark-1600.webp"
+              >
+                <picture>
+                  <source
+                    media="(prefers-color-scheme: dark)"
+                    srcset="
+                      assets/img/timeline-en-dark-800.webp   800w,
+                      assets/img/timeline-en-dark-1600.webp 1600w
+                    "
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  />
+                  <img
+                    src="assets/img/timeline-en-light-1600.webp"
+                    srcset="
+                      assets/img/timeline-en-light-800.webp   800w,
+                      assets/img/timeline-en-light-1600.webp 1600w
+                    "
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1600"
+                    height="1058"
+                    alt="The Timeline page in the months view, October to January. Three epics as bars, the filled part showing finished work; one epic is expanded to its ten issues. Behind the bars: two sprints, three release markers and a red line for today."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
+              </a>
+              <figcaption>
+                The timeline with one epic expanded: its issues, two sprints, three releases and
+                today’s line.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="modules" aria-labelledby="modules-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">06</span>Modules and import</p>
+            <h2 id="modules-title">Take what you need. Bring what you have.</h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Modules you can switch off</h3>
+              <p>
+                Everything beyond the tracker is a module: code, knowledge base, timeline, reports,
+                tests, agents, the importers. A module can be switched off for the whole instance
+                or for one project. Its data stays; it shows nothing and receives nothing until it
+                is switched on again.
+              </p>
+              <p>Or leave it out of the build and name the ones to keep:</p>
+              <div class="code">
+                <pre
+                  tabindex="0"
+                  aria-label="Build command with two modules"
+                ><code><span class="p">$ </span>cargo build --release -p hub-server \
+    --no-default-features --features github,wiki</code></pre>
+              </div>
+              <p>
+                New ones plug in the same way:
+                <a class="ext" href="https://github.com/jash90/team-hub/blob/main/docs/modules.md"
+                  >writing a module</a
+                >
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/modules-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/modules-1600.webp"
+                  srcset="assets/img/modules-800.webp 800w, assets/img/modules-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="1013"
+                  alt="Project settings, Modules tab: seven modules, each with a one-line description and a switch, all on. GitHub, Knowledge base, Confluence import, Jira import, Reports, Tests (e2e) and AI agents (MCP)."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Project settings → Modules. A module switched off here keeps its data, but its
+                navigation, its panel on issues and its badges on cards disappear from this
+                project.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <h3>Import from Jira and Confluence</h3>
+              <p>
+                Jira Cloud and Server/Data Center over their API, or a CSV export, with the issue
+                keys kept, history, comments, worklogs, sprints, versions and links. Statuses,
+                types and people are mapped in a preview before anything is written, and an
+                imported project can be brought up to date again later.
+              </p>
+              <p>Confluence spaces come into the knowledge base as a mirror.</p>
+              <p class="honest">
+                Both imports have been tested against local fakes only, not yet against a real Jira
+                or Confluence.
+              </p>
+            </div>
+            <figure class="shot">
+              <a class="frame" href="assets/img/jira-1600.webp">
+                <img
+                  class="light-only"
+                  src="assets/img/jira-1600.webp"
+                  srcset="assets/img/jira-800.webp 800w, assets/img/jira-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="938"
+                  alt="Settings, Import from Jira: a connection form with the Jira address, an e-mail and a token, a note that the token is stored encrypted and that the import only reads from Jira, and a second panel for importing a CSV file."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+              <figcaption>
+                Settings → Import from Jira: a connection over the API, or a CSV file. The import
+                only reads from Jira.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="built" aria-labelledby="built-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">07</span>How it is built</p>
+            <h2 id="built-title">One binary, one data directory.</h2>
+          </div>
+
+          <dl class="spec entry">
+            <div>
+              <dt>Server</dt>
+              <dd>
+                <strong>Rust.</strong> One binary, <code>team-hub</code>: the HTTP API, the live
+                stream, and it serves the built interface.
+              </dd>
+            </div>
+            <div>
+              <dt>Data</dt>
+              <dd>
+                <strong>SQLite in one file</strong> under the data directory, with FTS5 for text
+                search. Attachments and the instance key sit next to it; that directory is what you
+                back up.
+              </dd>
+            </div>
+            <div>
+              <dt>Beside it</dt>
+              <dd>
+                <strong>Nothing to run.</strong> No database server, no queue, no cache. GitHub,
+                Jira, Confluence and a model provider are things you connect if you use them.
+              </dd>
+            </div>
+            <div>
+              <dt>Interface</dt>
+              <dd>React and TypeScript, built with Vite. English and Polish, light and dark.</dd>
+            </div>
+            <div>
+              <dt>Modules</dt>
+              <dd>
+                One folder each: a Rust crate and its screens, behind a Cargo feature. A module
+                left out of the build has no tables, no routes and no entry in Settings.
+              </dd>
+            </div>
+            <div>
+              <dt>Sign-in</dt>
+              <dd>
+                Passwords hashed with Argon2, sign-in attempts rate limited. API tokens are stored
+                hashed and shown once. Tokens of other systems are encrypted at rest with the
+                instance key and never returned by any route.
+              </dd>
+            </div>
+            <div>
+              <dt>Desktop app</dt>
+              <dd>
+                A Tauri window over a Rust core that is also the <code>hub</code> command line. An
+                agent’s turn runs through the Claude Agent SDK.
+              </dd>
+            </div>
+            <div>
+              <dt>More</dt>
+              <dd>
+                <a
+                  class="ext"
+                  href="https://github.com/jash90/team-hub/blob/main/docs/architecture.md"
+                  >docs/architecture.md</a
+                >
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="chapter" id="run" aria-labelledby="run-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">08</span>Run it</p>
+            <h2 id="run-title">Three commands, or one container.</h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <p>
+                Building from source needs Rust (stable) and Node 22; the container needs only
+                Docker.
+              </p>
+              <p>
+                Open <code>http://localhost:8080</code>. The first visit creates the administrator
+                account, optionally with example projects, a team and a few weeks of history to
+                look around in.
+              </p>
+              <p>
+                The server binds to <code>127.0.0.1</code> by default; put a TLS-terminating proxy
+                in front before exposing it. Wherever the address is reachable by others before
+                you have set the instance up, set <code>TEAM_HUB_SETUP_TOKEN</code>: creating the
+                first account then asks for it.
+              </p>
+              <p>
+                On Railway the repository deploys as it is: a volume at <code>/data</code>, a
+                public domain and two variables.
+              </p>
+              <p class="links">
+                <a class="ext" href="https://github.com/jash90/team-hub#running-it"
+                  >README: Running it</a
+                >
+                <a class="ext" href="https://github.com/jash90/team-hub#in-a-container"
+                  >README: In a container</a
+                >
+              </p>
+            </div>
+            <div>
+              <div class="code">
+                <h3 class="code-title">From source, in a clone of the repository</h3>
+                <pre
+                  tabindex="0"
+                  aria-label="Commands to build and run from source"
+                ><code><span class="p">$ </span>cargo build --release
+<span class="p">$ </span>(cd web &amp;&amp; npm install &amp;&amp; npm run build)
+<span class="p">$ </span>./target/release/team-hub</code></pre>
+              </div>
+              <div class="code">
+                <h3 class="code-title">In a container</h3>
+                <pre
+                  tabindex="0"
+                  aria-label="Commands to build and run the container"
+                ><code><span class="p">$ </span>docker build -t team-hub .
+<span class="p">$ </span>docker run -p 8080:8080 -v team-hub-data:/data \
+    -e TEAM_HUB_SETUP_TOKEN=choose-one team-hub</code></pre>
+              </div>
+              <p>
+                The image holds the server and the built interface, listens on all interfaces, and
+                keeps everything in <code>/data</code>. Back up that directory.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="not-yet" aria-labelledby="not-yet-title">
+        <div class="wrap">
+          <div class="chapter-head">
+            <p class="kicker"><span class="num">09</span>Not yet</p>
+            <h2 id="not-yet-title">What it does not do yet.</h2>
+          </div>
+
+          <div class="pair entry">
+            <div class="text">
+              <p>
+                This list is the README’s, not a roadmap with dates. It is here so that you find
+                out now rather than after you have set it up.
+              </p>
+            </div>
+            <div class="notyet">
+              <h3>Missing, each meant to arrive as a module</h3>
+              <ul>
+                <li>E-mail notifications</li>
+                <li>Custom fields</li>
+                <li>Automation rules beyond the code-driven ones</li>
+                <li>
+                  GitLab as a second code host
+                  <span>(the drift rules and badges are host-neutral already)</span>
+                </li>
+                <li>Single sign-on</li>
+              </ul>
+              <h3>Known gaps in what is there</h3>
+              <ul>
+                <li>
+                  Tested only against local fakes, never against the real thing: the Jira and
+                  Confluence imports, the GitHub API calls, and the server’s own agent runs
+                  <span>(a fake model)</span>.
+                </li>
+                <li>
+                  The desktop app has run on Linux only. Its macOS and Windows sandboxes, the tray,
+                  notifications and installers are unverified.
+                </li>
+                <li>
+                  The server writes English. The interface puts its errors, notifications and
+                  status lines into Polish as they arrive; the descriptions of agent tools, which
+                  the agent itself reads, stay English.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <div class="pair">
+          <div>
+            <a class="brand" href="./">
+              <img src="assets/favicon.svg" width="24" height="24" alt="" loading="lazy" />
+              team-hub
+            </a>
+          </div>
+          <div>
+            <ul>
+              <li><a class="ext" href="https://github.com/jash90/team-hub">Source on GitHub</a></li>
+              <li>
+                <a class="ext" href="https://github.com/jash90/team-hub#readme">README</a>
+              </li>
+              <li>
+                <a class="ext" href="https://github.com/jash90/team-hub/releases/latest"
+                  >Desktop app releases</a
+                >
+              </li>
+              <li>
+                <a class="ext" href="https://github.com/jash90/team-hub/blob/main/docs/modules.md"
+                  >Writing a module</a
+                >
+              </li>
+              <li>
+                <a
+                  class="ext"
+                  href="https://github.com/jash90/team-hub/blob/main/docs/agent-runs.md"
+                  >The agent run contract</a
+                >
+              </li>
+              <li><a href="pl/" hreflang="pl" lang="pl">Po polsku</a></li>
+            </ul>
+            <p>
+              This page makes no requests to anyone else: no analytics, no trackers, no fonts or
+              scripts from other servers.
+            </p>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

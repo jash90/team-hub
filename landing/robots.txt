@@ -1,0 +1,4 @@
+# Everything here is public. Add a "Sitemap:" line with the absolute address
+# once the site has one (see README.md, "The site's address").
+User-agent: *
+Allow: /
