@@ -62,8 +62,19 @@ text_enum!(AgentProposalKind {
     CreateSubtasks => "create_subtasks",
     CreateIssue => "create_issue",
     LogWork => "log_work",
+    Push => "push",
+    PullRequest => "pull_request",
 });
 text_enum!(AgentProposalState { Pending => "pending", Approved => "approved", Rejected => "rejected", Failed => "failed" });
+
+impl AgentProposalKind {
+    /// Pushing a branch and opening a pull request happen where the code is. Such a proposal
+    /// is shown here and decided in the runner's own app, by a person who has seen the
+    /// changes; the runner then says how it went.
+    pub fn decided_by_runner(self) -> bool {
+        matches!(self, Self::Push | Self::PullRequest)
+    }
+}
 
 impl AgentRunState {
     pub fn is_finished(self) -> bool {

@@ -180,6 +180,8 @@ pub fn tool_name(kind: AgentProposalKind) -> &'static str {
         AgentProposalKind::Transition => "propose_transition",
         AgentProposalKind::CreateIssue => "propose_issue",
         AgentProposalKind::LogWork => "propose_work_log",
+        AgentProposalKind::Push => "propose_push",
+        AgentProposalKind::PullRequest => "propose_pull_request",
     }
 }
 
@@ -235,6 +237,13 @@ fn tool(kind: AgentProposalKind) -> Value {
             "Propose a record of time spent.",
             json!({ "spent": { "type": "string", "description": "Such as \"1h 30m\"" }, "note": { "type": "string" } }),
             &["spent"],
+        ),
+        // The server's own runs have no code; these are here for completeness of the match.
+        AgentProposalKind::Push => ("Propose pushing the branch with the work.", json!({ "branch": { "type": "string" }, "note": { "type": "string" } }), &["branch"]),
+        AgentProposalKind::PullRequest => (
+            "Propose opening a pull request for the branch with the work.",
+            json!({ "title": { "type": "string" }, "body": { "type": "string" }, "head": { "type": "string" }, "base": { "type": "string" } }),
+            &["title"],
         ),
     };
 

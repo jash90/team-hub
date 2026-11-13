@@ -260,6 +260,11 @@ impl HubClient {
         self.post(&format!("{AGENTS}/proposals/{id}/decide"), &json!({ "approve": approve, "note": note }))
     }
 
+    /// Says how a push or a pull request the person decided here went.
+    pub fn settle_proposal(&self, id: i64, approve: bool, note: Option<&str>, result: &Value) -> CoreResult<AgentRunDetail> {
+        self.post(&format!("{AGENTS}/proposals/{id}/settle"), &json!({ "approve": approve, "note": note, "result": result }))
+    }
+
     pub fn cancel_run(&self, id: i64) -> CoreResult<AgentRun> {
         self.post(&format!("{AGENTS}/runs/{id}/cancel"), &json!({}))
     }

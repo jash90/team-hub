@@ -255,8 +255,7 @@ async fn a_thread_works_in_its_own_tree_and_shows_up_on_the_server_as_a_run() {
     assert_eq!(said, vec!["Reading WEB-1 before touching the code.", "The change is committed locally."]);
     assert_eq!(tools[..3], ["mcp__team-hub__get_issue", "Write", "Bash"]);
     assert_eq!(kinds, vec![ProposalKind::Comment, ProposalKind::Push, ProposalKind::PullRequest]);
-    assert!(detail.proposals[0].remote_id.is_some());
-    assert!(detail.proposals[1].remote_id.is_none() && detail.proposals[2].remote_id.is_none());
+    assert!(detail.proposals.iter().all(|proposal| proposal.remote_id.is_some()), "the run on the server shows all three");
 
     let diff = bench.desktop.run(move |core| core.thread_diff(id)).await.unwrap();
 
@@ -280,8 +279,13 @@ async fn a_thread_works_in_its_own_tree_and_shows_up_on_the_server_as_a_run() {
     assert_eq!(run["run"]["runnerName"], bench.desktop.core().settings().runner_name);
     assert!(run["run"]["summary"].as_str().unwrap().starts_with("Implemented WEB-1"));
     assert_eq!(texts(events, "message"), said);
-    assert_eq!(run["proposals"].as_array().unwrap().len(), 1);
-    assert_eq!(run["proposals"][0]["kind"], "comment");
+    // The web can decide the comment; the push and the pull request it only shows.
+    let shown: Vec<(&str, &str)> =
+        run["proposals"].as_array().unwrap().iter().map(|proposal| (proposal["kind"].as_str().unwrap(), proposal["state"].as_str().unwrap())).collect();
+
+    assert_eq!(shown, vec![("comment", "pending"), ("push", "pending"), ("pull_request", "pending")]);
+    assert_eq!(run["proposals"][1]["payload"]["branch"], branch);
+    assert_eq!(run["proposals"][2]["payload"]["head"], branch);
     assert!(texts(events, "status").iter().any(|text| text.contains("pushing the branch")));
     // Mirrored once: another round sends nothing again.
     let sent = hub.state().events.len();
@@ -659,7 +663,17 @@ async fn a_push_goes_out_only_after_the_click_and_only_the_commit_that_was_shown
     assert_eq!(hub.run(run_id)["run"]["state"], "waiting");
     assert!(bench.desktop.run(move |core| core.record_pull_request(id, "javascript:alert(1)")).await.is_err());
 
+    // The run was told how the push went as soon as it was done.
+    let on_run = |kind: &str| hub.run(run_id)["proposals"].as_array().unwrap().iter().find(|proposal| proposal["kind"] == kind).cloned().unwrap();
+
+    assert_eq!((&on_run("push")["state"], &on_run("push")["result"]["commit"]), (&json!("approved"), &json!(preview.commit)));
+    assert_eq!(on_run("pull_request")["state"], "pending");
+
     bench.desktop.run(move |core| core.record_pull_request(id, "https://github.com/acme/web/pull/7")).await.unwrap();
+    assert_eq!(
+        (&on_run("pull_request")["state"], &on_run("pull_request")["result"]["url"]),
+        (&json!("approved"), &json!("https://github.com/acme/web/pull/7"))
+    );
     bench.desktop.tick(true).await.unwrap();
 
     let run = hub.run(run_id);
@@ -715,6 +729,44 @@ async fn without_gh_the_pull_request_is_opened_by_the_server_or_finished_in_the_
 
     bench.desktop.tick(true).await.unwrap();
     assert_eq!(hub.run(thread.run_id.unwrap())["run"]["pullRequestUrl"], "https://github.com/acme/web/pull/12");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_push_declined_here_is_declined_on_the_run_and_an_older_server_is_simply_not_told() {
+    let (bench, hub, _repo) = ready("declined").await;
+    let id = start(&bench, "WEB-1", ThreadKind::Implement, "").await;
+    let thread = bench.until_state(id, ThreadState::Done).await;
+    let run_id = thread.run_id.unwrap();
+    let push = bench.desktop.run(move |core| core.thread(id)).await.unwrap().proposals[1].clone();
+    let push_id = push.id;
+
+    // The settlement does not get through; the next round catches up.
+    hub.state().runs_api = false;
+    bench.desktop.run(move |core| core.decide_proposal(push_id, false, Some("Not this week."))).await.unwrap();
+    hub.state().runs_api = true;
+
+    let on_run = |hub: &FakeHub| hub.run(run_id)["proposals"].as_array().unwrap().iter().find(|proposal| proposal["kind"] == "push").cloned().unwrap();
+
+    assert_eq!(on_run(&hub)["state"], "pending");
+    bench.desktop.tick(true).await.unwrap();
+    assert_eq!((&on_run(&hub)["state"], &on_run(&hub)["note"]), (&json!("rejected"), &json!("Not this week.")));
+
+    // A server that cannot show such proposals: they are decided here all the same.
+    let (bench, hub, _repo) = ready("declined-old-server").await;
+
+    hub.state().shows_no_pushes = true;
+
+    let id = start(&bench, "WEB-1", ThreadKind::Implement, "").await;
+    let thread = bench.until_state(id, ThreadState::Done).await;
+    let proposals = bench.desktop.run(move |core| core.thread(id)).await.unwrap().proposals;
+
+    assert_eq!(proposals.iter().map(|proposal| proposal.remote_id.is_some()).collect::<Vec<_>>(), vec![true, false, false]);
+    assert_eq!(hub.run(thread.run_id.unwrap())["proposals"].as_array().unwrap().len(), 1);
+
+    let push_id = proposals[1].id;
+    let declined = bench.desktop.run(move |core| core.decide_proposal(push_id, false, None)).await.unwrap();
+
+    assert_eq!(declined.state, ProposalState::Rejected);
 }
 
 #[tokio::test(flavor = "multi_thread")]

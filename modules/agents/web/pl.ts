@@ -223,4 +223,11 @@ export const polish: Record<string, string> = {
   'Asked to stop': 'Poproszono o zatrzymanie',
   'The runner stopped answering; the run is queued again': 'Runner przestał odpowiadać; zlecenie wróciło do kolejki',
   'The server restarted; the run is queued again': 'Serwer został uruchomiony ponownie; zlecenie wróciło do kolejki',
+  'Push the branch': 'Wypchnij gałąź',
+  'Open a pull request': 'Otwórz pull request',
+  'Done in the desktop app: {what}': 'Wykonano w aplikacji desktopowej: {what}',
+  'Declined in the desktop app: {what}': 'Odrzucono w aplikacji desktopowej: {what}',
+  'Pushed at': 'Wypchnięto commit',
+  'Decided in the desktop app, on the computer that has the code, where the changes can be looked at first.':
+    'Decyzja zapada w aplikacji desktopowej, na komputerze z kodem, gdzie można najpierw obejrzeć zmiany.',
 };

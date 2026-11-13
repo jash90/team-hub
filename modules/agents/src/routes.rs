@@ -10,7 +10,7 @@ use hub_core::Id;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::proposals::{self, Decision};
+use crate::proposals::{self, Decision, Settlement};
 use crate::runs::{self, Claim, Heartbeat, NewEvent, NewRun, RunFilter, RunPatch, AI_LABEL};
 use crate::settings::{self, SettingsInput};
 use crate::types::{AgentProposal, AgentProposalKind, AgentRun, AgentRunDetail, AgentRunner, AgentSettings, AgentTrust};
@@ -28,6 +28,7 @@ pub fn router() -> Router<App> {
         .route("/runs/{id}/events", post(add_event))
         .route("/runs/{id}/proposals", post(add_proposal))
         .route("/proposals/{id}/decide", post(decide))
+        .route("/proposals/{id}/settle", post(settle))
         .route("/runners", get(runners))
         .route("/runners/heartbeat", post(heartbeat))
         .route("/settings", get(get_settings).put(put_settings))
@@ -161,6 +162,10 @@ async fn add_proposal(State(app): State<App>, user: AuthUser, Path(id): Path<Id>
     })
     .await
     .map(Json)
+}
+
+async fn settle(State(app): State<App>, user: AuthUser, Path(id): Path<Id>, Json(settlement): Json<Settlement>) -> Reply<AgentRunDetail> {
+    app.run(move |app| app.write(Actor::user_via(user.id, AI_LABEL), |tx| proposals::settle(tx, &user, id, &settlement))).await.map(Json)
 }
 
 async fn patch_run(State(app): State<App>, user: AuthUser, Path(id): Path<Id>, Json(patch): Json<RunPatch>) -> Reply<AgentRun> {

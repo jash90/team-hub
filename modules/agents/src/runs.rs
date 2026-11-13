@@ -361,7 +361,7 @@ pub fn answer(tx: &Tx, user: &AuthUser, id: Id, text: &str) -> ApiResult<AgentRu
 // ---------- the runner's side ----------
 
 /// The run, for the runner that claimed it, whether or not it has ended.
-fn holder(tx: &Tx, user: &AuthUser, id: Id) -> ApiResult<RunRow> {
+pub fn holder(tx: &Tx, user: &AuthUser, id: Id) -> ApiResult<RunRow> {
     let (row, _) = run_access(tx, user, id)?;
 
     if row.on_server() || row.runner_user_id != Some(user.id) {

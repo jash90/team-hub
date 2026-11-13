@@ -150,7 +150,7 @@ AgentSettings = {
 `POST /runs/{id}/proposals`, `PATCH /runs/{id}`, `GET /runs/{id}`: bodies and answers as in the
 contract. A runner is whoever's API token it sends; only the person whose runner claimed a run
 may write to it (403 otherwise, 409 once the run has ended, except that its branch and its
-pull request can still be recorded). A runner that starts work itself sends its `runnerId`
+pull request can still be recorded, and a push or a pull request settled). A runner that starts work itself sends its `runnerId`
 with `POST /issues/{key}/runs` and gets the run already claimed; `POST /runs/claim` with a
 `runId` takes that run or nothing.
 
@@ -178,6 +178,10 @@ with `POST /issues/{key}/runs` and gets the run already claimed; `POST /runs/cla
   reason in `note`. `decide` may carry `payload`, the proposal as the person edited it.
   `result`: `{ changed, previousDescription? }`, `{ keys }`, `{ key }`, `{ commentId }`, `{ worklogId }`.
   New subtasks join their parent's sprint.
+- **What leaves a computer.** A runner records a `push` or a `pull_request` proposal so that
+  the run shows what waits in its app. `decide` refuses them (409), trust never covers them,
+  the server's own runs cannot make them; the runner settles them with
+  `POST /proposals/{id}/settle` once the person has pushed, opened the pull request, or declined.
 - **Trust.** A proposal of a kind the project trusts is applied at once, as the run's requester.
 - **Notifications** (kind `agent`) go to the requester: a question, each proposal, finished, failed.
 

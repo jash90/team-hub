@@ -76,9 +76,16 @@ export function proposalLabel(kind: AgentProposalKind): string {
     create_subtasks: t('Create subtasks'),
     create_issue: t('Create an issue'),
     log_work: t('Log work'),
+    push: t('Push the branch'),
+    pull_request: t('Open a pull request'),
   };
 
   return labels[kind];
+}
+
+/** Pushing and opening a pull request are decided where the code is, not here. */
+function decidedByRunner(kind: AgentProposalKind): boolean {
+  return kind === 'push' || kind === 'pull_request';
 }
 
 function fieldLabel(field: string): string {
@@ -102,6 +109,8 @@ const PROPOSAL_WORDS: Record<string, AgentProposalKind> = {
   subtasks: 'create_subtasks',
   'a new issue': 'create_issue',
   'a work log': 'log_work',
+  'pushing the branch': 'push',
+  'opening a pull request': 'pull_request',
 };
 
 /**
@@ -122,6 +131,8 @@ function statusText(text: string): string {
     [/^Proposed (.+)$/, (found) => t('Proposed: {what}', { what: what(found[1]) })],
     [/^Approved: (.+)$/, (found) => t('Approved: {what}', { what: what(found[1]) })],
     [/^Rejected: (.+)$/, (found) => t('Rejected: {what}', { what: what(found[1]) })],
+    [/^Done in the runner's app: (.+)$/, (found) => t('Done in the desktop app: {what}', { what: what(found[1]) })],
+    [/^Declined in the runner's app: (.+)$/, (found) => t('Declined in the desktop app: {what}', { what: what(found[1]) })],
     [/^Could not apply (.+?): (.+)$/, (found) => t('Could not apply ({what}): {why}', { what: what(found[1]), why: found[2] })],
     [/^A proposal was refused: (.+)$/, (found) => t('A proposal was refused: {why}', { why: found[1] })],
     [/^Cancelled$/, () => t('Cancelled')],
@@ -283,6 +294,38 @@ function ProposalPreview({ proposal, drafts, onDrafts }: { proposal: AgentPropos
     );
   }
 
+  if (proposal.kind === 'push') {
+    return (
+      <p>
+        <code>{asText(payload.branch)}</code>
+        {asText(payload.note) && <span className="muted"> · {asText(payload.note)}</span>}
+      </p>
+    );
+  }
+
+  if (proposal.kind === 'pull_request') {
+    return (
+      <>
+        <p>
+          <strong>{asText(payload.title)}</strong>
+          {asText(payload.head) && (
+            <span className="muted">
+              {' · '}
+              <code>{asText(payload.head)}</code>
+              {asText(payload.base) && (
+                <>
+                  {' → '}
+                  <code>{asText(payload.base)}</code>
+                </>
+              )}
+            </span>
+          )}
+        </p>
+        {asText(payload.body) && <Markdown text={asText(payload.body)} className="agents-quote" />}
+      </>
+    );
+  }
+
   if (proposal.kind === 'create_subtasks') {
     return (
       <>
@@ -357,6 +400,8 @@ function ProposalResult({ proposal }: { proposal: AgentProposal }) {
   const result = asRecord(proposal.result);
   const keys = [...(Array.isArray(result.keys) ? result.keys : []), result.key].filter((key): key is string => typeof key === 'string');
   const who = userById(proposal.decidedBy)?.name;
+  const commit = typeof result.commit === 'string' ? result.commit : null;
+  const url = typeof result.url === 'string' && /^https?:\/\//.test(result.url) ? result.url : null;
 
   return (
     <div className="agents-decision">
@@ -367,6 +412,16 @@ function ProposalResult({ proposal }: { proposal: AgentProposal }) {
         {proposal.decidedAt && ` · ${timeAgo(proposal.decidedAt)}`}
       </span>
       {proposal.note && <span className={proposal.state === 'failed' ? 'agents-failure' : undefined}>{proposal.note}</span>}
+      {commit && (
+        <span>
+          {t('Pushed at')} <code>{commit.slice(0, 12)}</code>
+        </span>
+      )}
+      {url && (
+        <a href={url} target="_blank" rel="noreferrer noopener">
+          {url}
+        </a>
+      )}
       {keys.length > 0 && (
         <span className="agents-keys">
           {t('Created:')}
@@ -380,7 +435,8 @@ function ProposalResult({ proposal }: { proposal: AgentProposal }) {
 }
 
 function ProposalCard({ proposal, canDecide, onDecided }: { proposal: AgentProposal; canDecide: boolean; onDecided: (detail: AgentRunDetail) => void }) {
-  const editable = proposal.state === 'pending' && canDecide;
+  const elsewhere = decidedByRunner(proposal.kind);
+  const editable = proposal.state === 'pending' && canDecide && !elsewhere;
   const [drafts, setDrafts] = useState(() => subtasksOf(proposal.payload));
   const [note, setNote] = useState('');
   const [busy, run] = useBusy();
@@ -411,6 +467,8 @@ function ProposalCard({ proposal, canDecide, onDecided }: { proposal: AgentPropo
             {t('Reject')}
           </Button>
         </div>
+      ) : proposal.state === 'pending' && elsewhere ? (
+        <p className="muted">{t('Decided in the desktop app, on the computer that has the code, where the changes can be looked at first.')}</p>
       ) : proposal.state === 'pending' ? (
         <p className="muted">{t('Waiting for someone who may edit this project to decide.')}</p>
       ) : (

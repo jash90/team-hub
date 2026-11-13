@@ -924,8 +924,40 @@ impl Core {
         }
     }
 
-    /// Records a proposal. Changes to the issue also become proposals of the run on the
-    /// server, so they can be decided on the web; a push or a pull request is decided here.
+    /// A push or a pull request as the run on the server shows it.
+    fn shown_on_run(kind: ProposalKind, payload: &Value) -> Value {
+        match kind {
+            ProposalKind::PullRequest => json!({ "title": payload["title"], "body": payload["body"], "head": payload["branch"] }),
+            _ => payload.clone(),
+        }
+    }
+
+    /// Tells the run how a push or a pull request decided here went. The run only shows it,
+    /// so a server that cannot be told now is told on a later round (`settle_decided`).
+    fn settle_on_run(&self, proposal: &Proposal) {
+        let (Some(remote_id), false) = (proposal.remote_id, proposal.kind.is_remote()) else { return };
+        let approve = match proposal.state {
+            ProposalState::Approved => true,
+            ProposalState::Rejected | ProposalState::Failed => false,
+            ProposalState::Pending => return,
+        };
+
+        let _ = self.client().and_then(|client| self.seen(client.settle_proposal(remote_id, approve, proposal.note.as_deref(), &proposal.result)));
+    }
+
+    /// Catches up on what `settle_on_run` could not say: a push or a pull request the run
+    /// still shows as undecided although it was decided here.
+    fn settle_decided(&self, proposals: &[RunProposal]) {
+        for remote in proposals.iter().filter(|remote| remote.state == RunProposalState::Pending) {
+            if let Ok(Some(local)) = self.store.proposal_by_remote(remote.id) {
+                self.settle_on_run(&local);
+            }
+        }
+    }
+
+    /// Records a proposal. It also becomes a proposal of the run on the server: a change to
+    /// the issue so that it can be decided on the web as well, a push or a pull request so
+    /// that the web shows what waits here. Those two are decided only here.
     fn propose(&self, thread: &Thread, kind: ProposalKind, payload: Value) -> CoreResult<Value> {
         let pending_same = self
             .store
@@ -936,17 +968,20 @@ impl Core {
         if let Some(existing) = pending_same {
             // One pending push or pull request per thread: the newer wording replaces the older.
             self.store.decide_proposal(existing.id, ProposalState::Rejected, Some("Replaced by a newer proposal of the thread"), &Value::Null)?;
+            self.settle_on_run(&self.store.proposal(existing.id)?);
         }
 
-        let remote = match (kind.is_remote(), thread.run_id) {
-            (true, Some(run_id)) => match self.client().and_then(|client| self.seen(client.add_run_proposal(run_id, kind.as_str(), &payload))) {
+        let shown = if kind.is_remote() { payload.clone() } else { Self::shown_on_run(kind, &payload) };
+        let remote = match thread.run_id {
+            Some(run_id) => match self.client().and_then(|client| self.seen(client.add_run_proposal(run_id, kind.as_str(), &shown))) {
                 Ok(proposal) => Some(proposal),
                 // The server checked the proposal against the project and refused it (an unknown
                 // status, say): the agent reads why and can correct it.
-                Err(CoreError::Api { status: 400 | 422, message, .. }) => return Err(CoreError::not_possible(message)),
+                Err(CoreError::Api { status: 400 | 422, message, .. }) if kind.is_remote() => return Err(CoreError::not_possible(message)),
+                // A push or a pull request is decided here whether or not the server can show it.
                 Err(_) => None,
             },
-            _ => None,
+            None => None,
         };
         let proposal = self.store.add_proposal(thread.id, kind, &payload, remote.as_ref().map(|proposal| proposal.id))?;
 
@@ -1079,6 +1114,7 @@ impl Core {
             }
             (_, _, false) => {
                 self.store.decide_proposal(id, ProposalState::Rejected, note, &Value::Null)?;
+                self.settle_on_run(&self.store.proposal(id)?);
             }
         }
 
@@ -1090,6 +1126,7 @@ impl Core {
         for proposal in self.store.proposals(thread_id)? {
             if proposal.kind == kind && proposal.state == ProposalState::Pending {
                 self.store.decide_proposal(proposal.id, state, None, result)?;
+                self.settle_on_run(&self.store.proposal(proposal.id)?);
             }
         }
 
@@ -1622,6 +1659,8 @@ impl Core {
             }
 
             let _ = self.apply_remote_proposals(&thread, &detail.proposals);
+
+            self.settle_decided(&detail.proposals);
 
             // The server moves a run by itself too (a decision puts a waiting run back to
             // running). When the thread is at rest and the run says otherwise, say it again.

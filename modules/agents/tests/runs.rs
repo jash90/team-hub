@@ -797,6 +797,70 @@ async fn a_runner_keeps_the_run_it_started_itself_and_can_name_the_pull_request_
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_push_and_a_pull_request_are_shown_here_and_decided_in_the_runners_app() {
+    let world = world();
+    let (_, other_token) = person(&world.app, "Piotr Runner", "piotr@example.com", Role::Member);
+
+    world.post("/runners/heartbeat", json!({ "runnerId": "app", "name": "Desktop", "kinds": ["implement"], "version": "1" })).await;
+    let id = world.post("/issues/WEB-1/runs", json!({ "kind": "implement", "runnerId": "app" })).await["id"].as_i64().unwrap();
+    let proposals = format!("/runs/{id}/proposals");
+
+    // What leaves the computer cannot be trusted in advance, whatever the project is told.
+    let trust = world.send(&world.token, Method::PUT, "/projects/WEB/trust", Some(json!({ "kinds": ["comment", "push", "pull_request"] }))).await.1;
+    assert_eq!(trust["kinds"], json!(["comment"]));
+    world.send(&world.token, Method::PUT, "/projects/WEB/trust", Some(json!({ "kinds": [] }))).await;
+
+    for refused in [json!({ "kind": "push", "payload": { "branch": "two words" } }), json!({ "kind": "pull_request", "payload": { "title": " " } })] {
+        assert_eq!(world.send(&world.token, Method::POST, &proposals, Some(refused.clone())).await.0, StatusCode::BAD_REQUEST, "{refused}");
+    }
+
+    let push = world.post(&proposals, json!({ "kind": "push", "payload": { "branch": "feature/WEB-1", "note": "One commit." } })).await;
+    let pull = world.post(&proposals, json!({ "kind": "pull_request", "payload": { "title": "WEB-1 Login", "body": "Adds validation.", "head": "feature/WEB-1" } })).await;
+    let (push_id, pull_id) = (push["id"].as_i64().unwrap(), pull["id"].as_i64().unwrap());
+
+    assert_eq!((&push["state"], &push["payload"]), (&json!("pending"), &json!({ "branch": "feature/WEB-1", "note": "One commit." })));
+
+    let waiting = world.run(id).await;
+    assert_eq!((&waiting["run"]["state"], &waiting["run"]["pendingProposals"]), (&json!("waiting"), &json!(2)));
+
+    // Nobody decides them on the web, not even the person whose run it is.
+    for approve in [true, false] {
+        let decision = Some(json!({ "approve": approve }));
+        assert_eq!(world.send(&world.token, Method::POST, &format!("/proposals/{push_id}/decide"), decision).await.0, StatusCode::CONFLICT);
+    }
+
+    // Only the run's runner says how it went, and only for these kinds.
+    let done = |commit: &str| json!({ "approve": true, "result": { "commit": commit } });
+    assert_eq!(world.send(&other_token, Method::POST, &format!("/proposals/{push_id}/settle"), Some(done("abc"))).await.0, StatusCode::FORBIDDEN);
+
+    let comment = world.post(&proposals, json!({ "kind": "comment", "payload": { "body": "Done." } })).await["id"].as_i64().unwrap();
+    assert_eq!(world.send(&world.token, Method::POST, &format!("/proposals/{comment}/settle"), Some(done("abc"))).await.0, StatusCode::BAD_REQUEST);
+    world.post(&format!("/proposals/{comment}/decide"), json!({ "approve": false })).await;
+
+    let settled = world.post(&format!("/proposals/{push_id}/settle"), done("abc123")).await;
+    let pushed = settled["proposals"].as_array().unwrap().iter().find(|proposal| proposal["id"] == push_id).cloned().unwrap();
+    assert_eq!(
+        (&pushed["state"], &pushed["result"], &pushed["decidedBy"]),
+        (&json!("approved"), &json!({ "commit": "abc123" }), &json!(world.admin.id))
+    );
+    assert_eq!(settled["run"]["state"], "waiting", "the pull request is still undecided");
+    assert_eq!(world.send(&world.token, Method::POST, &format!("/proposals/{push_id}/settle"), Some(done("again"))).await.0, StatusCode::CONFLICT);
+
+    let declined = world.post(&format!("/proposals/{pull_id}/settle"), json!({ "approve": false, "note": "Not yet." })).await;
+    let pull = declined["proposals"].as_array().unwrap().iter().find(|proposal| proposal["id"] == pull_id).cloned().unwrap();
+    assert_eq!((&pull["state"], &pull["note"]), (&json!("rejected"), &json!("Not yet.")));
+    assert_eq!((&declined["run"]["state"], &declined["run"]["pendingProposals"]), (&json!("running"), &json!(0)));
+    assert_eq!(texts(&declined["events"]).last(), Some(&"Declined in the runner's app: opening a pull request"));
+
+    // The server's own runs have no code to push.
+    let own = world.start("WEB-2", "refine", "").await;
+    let refused = world.app.write(Actor::system("test"), |tx| {
+        Ok(hub_mod_agents::proposals::add(tx, &runs::load(tx, own)?, hub_mod_agents::types::AgentProposalKind::Push, &json!({ "branch": "x" })).map(|_| ()))
+    });
+    assert!(refused.unwrap().is_err());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn a_claimed_run_whose_runner_went_silent_for_ten_minutes_returns_to_the_queue() {
     let world = world();
     world.post("/runners/heartbeat", json!({ "runnerId": "desk-1", "name": "Desktop", "kinds": ["implement"], "version": "1" })).await;

@@ -28,6 +28,8 @@ use crate::types::{
 };
 
 const MAX_SUBTASKS: usize = 30;
+const MAX_NOTE: usize = 4_000;
+const MAX_PULL_REQUEST_BODY: usize = 60_000;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct CommentPayload {
@@ -81,6 +83,35 @@ struct IssuePayload {
     issue_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     parent_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct PushPayload {
+    branch: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    note: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct PullRequestPayload {
+    title: String,
+    #[serde(default)]
+    body: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    head: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    base: Option<String>,
+}
+
+/// A branch name as it is shown: one line, no control characters, of a sane length.
+fn branch_name(name: &str) -> ApiResult<String> {
+    let name = name.trim();
+
+    if name.is_empty() || name.chars().count() > 250 || name.chars().any(|character| character.is_control() || character.is_whitespace()) {
+        return Err(ApiError::bad_request("That is not a branch name"));
+    }
+
+    Ok(name.to_string())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -228,6 +259,30 @@ fn check(connection: &Connection, row: &RunRow, kind: AgentProposalKind, payload
 
             json!(WorkPayload { spent: format_duration(minutes), note: work.note })
         }
+        AgentProposalKind::Push => {
+            let push: PushPayload = parse(payload)?;
+            let note = push.note.as_deref().map(str::trim).filter(|note| !note.is_empty());
+
+            if note.is_some_and(|note| note.len() > MAX_NOTE) {
+                return Err(ApiError::bad_request("The note is too long"));
+            }
+
+            json!(PushPayload { branch: branch_name(&push.branch)?, note: note.map(String::from) })
+        }
+        AgentProposalKind::PullRequest => {
+            let pull: PullRequestPayload = parse(payload)?;
+
+            if pull.body.len() > MAX_PULL_REQUEST_BODY {
+                return Err(ApiError::bad_request("The description of the pull request is too long"));
+            }
+
+            json!(PullRequestPayload {
+                title: filled(&pull.title, "The title of the pull request")?,
+                body: pull.body.trim().to_string(),
+                head: pull.head.as_deref().map(branch_name).transpose()?,
+                base: pull.base.as_deref().map(branch_name).transpose()?,
+            })
+        }
     })
 }
 
@@ -313,7 +368,7 @@ fn preview(connection: &Connection, row: &RunRow, kind: AgentProposalKind, paylo
                 (None, None) => None,
             };
         }
-        AgentProposalKind::Comment | AgentProposalKind::LogWork => {}
+        AgentProposalKind::Comment | AgentProposalKind::LogWork | AgentProposalKind::Push | AgentProposalKind::PullRequest => {}
     }
 
     Ok(preview)
@@ -404,6 +459,9 @@ fn apply(tx: &Tx, approver: &AuthUser, row: &RunRow, kind: AgentProposalKind, pa
 
             json!({ "worklogId": issues::add_worklog(tx, issue_id, minutes, None, work.note.as_deref().unwrap_or(""))?.id })
         }
+        AgentProposalKind::Push | AgentProposalKind::PullRequest => {
+            return Err(ApiError::conflict("This is decided in the runner's app, where the changes can be looked at first"));
+        }
     })
 }
 
@@ -481,7 +539,9 @@ pub fn trust(connection: &Connection, project_id: Id) -> ApiResult<AgentTrust> {
 }
 
 pub fn set_trust(connection: &Connection, project_id: Id, trust: &AgentTrust) -> ApiResult<()> {
-    let kinds: Vec<&str> = AgentProposalKind::ALL.iter().filter(|kind| trust.kinds.contains(kind)).map(|kind| kind.as_str()).collect();
+    // What leaves a person's computer is never trusted in advance.
+    let kinds: Vec<&str> =
+        AgentProposalKind::ALL.iter().filter(|kind| trust.kinds.contains(kind) && !kind.decided_by_runner()).map(|kind| kind.as_str()).collect();
 
     set_setting(connection, &trust_setting(project_id), &kinds)
 }
@@ -494,12 +554,18 @@ fn kind_words(kind: AgentProposalKind) -> &'static str {
         AgentProposalKind::CreateSubtasks => "subtasks",
         AgentProposalKind::CreateIssue => "a new issue",
         AgentProposalKind::LogWork => "a work log",
+        AgentProposalKind::Push => "pushing the branch",
+        AgentProposalKind::PullRequest => "opening a pull request",
     }
 }
 
 /// Records a proposal for the run in `tx`. It is refused, with the reason, when it could not
 /// be applied as it stands.
 pub fn add(tx: &Tx, row: &RunRow, kind: AgentProposalKind, payload: &Value) -> ApiResult<Id> {
+    if kind.decided_by_runner() && (row.on_server() || row.runner_user_id.is_none()) {
+        return Err(ApiError::bad_request("Only a runner that has the code can propose a push or a pull request"));
+    }
+
     let payload = check(tx, row, kind, payload)?;
     let preview = preview(tx, row, kind, &payload)?;
 
@@ -527,7 +593,7 @@ pub fn submit(app: &App, actor: Actor, run_id: Id, kind: AgentProposalKind, payl
     let (id, row, trusted) = app.write(actor, |tx| {
         let row = runs::load(tx, run_id)?;
         let id = add(tx, &row, kind, payload)?;
-        let trusted = trust(tx, row.project_id)?.kinds.contains(&kind);
+        let trusted = !kind.decided_by_runner() && trust(tx, row.project_id)?.kinds.contains(&kind);
 
         Ok((id, row, trusted))
     })?;
@@ -601,6 +667,10 @@ pub fn decide(app: &App, user: &AuthUser, id: Id, decision: &Decision) -> ApiRes
             return Err(ApiError::conflict("The run was cancelled"));
         }
 
+        if proposal.kind.decided_by_runner() {
+            return Err(ApiError::conflict("This is decided in the runner's app, where the changes can be looked at first"));
+        }
+
         if !decision.approve {
             return decided(tx, &row, &proposal, AgentProposalState::Rejected, note, None, &format!("Rejected: {}", kind_words(proposal.kind)));
         }
@@ -643,4 +713,45 @@ pub fn decide(app: &App, user: &AuthUser, id: Id, decision: &Decision) -> ApiRes
         (Err(error), _) => Err(error),
         (Ok(()), None) => Err(ApiError::not_found("Proposal")),
     }
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Settlement {
+    pub approve: bool,
+    pub note: Option<String>,
+    /// What came of it: `{ commit }` for a push, `{ url }` for a pull request.
+    #[serde(default)]
+    pub result: Value,
+}
+
+/// The runner says how a proposal it decides itself went: the person looked at the changes
+/// in the runner's app and pushed, opened the pull request, or declined. Recorded as that
+/// person's decision; nothing is applied here.
+pub fn settle(tx: &Tx, user: &AuthUser, id: Id, settlement: &Settlement) -> ApiResult<AgentRunDetail> {
+    let proposal = stored(tx, "id = ?1", id)?.pop().ok_or_else(|| ApiError::not_found("Proposal"))?.proposal;
+    // Like the run's branch, how it went may be said after the run has ended.
+    let row = runs::holder(tx, user, proposal.run_id)?;
+
+    if !proposal.kind.decided_by_runner() {
+        return Err(ApiError::bad_request("A person decides this proposal here; a runner cannot settle it"));
+    }
+
+    if proposal.state != AgentProposalState::Pending {
+        return Err(ApiError::conflict("This proposal has already been decided"));
+    }
+
+    if settlement.result.to_string().len() > MAX_NOTE {
+        return Err(ApiError::bad_request("The result is too long"));
+    }
+
+    let note = settlement.note.as_deref().map(str::trim).filter(|note| !note.is_empty());
+    let (state, words) = if settlement.approve {
+        (AgentProposalState::Approved, format!("Done in the runner's app: {}", kind_words(proposal.kind)))
+    } else {
+        (AgentProposalState::Rejected, format!("Declined in the runner's app: {}", kind_words(proposal.kind)))
+    };
+
+    decided(tx, &row, &proposal, state, note, settlement.approve.then_some(&settlement.result), &words)?;
+
+    runs::detail(tx, row.run.id)
 }

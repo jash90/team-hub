@@ -114,6 +114,8 @@ pub struct HubState {
     pub refuses_runner_answers: bool,
     /// The server's code module has no GitHub token to open pull requests with.
     pub github_token_missing: bool,
+    /// An older server: a run cannot show a push or a pull request that waits in the app.
+    pub shows_no_pushes: bool,
     pub issues: BTreeMap<String, Issue>,
     pub project: Project,
     pub runs: Vec<Value>,
@@ -721,6 +723,12 @@ async fn add_proposal(State(state): Shared, headers: HeaderMap, UrlPath(id): Url
         return error(StatusCode::CONFLICT, "The run is finished");
     }
 
+    let runner_decides = body["kind"] == "push" || body["kind"] == "pull_request";
+
+    if runner_decides && state.shows_no_pushes {
+        return error(StatusCode::UNPROCESSABLE_ENTITY, "unknown variant");
+    }
+
     if body["kind"] == "transition" {
         let wanted = body["payload"]["status"].as_str().unwrap_or_default();
         let valid: Vec<&str> = state.project.statuses.iter().map(|status| status.name.as_str()).collect();
@@ -747,6 +755,34 @@ async fn add_proposal(State(state): Shared, headers: HeaderMap, UrlPath(id): Url
     state.proposals.push(proposal.clone());
 
     Json(proposal).into_response()
+}
+
+/// The runner says how a push or a pull request decided in its own app went.
+async fn settle(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i64>, Json(body): Json<Value>) -> Response {
+    let mut state = guard!(runs state, headers);
+    let Some(index) = state.proposals.iter().position(|proposal| proposal["id"] == id) else {
+        return error(StatusCode::NOT_FOUND, "No such proposal");
+    };
+
+    if state.proposals[index]["kind"] != "push" && state.proposals[index]["kind"] != "pull_request" {
+        return error(StatusCode::BAD_REQUEST, "A person decides this proposal here; a runner cannot settle it");
+    }
+
+    if state.proposals[index]["state"] != "pending" {
+        return error(StatusCode::CONFLICT, "Already decided");
+    }
+
+    let approved = body["approve"] == true;
+
+    state.writes.push(("POST".into(), format!("/proposals/{id}/settle"), body.clone()));
+    state.proposals[index]["state"] = json!(if approved { "approved" } else { "rejected" });
+    state.proposals[index]["result"] = if approved { body["result"].clone() } else { Value::Null };
+    state.proposals[index]["note"] = body["note"].clone();
+    state.proposals[index]["decidedBy"] = json!(1);
+
+    let run_id = state.proposals[index]["runId"].as_i64().unwrap();
+
+    Json(state.detail(run_id)).into_response()
 }
 
 async fn cancel_run(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i64>) -> Response {
@@ -783,6 +819,11 @@ async fn decide(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i
     }
 
     let proposal = state.proposals[index].clone();
+
+    if proposal["kind"] == "push" || proposal["kind"] == "pull_request" {
+        return error(StatusCode::CONFLICT, "This is decided in the runner's app, where the changes can be looked at first");
+    }
+
     let run_id = proposal["runId"].as_i64().unwrap();
     let run = state.run_index(run_id).unwrap();
     let key = state.runs[run]["issueKey"].as_str().unwrap().to_string();
@@ -827,6 +868,7 @@ impl FakeHub {
             runs_api: true,
             refuses_runner_answers: false,
             github_token_missing: false,
+            shows_no_pushes: false,
             issues: issues.into_iter().map(|issue| (issue.row.key.clone(), issue)).collect(),
             project: project(),
             runs: Vec::new(),
@@ -852,7 +894,8 @@ impl FakeHub {
             .route("/runs/{id}/proposals", post(add_proposal))
             .route("/runs/{id}/cancel", post(cancel_run))
             .route("/runs/{id}/answer", post(answer_run))
-            .route("/proposals/{id}/decide", post(decide));
+            .route("/proposals/{id}/decide", post(decide))
+            .route("/proposals/{id}/settle", post(settle));
         let api = Router::new()
             .route("/bootstrap", get(bootstrap))
             .route("/dashboard", get(dashboard))

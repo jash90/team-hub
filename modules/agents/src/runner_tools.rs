@@ -60,7 +60,7 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema(
                 json!({
                     "runId": run_id(),
-                    "kind": { "type": "string", "enum": ["comment", "transition", "update_fields", "create_subtasks", "create_issue", "log_work"] },
+                    "kind": { "type": "string", "enum": ["comment", "transition", "update_fields", "create_subtasks", "create_issue", "log_work", "push", "pull_request"] },
                     "payload": { "type": "object" },
                 }),
                 &["runId", "kind", "payload"],

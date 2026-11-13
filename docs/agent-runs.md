@@ -67,7 +67,8 @@ type RunEvent = {
   at: string;
 };
 
-type ProposalKind = 'comment' | 'transition' | 'update_fields' | 'create_subtasks' | 'create_issue' | 'log_work';
+type ProposalKind = 'comment' | 'transition' | 'update_fields' | 'create_subtasks' | 'create_issue' | 'log_work'
+  | 'push' | 'pull_request';   // decided in the runner's app, see below
 
 type AgentProposal = {
   id: number;
@@ -105,6 +106,14 @@ Proposal payloads:
 | `create_subtasks` | `{ items: [{ summary, description? }] }` |
 | `create_issue` | `{ projectKey, summary, description?, type?, parentKey? }` |
 | `log_work` | `{ spent, note? }` (`spent` as "1h 30m") |
+| `push` | `{ branch, note? }`; result `{ commit }` |
+| `pull_request` | `{ title, body?, head?, base? }`; result `{ url }` |
+
+`push` and `pull_request` are different in kind: they happen on the computer that has the
+code, after a person has looked at the changes there. A runner (never the server's own run)
+records them so that the run shows what is waiting; nobody decides them here (`decide`
+answers 409), no project can trust them in advance, and the runner says how it went with
+`POST /proposals/{id}/settle`.
 
 An approved proposal is applied through the ordinary services, as the approving person, with
 the label "AI agent" in the history.
@@ -135,6 +144,7 @@ A runner authenticates with an API token and acts as that person.
 | `POST /runs/{id}/events` `{ kind, text, data? }` | `{ id }` — a `question` puts the run in `waiting`. An `answer` is what the person said to the agent in the runner's own app, recorded as said by them; it answers no pending question (409 then: use `POST /runs/{id}/answer`). |
 | `POST /runs/{id}/proposals` `{ kind, payload }` | `AgentProposal` |
 | `PATCH /runs/{id}` `{ state?, summary?, branch?, pullRequestUrl?, model?, inputTokens?, outputTokens?, costUsd? }` | `AgentRun` — read `cancelRequested` from the answer and stop when it is set |
+| `POST /proposals/{id}/settle` `{ approve, note?, result? }` | `AgentRunDetail` — for a `push` or `pull_request` of a run this runner holds: done (with `{ commit }` or `{ url }`) or declined, recorded as the person's decision. Allowed after the run has ended. |
 | `GET /runs/{id}` | `AgentRunDetail` — where answers and decisions show up |
 
 Only the runner that claimed a run may write to it. A claimed run whose runner has not been
