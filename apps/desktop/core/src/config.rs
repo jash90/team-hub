@@ -95,9 +95,33 @@ fn machine_name() -> String {
         .iter()
         .find_map(|name| std::env::var(name).ok())
         .or_else(|| std::fs::read_to_string("/etc/hostname").ok())
-        .map(|name| name.trim().to_string())
+        .or_else(asked_of_the_system)
+        .map(|name| name.trim().trim_end_matches(".local").to_string())
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| "this computer".to_string())
+}
+
+/// The name the system itself gives. macOS has no /etc/hostname, and a program started from
+/// the Dock or the Finder gets no HOSTNAME, so without this every Mac is "this computer".
+#[cfg(unix)]
+fn asked_of_the_system() -> Option<String> {
+    let mut bytes = [0u8; 256];
+    // SAFETY: the buffer is ours and its length is given; the name is ended with a zero
+    // when it fits, and the last byte stays zero for when it does not.
+    let answered = unsafe { libc::gethostname(bytes.as_mut_ptr().cast(), bytes.len() - 1) };
+
+    if answered != 0 {
+        return None;
+    }
+
+    let length = bytes.iter().position(|byte| *byte == 0).unwrap_or(bytes.len());
+
+    String::from_utf8(bytes[..length].to_vec()).ok()
+}
+
+#[cfg(not(unix))]
+fn asked_of_the_system() -> Option<String> {
+    None
 }
 
 pub fn default_settings() -> Settings {
