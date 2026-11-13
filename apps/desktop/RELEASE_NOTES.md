@@ -1,11 +1,14 @@
-# team-hub desktop 0.1.0
+# team-hub desktop 0.1.1
 
-The first release of the desktop app for [team-hub](https://github.com/jash90/team-hub).
+The desktop app for [team-hub](https://github.com/jash90/team-hub). This is 0.1.0 again with
+one change: **the macOS app is now signed with an Apple Developer ID and notarized by Apple**,
+so it opens without the "Open Anyway" step. Nothing else in the app changed.
 
-**Read this first.** The app was written and run on Linux only. The installers below were
-built by GitHub's machines; none of them was installed and tried by a person before this
-release, and the macOS and Windows builds have never been run at all. They are not signed
-with a developer certificate. Treat 0.1.0 as a preview and
+**Read this first.** The app was written and run on Linux only. The Windows and Linux
+installers and the `hub` archives were built by GitHub's machines, the two macOS `.dmg` files
+on a Mac that holds the certificate; none of them was installed and tried by a person before
+this release, and the Windows build has never been run at all. The Windows installer is not
+signed. Treat 0.1.1 as a preview and
 [report](https://github.com/jash90/team-hub/issues) what does not work.
 
 ## What it is
@@ -82,13 +85,13 @@ needs other versions:
 
 | System | File |
 |---|---|
-| macOS 13 or newer, Apple silicon | `team-hub-desktop-0.1.0-macos-arm64.dmg` |
-| macOS 13 or newer, Intel | `team-hub-desktop-0.1.0-macos-x64.dmg` |
-| Windows 10 and 11, 64-bit Intel/AMD | `team-hub-desktop-0.1.0-windows-x64-setup.exe` |
-| Debian 12 or newer, Ubuntu 22.04 or newer | `team-hub-desktop-0.1.0-linux-x64.deb` |
-| Fedora (other RPM systems are untried) | `team-hub-desktop-0.1.0-linux-x64.rpm` |
-| Other Linux (glibc 2.35 or newer) | `team-hub-desktop-0.1.0-linux-x64.AppImage` |
-| The `hub` command line alone | `hub-0.1.0-macos-arm64.tar.gz`, `hub-0.1.0-macos-x64.tar.gz`, `hub-0.1.0-linux-x64.tar.gz`, `hub-0.1.0-windows-x64.zip` |
+| macOS 13 or newer, Apple silicon | `team-hub-desktop-0.1.1-macos-arm64.dmg` |
+| macOS 13 or newer, Intel | `team-hub-desktop-0.1.1-macos-x64.dmg` |
+| Windows 10 and 11, 64-bit Intel/AMD | `team-hub-desktop-0.1.1-windows-x64-setup.exe` |
+| Debian 12 or newer, Ubuntu 22.04 or newer | `team-hub-desktop-0.1.1-linux-x64.deb` |
+| Fedora (other RPM systems are untried) | `team-hub-desktop-0.1.1-linux-x64.rpm` |
+| Other Linux (glibc 2.35 or newer) | `team-hub-desktop-0.1.1-linux-x64.AppImage` |
+| The `hub` command line alone | `hub-0.1.1-macos-arm64.tar.gz`, `hub-0.1.1-macos-x64.tar.gz`, `hub-0.1.1-linux-x64.tar.gz`, `hub-0.1.1-windows-x64.zip` |
 | Checksums of all of the above | `SHA256SUMS` |
 
 Check a download: `sha256sum --ignore-missing -c SHA256SUMS` (macOS:
@@ -99,15 +102,9 @@ Check a download: `sha256sum --ignore-missing -c SHA256SUMS` (macOS:
 Take the file for your Mac's processor (Apple menu → About This Mac), open the `.dmg` and
 drag **team-hub** to Applications.
 
-The app is not signed with an Apple Developer ID and not notarized, so macOS refuses to open
-it the first time ("Apple could not verify…", or "is damaged and can't be opened"). Either:
-
-- open it once, then go to System Settings → Privacy & Security, scroll to the message about
-  team-hub and choose **Open Anyway**; or
-- remove the download mark in a terminal:
-  `xattr -dr com.apple.quarantine /Applications/team-hub.app`
-
-Only do this for a file whose checksum you have checked.
+The app is signed with an Apple Developer ID and notarized, so macOS opens it after the usual
+"downloaded from the internet" question. The `hub` command line archives are not signed; see
+below.
 
 ### Windows
 
@@ -119,9 +116,9 @@ needs the internet).
 ### Linux
 
 ```bash
-sudo apt install ./team-hub-desktop-0.1.0-linux-x64.deb      # Debian, Ubuntu
-sudo dnf install ./team-hub-desktop-0.1.0-linux-x64.rpm      # Fedora
-chmod +x team-hub-desktop-0.1.0-linux-x64.AppImage && ./team-hub-desktop-0.1.0-linux-x64.AppImage
+sudo apt install ./team-hub-desktop-0.1.1-linux-x64.deb      # Debian, Ubuntu
+sudo dnf install ./team-hub-desktop-0.1.1-linux-x64.rpm      # Fedora
+chmod +x team-hub-desktop-0.1.1-linux-x64.AppImage && ./team-hub-desktop-0.1.1-linux-x64.AppImage
 ```
 
 The packages need WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), which the `.deb` and `.rpm` ask
@@ -159,8 +156,8 @@ what the app downloads at its first start is described above.
   without a shell unless you allow one in Settings); the tray icon, system notifications and
   the folder dialog; a long real implementation run. On Windows, console windows may appear
   while the app runs git or an agent.
-- **The installers are untested and unsigned**, as said above. The AppImage is the least
-  certain of the three Linux packages.
+- **The installers are untested**, as said above, and the Windows installer and the `hub`
+  archives are unsigned. The AppImage is the least certain of the three Linux packages.
 - **Node.js and npm are not bundled.** The app looks for `node` and `npm` on the `PATH` of
   your shell; a Node it cannot find or that is older than 22.18 is reported when the app
   starts, and so is a download of the agent runtime that failed.
