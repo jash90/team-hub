@@ -114,6 +114,11 @@ API token, so that token should be one made for it and for nothing else.
 
 ## What the desktop app does with this
 
+The app's window shows the server's web interface (the tracker) beside the app's own panel
+of threads, so the pages below are the same pages there. Inside the app the web interface
+knows which runner the app is (`web/src/desktop.ts`): where a runner is picked, this
+computer comes first and is called "this computer".
+
 - **Runs started in the app are carried out by the app**, on the computer: an agent thread
   is created already claimed by the app's runner id (as before), and a test run is a job
   pinned to it. Nothing of that uses the server's or the cloud runner's CPU; the server

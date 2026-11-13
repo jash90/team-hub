@@ -7,6 +7,7 @@ const PATHS = {
   check: ['m5 12 5 5L20 7'],
   x: ['M18 6 6 18', 'm6 6 12 12'],
   chevronDown: ['m6 9 6 6 6-6'],
+  chevronLeft: ['m15 6-6 6 6 6'],
   chevronRight: ['m9 6 6 6-6 6'],
   chevronUp: ['m6 15 6-6 6 6'],
   settings: [

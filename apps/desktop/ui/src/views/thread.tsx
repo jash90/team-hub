@@ -186,7 +186,7 @@ function Header({ thread }: { thread: Thread }) {
           </Button>
         )}
         {!thread.worktree && !working && (
-          <Button variant="ghost" icon="trash" disabled={busy} onClick={async () => (await run(() => core.forgetThread(thread.id), t('Removed'))) !== undefined && go({ name: 'home' })}>
+          <Button variant="ghost" icon="trash" disabled={busy} onClick={async () => (await run(() => core.forgetThread(thread.id), t('Removed'))) !== undefined && go({ name: 'web' })}>
             {t('Forget this thread')}
           </Button>
         )}

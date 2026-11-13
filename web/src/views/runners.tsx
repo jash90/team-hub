@@ -5,6 +5,7 @@ import type { Runner } from '../bindings/Runner.ts';
 import type { RunnerWork } from '../bindings/RunnerWork.ts';
 import { Icon } from '../components/icon.tsx';
 import { Empty, ErrorNote, Spinner, Tag } from '../components/ui.tsx';
+import { hereRunner } from '../desktop.ts';
 import { t, timeAgo } from '../i18n/index.ts';
 import { useModules } from '../modules.ts';
 import { Link } from '../router.tsx';
@@ -91,6 +92,7 @@ function RunnerCard({ runner, owner }: { runner: Runner; owner: string | null })
         <Tag tone={runner.interactive ? 'neutral' : 'blue'} title={runner.interactive ? t('The desktop app on a person’s computer; it uses that computer.') : t('A service with nobody at it; what it wants to push is decided here.')}>
           {runner.interactive ? t('computer') : t('service')}
         </Tag>
+        {runner.id === hereRunner() && <Tag tone="blue" title={t('The desktop app this page is shown in.')}>{t('this computer')}</Tag>}
         {runner.shared && <Tag tone="green" title={t('The team’s runner: it takes anyone’s work and carries it out with that person’s own keys (Settings → My keys).')}>{t('shared')}</Tag>}
         <code className="runner-id" title={t('The runner’s id: what a scheduled task names to send its work to this runner.')}>
           {runner.id}

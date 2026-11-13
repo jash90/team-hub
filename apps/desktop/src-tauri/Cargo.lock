@@ -4782,6 +4782,7 @@ dependencies = [
 name = "team-hub-desktop"
 version = "0.1.1"
 dependencies = [
+ "gtk",
  "hub-desktop-core",
  "serde_json",
  "tauri",

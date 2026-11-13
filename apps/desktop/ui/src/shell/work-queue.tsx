@@ -13,10 +13,15 @@ import { t, timeAgo } from '@web/i18n/index.ts';
 import { core } from '../api.ts';
 import type { DashboardView } from '../bindings/DashboardView.ts';
 import type { Thread } from '../bindings/Thread.ts';
-import { IssueKeyLink, IssueRowLine, Section } from '../components/bits.tsx';
+import { IssueKeyLink, IssueRowLine, Section, issuePath } from '../components/bits.tsx';
 import { openExternal } from '../bridge.ts';
 import { useRemote, useStored } from '../live.ts';
 import { partsOf, useSession } from '../session.tsx';
+
+/** The tracker's search for these words: its own query language, or plain text. */
+export function searchPath(words: string): string {
+  return `/search?q=${encodeURIComponent(words.trim())}`;
+}
 
 export const DRIFT_TEXT: Record<DriftKind, string> = {
   done_with_open_pr: 'Done, but a pull request is still open',
@@ -97,7 +102,7 @@ function Issues({ rows, view, threads }: { rows: IssueRow[]; view: DashboardView
 }
 
 export function WorkQueue() {
-  const { go } = useSession();
+  const { go, openPage } = useSession();
   const dashboard = useRemote(() => core.dashboard(), [], (event) => event.type === 'data_changed' || event.type === 'connection');
   const threads = useRemote(() => core.threads(), [], (event) => event.type === 'thread_changed');
   const { status } = useSession();
@@ -138,7 +143,7 @@ export function WorkQueue() {
           placeholder={t('Filter my work, Enter searches everything')}
           value={words}
           onChange={(event) => setWords(event.target.value)}
-          onKeyDown={(event) => event.key === 'Enter' && words.trim() && go({ name: 'search', query: words.trim() })}
+          onKeyDown={(event) => event.key === 'Enter' && words.trim() && openPage(searchPath(words))}
         />
       </div>
       <div className="desk-chips" role="group" aria-label={t('Quick filters')}>
@@ -158,7 +163,7 @@ export function WorkQueue() {
                 <div
                   key={run.id}
                   className="issue-line desk-row"
-                  onClick={() => go(run.runnerId && run.runnerId !== status.runner.id ? { name: 'run', id: run.id } : { name: 'issue', key: run.issueKey })}
+                  onClick={() => (run.runnerId && run.runnerId !== status.runner.id ? go({ name: 'run', id: run.id }) : openPage(issuePath(run.issueKey)))}
                 >
                   <Icon name="bot" size={14} />
                   <IssueKeyLink issueKey={run.issueKey} />
@@ -199,7 +204,7 @@ export function WorkQueue() {
           {github && github.drift.length > 0 && (
             <Section id="q-drift" title={t('Status and code disagree')} count={github.drift.length}>
               {github.drift.map((item) => (
-                <div key={item.key} className="drift-row desk-row" onClick={() => go({ name: 'issue', key: item.key })}>
+                <div key={item.key} className="drift-row desk-row" onClick={() => openPage(issuePath(item.key))}>
                   <div className="issue-line">
                     <IssueKeyLink issueKey={item.key} />
                     <span className="issue-line-summary">{item.summary}</span>
@@ -233,7 +238,7 @@ export function WorkQueue() {
           {tests && tests.issues.length > 0 && (
             <Section id="q-tests" title={t('My issues with failing tests')} count={tests.issues.length}>
               {tests.issues.map((issue) => (
-                <div key={issue.key} className="issue-line desk-row" onClick={() => go({ name: 'issue', key: issue.key })}>
+                <div key={issue.key} className="issue-line desk-row" onClick={() => openPage(issuePath(issue.key))}>
                   <IssueKeyLink issueKey={issue.key} />
                   <span className="issue-line-summary">{issue.summary}</span>
                   <Tag tone="red">{issue.tests.length}</Tag>

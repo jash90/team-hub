@@ -437,6 +437,8 @@ export const pl: Record<string, string> = {
   'The desktop app on a person’s computer; it uses that computer.': 'Aplikacja desktopowa na czyimś komputerze; korzysta z zasobów tego komputera.',
   'A service with nobody at it; what it wants to push is decided here.': 'Usługa, przy której nikt nie siedzi; o tym, co chce wypchnąć, decyduje się tutaj.',
   computer: 'komputer',
+  'this computer': 'ten komputer',
+  'The desktop app this page is shown in.': 'Aplikacja desktopowa, w której wyświetla się ta strona.',
   service: 'usługa',
   'last heard from {when}': 'ostatni sygnał {when}',
   'any project': 'dowolny projekt',

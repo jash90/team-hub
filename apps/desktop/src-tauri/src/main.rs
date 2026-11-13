@@ -1,11 +1,13 @@
-//! The window. Everything it can do is a command of `hub-desktop-core`, forwarded by name;
-//! this crate adds only what needs a desktop: the tray, system notifications, and keeping the
-//! window's size.
+//! The window. Everything the app's own interface can do is a command of `hub-desktop-core`,
+//! forwarded by name; this crate adds only what needs a desktop: the tray, system
+//! notifications, keeping the window's size, and the server's web interface shown in the
+//! same window (`stage.rs`).
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod environment;
 mod runtime;
+mod stage;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -60,8 +62,8 @@ impl Fetch {
     }
 }
 
-struct Shell {
-    desktop: Desktop,
+pub(crate) struct Shell {
+    pub(crate) desktop: Desktop,
     /// None when the helper does not come from a fetched runtime: `TEAM_HUB_SIDECAR`, or a
     /// run from the source tree with `sidecar/node_modules` in it.
     fetch: Option<Arc<Fetch>>,
@@ -74,7 +76,10 @@ struct Shell {
 
 /// The one command: a command of the core by name. See `hub_desktop_core::commands`.
 #[tauri::command]
-async fn hub(app: AppHandle, state: State<'_, Shell>, command: String, args: Option<Value>) -> Result<Value, String> {
+async fn hub(app: AppHandle, webview: tauri::Webview, state: State<'_, Shell>, command: String, args: Option<Value>) -> Result<Value, String> {
+    // The server's web interface is in the same window and must not reach the core.
+    stage::local_only(&webview)?;
+
     // The two commands that start the helper look for the runtime first. Without it they say
     // so, instead of a thread failing, and the download is started if it is not under way.
     if matches!(command.as_str(), "start_thread" | "say_to_thread") {
@@ -89,7 +94,7 @@ async fn hub(app: AppHandle, state: State<'_, Shell>, command: String, args: Opt
 }
 
 fn show_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_window(stage::LOCAL) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
@@ -188,7 +193,7 @@ fn show_progress(app: &AppHandle, line: Option<&str>) {
         None => TITLE.to_string(),
     };
 
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_window(stage::LOCAL) {
         let _ = window.set_title(&title);
     }
 
@@ -424,6 +429,8 @@ fn main() {
                 settled: AtomicBool::new(!fetches),
                 background: AtomicBool::new(false),
             });
+            app.manage(stage::Stage::default());
+            stage::open_window(app.handle(), TITLE)?;
             tray(app.handle(), fetches)?;
 
             let connecting = app.handle().clone();
@@ -451,7 +458,15 @@ fn main() {
                 let _ = window.hide();
             }
         })
-        .invoke_handler(tauri::generate_handler![hub])
+        .invoke_handler(tauri::generate_handler![
+            hub,
+            stage::web_show,
+            stage::web_hide,
+            stage::web_open,
+            stage::web_location,
+            stage::web_go,
+            stage::web_forget
+        ])
         .run(context)
         .expect("the team-hub desktop app could not start");
 }

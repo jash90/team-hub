@@ -1,0 +1,373 @@
+//! The window and the two webviews in it.
+//!
+//! `main` is the app's own interface, loaded from the app's own files: threads, decisions,
+//! repositories, settings. It is the only one that can call the core.
+//!
+//! `web` is the server's web interface, loaded from the server the app is connected to: the
+//! tracker itself, the same pages a browser shows. It lies over the part of the window the
+//! local interface leaves for it (`web_show` says where), and it cannot call anything here:
+//! Tauri refuses commands from a page that is not the app's own, no capability names a
+//! remote address, and every command below also asks which webview is calling. What comes
+//! from the server can change with the server; what can run an agent or push from this
+//! computer stays in files that came with the app.
+
+use serde_json::Value;
+use tauri::webview::NewWindowResponse;
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, State, Url, Webview, WebviewBuilder, WebviewUrl, Window};
+use tauri_plugin_opener::OpenerExt;
+
+use hub_desktop_core::commands;
+
+use crate::Shell;
+
+/// The label of the window and of the local interface in it.
+pub const LOCAL: &str = "main";
+/// The label of the server's web interface.
+const WEB: &str = "web";
+
+/// Where the web interface starts: the sign-in form, which a signed-in person is sent on
+/// from to their start page. `/` would be the page about team-hub for somebody signed out.
+const START: &str = "/login";
+
+/// The server whose web interface is in the window, when one is.
+#[derive(Default)]
+pub struct Stage {
+    server: tokio::sync::Mutex<Option<Url>>,
+}
+
+/// Refuses a command that does not come from the app's own interface.
+pub fn local_only(webview: &Webview) -> Result<(), String> {
+    if webview.label() == LOCAL {
+        Ok(())
+    } else {
+        Err("Only the app's own interface can do this.".to_string())
+    }
+}
+
+/// The window, with the local interface filling it.
+pub fn open_window(app: &AppHandle, title: &str) -> tauri::Result<Window> {
+    let window = tauri::window::WindowBuilder::new(app, LOCAL).title(title).inner_size(1440.0, 900.0).min_inner_size(900.0, 560.0).build()?;
+    let local = window.add_child(
+        WebviewBuilder::new(LOCAL, WebviewUrl::App("index.html".into())).auto_resize(),
+        LogicalPosition::new(0.0, 0.0),
+        window.inner_size()?,
+    )?;
+
+    layout::wrap(&local)?;
+
+    Ok(window)
+}
+
+fn same_origin(one: &Url, other: &Url) -> bool {
+    one.scheme() == other.scheme() && one.host_str() == other.host_str() && one.port_or_known_default() == other.port_or_known_default()
+}
+
+/// A link that leads away from the server opens in the person's browser.
+fn open_outside(app: &AppHandle, url: &Url) {
+    if matches!(url.scheme(), "http" | "https") {
+        let _ = app.opener().open_url(url.as_str(), None::<&str>);
+    }
+}
+
+/// What the web interface is told about where it runs: nothing it could not be told by
+/// anyone, and enough to offer "this computer" where work is sent to a runner.
+fn introduction(server: &Url, runner: &str, version: &str) -> String {
+    let about = serde_json::json!({ "runnerId": runner, "version": version });
+    let origin = Value::String(server.origin().ascii_serialization());
+
+    format!("if (window.location.origin === {origin}) {{ Object.defineProperty(window, '__TEAM_HUB_DESKTOP__', {{ value: Object.freeze({about}) }}); }}")
+}
+
+/// The web interface of the server the app is connected to, made when it is not there yet
+/// and made anew when the server is another one.
+async fn web(app: &AppHandle, shell: &Shell, stage: &Stage) -> Result<Webview, String> {
+    let status = commands::invoke(&shell.desktop, "status", Value::Null).await?;
+    let server = status["serverUrl"].as_str().and_then(|address| Url::parse(address).ok()).ok_or("The app is not connected to a team-hub server.")?;
+    let runner = status["runner"]["id"].as_str().unwrap_or_default().to_string();
+    let mut current = stage.server.lock().await;
+
+    if let Some(existing) = app.get_webview(WEB) {
+        if current.as_ref().is_some_and(|shown| same_origin(shown, &server)) {
+            return Ok(existing);
+        }
+
+        layout::release(app);
+        existing.close().map_err(|error| error.to_string())?;
+    }
+
+    let start = server.join(START).map_err(|error| error.to_string())?;
+    let stay = server.clone();
+    let leave = app.clone();
+    let opened = server.clone();
+    let opener = app.clone();
+    let builder = WebviewBuilder::new(WEB, WebviewUrl::External(start))
+        .initialization_script(introduction(&server, &runner, &app.package_info().version.to_string()))
+        // The view shows the server and nothing else.
+        .on_navigation(move |url| {
+            if same_origin(url, &stay) || url.scheme() == "about" {
+                return true;
+            }
+
+            open_outside(&leave, url);
+
+            false
+        })
+        // There is one window. A link that asks for a new one opens here when it is the
+        // server's (an attachment), and in the browser when it is not.
+        .on_new_window(move |url, _| {
+            if same_origin(&url, &opened) {
+                if let Some(view) = opener.get_webview(WEB) {
+                    let _ = view.navigate(url);
+                }
+            } else {
+                open_outside(&opener, &url);
+            }
+
+            NewWindowResponse::Deny
+        })
+        .on_download(|_, _| true);
+    let window = app.get_window(LOCAL).ok_or("The window is gone.")?;
+    let view = window.add_child(builder, LogicalPosition::new(0.0, 0.0), LogicalSize::new(1.0, 1.0)).map_err(|error| error.to_string())?;
+
+    layout::adopt(&view).map_err(|error| error.to_string())?;
+    *current = Some(server);
+
+    Ok(view)
+}
+
+/// Shows the server's web interface over this part of the local interface, in the local
+/// interface's own units.
+#[tauri::command]
+pub async fn web_show(
+    app: AppHandle,
+    webview: Webview,
+    shell: State<'_, Shell>,
+    stage: State<'_, Stage>,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    local_only(&webview)?;
+
+    let view = web(&app, &shell, &stage).await?;
+
+    layout::place(&app, &view, Some((x.max(0.0), y.max(0.0), width.max(1.0), height.max(1.0)))).map_err(|error| error.to_string())
+}
+
+/// Takes the web interface off the window; it keeps its page.
+#[tauri::command]
+pub async fn web_hide(app: AppHandle, webview: Webview) -> Result<(), String> {
+    local_only(&webview)?;
+
+    match app.get_webview(WEB) {
+        Some(view) => layout::place(&app, &view, None).map_err(|error| error.to_string()),
+        None => Ok(()),
+    }
+}
+
+/// Opens a page of the server in the web interface: `/issue/WEB-12`.
+#[tauri::command]
+pub async fn web_open(app: AppHandle, webview: Webview, shell: State<'_, Shell>, stage: State<'_, Stage>, path: String) -> Result<(), String> {
+    local_only(&webview)?;
+
+    if !path.starts_with('/') || path.starts_with("//") {
+        return Err("A page of the server starts with one slash.".to_string());
+    }
+
+    let view = web(&app, &shell, &stage).await?;
+    let server = stage.server.lock().await.clone().ok_or("The app is not connected to a team-hub server.")?;
+    let target = server.join(&path).map_err(|error| error.to_string())?;
+
+    if !same_origin(&target, &server) {
+        return Err("That is not a page of the server.".to_string());
+    }
+
+    // The interface is one page that follows the address: on the server already, changing
+    // the address is enough and keeps what the page has loaded.
+    if view.url().is_ok_and(|now| same_origin(&now, &server)) {
+        let to = Value::String(format!("{}{}", target.path(), target.query().map(|query| format!("?{query}")).unwrap_or_default()));
+
+        view.eval(format!("window.history.pushState(null, '', {to}); window.dispatchEvent(new PopStateEvent('popstate'));"))
+    } else {
+        view.navigate(target)
+    }
+    .map_err(|error| error.to_string())
+}
+
+/// The page of the server the web interface shows now, as a path, when it shows one.
+#[tauri::command]
+pub async fn web_location(app: AppHandle, webview: Webview, stage: State<'_, Stage>) -> Result<Option<String>, String> {
+    local_only(&webview)?;
+
+    let server = stage.server.lock().await.clone();
+    let now = app.get_webview(WEB).and_then(|view| view.url().ok());
+
+    Ok(match (server, now) {
+        (Some(server), Some(now)) if same_origin(&now, &server) => {
+            Some(format!("{}{}", now.path(), now.query().map(|query| format!("?{query}")).unwrap_or_default()))
+        }
+        _ => None,
+    })
+}
+
+/// Back, forward and reload, for a page without a browser around it.
+#[tauri::command]
+pub async fn web_go(app: AppHandle, webview: Webview, step: String) -> Result<(), String> {
+    local_only(&webview)?;
+
+    let script = match step.as_str() {
+        "back" => "window.history.back();",
+        "forward" => "window.history.forward();",
+        "reload" => "window.location.reload();",
+        _ => return Err("Back, forward or reload.".to_string()),
+    };
+
+    match app.get_webview(WEB) {
+        Some(view) => view.eval(script).map_err(|error| error.to_string()),
+        None => Ok(()),
+    }
+}
+
+/// Closes the web interface and forgets what its pages stored: the sign-in above all. For
+/// when the app is disconnected from its server.
+#[tauri::command]
+pub async fn web_forget(app: AppHandle, webview: Webview, stage: State<'_, Stage>) -> Result<(), String> {
+    local_only(&webview)?;
+
+    let mut current = stage.server.lock().await;
+
+    if let Some(view) = app.get_webview(WEB) {
+        let _ = view.clear_all_browsing_data();
+
+        layout::release(&app);
+        view.close().map_err(|error| error.to_string())?;
+    }
+
+    *current = None;
+
+    Ok(())
+}
+
+/// Where the two webviews are in the window. Everywhere but Linux Tauri places a webview
+/// where it is told.
+#[cfg(not(target_os = "linux"))]
+mod layout {
+    use tauri::{AppHandle, LogicalPosition, LogicalSize, Rect, Webview};
+
+    pub fn wrap(_local: &Webview) -> tauri::Result<()> {
+        Ok(())
+    }
+
+    pub fn adopt(view: &Webview) -> tauri::Result<()> {
+        view.hide()
+    }
+
+    pub fn release(_app: &AppHandle) {}
+
+    pub fn place(_app: &AppHandle, view: &Webview, at: Option<(f64, f64, f64, f64)>) -> tauri::Result<()> {
+        match at {
+            Some((x, y, width, height)) => {
+                view.set_bounds(Rect { position: LogicalPosition::new(x, y).into(), size: LogicalSize::new(width, height).into() })?;
+                view.show()
+            }
+            None => view.hide(),
+        }
+    }
+}
+
+/// On Linux Tauri puts a window's webviews into one vertical box, one under another, and a
+/// position given to a webview does nothing. So the local interface is put into a GTK
+/// overlay, and the web interface is laid over it at the place asked for.
+#[cfg(target_os = "linux")]
+mod layout {
+    use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
+
+    use gtk::prelude::*;
+    use tauri::{AppHandle, Webview};
+
+    struct Laid {
+        overlay: gtk::Overlay,
+        web: Option<gtk::Widget>,
+        at: Rc<Cell<(i32, i32, i32, i32)>>,
+    }
+
+    thread_local! {
+        // GTK's widgets belong to the main thread, and so does this.
+        static LAID: RefCell<Option<Laid>> = const { RefCell::new(None) };
+    }
+
+    pub fn wrap(local: &Webview) -> tauri::Result<()> {
+        local.with_webview(|platform| {
+            let widget: gtk::Widget = platform.inner().upcast();
+            let Some(parent) = widget.parent().and_then(|parent| parent.downcast::<gtk::Box>().ok()) else { return };
+            let overlay = gtk::Overlay::new();
+            let at = Rc::new(Cell::new((0, 0, 1, 1)));
+            let asked = at.clone();
+
+            parent.remove(&widget);
+            overlay.add(&widget);
+            parent.pack_start(&overlay, true, true, 0);
+            overlay.connect_get_child_position(move |_, _| {
+                let (x, y, width, height) = asked.get();
+
+                Some(gtk::gdk::Rectangle::new(x, y, width, height))
+            });
+            overlay.show_all();
+
+            LAID.with(|laid| *laid.borrow_mut() = Some(Laid { overlay, web: None, at }));
+        })
+    }
+
+    pub fn adopt(view: &Webview) -> tauri::Result<()> {
+        view.with_webview(|platform| {
+            let widget: gtk::Widget = platform.inner().upcast();
+
+            LAID.with(|laid| {
+                let mut laid = laid.borrow_mut();
+                let Some(laid) = laid.as_mut() else { return };
+
+                if let Some(parent) = widget.parent().and_then(|parent| parent.downcast::<gtk::Container>().ok()) {
+                    parent.remove(&widget);
+                }
+
+                laid.overlay.add_overlay(&widget);
+                widget.hide();
+                laid.web = Some(widget);
+            });
+        })
+    }
+
+    /// Before the web interface is closed: the overlay lets go of it.
+    pub fn release(app: &AppHandle) {
+        let _ = app.run_on_main_thread(|| {
+            LAID.with(|laid| {
+                if let Some(laid) = laid.borrow_mut().as_mut() {
+                    if let Some(widget) = laid.web.take() {
+                        laid.overlay.remove(&widget);
+                    }
+                }
+            });
+        });
+    }
+
+    pub fn place(app: &AppHandle, _view: &Webview, at: Option<(f64, f64, f64, f64)>) -> tauri::Result<()> {
+        app.run_on_main_thread(move || {
+            LAID.with(|laid| {
+                let laid = laid.borrow();
+                let Some(laid) = laid.as_ref() else { return };
+                let Some(widget) = &laid.web else { return };
+
+                match at {
+                    Some((x, y, width, height)) => {
+                        laid.at.set((x.round() as i32, y.round() as i32, width.round() as i32, height.round() as i32));
+                        widget.show();
+                        laid.overlay.queue_resize();
+                    }
+                    None => widget.hide(),
+                }
+            });
+        })
+    }
+}

@@ -9,6 +9,7 @@ import type { Project } from '@/bindings/Project.ts';
 import type { Runner } from '@/bindings/Runner.ts';
 import { Icon } from '@/components/icon.tsx';
 import { Avatar, Button, Dialog, Empty, ErrorNote, Field, Spinner, Tag, attempt, useBusy } from '@/components/ui.tsx';
+import { hereRunner } from '@/desktop.ts';
 import { formatDateTime, t, timeAgo } from '@/i18n/index.ts';
 import { translateServer } from '@/i18n/server.ts';
 import { Link, navigate } from '@/router.tsx';
@@ -97,7 +98,7 @@ function RunnerLine({ runner, owner }: { runner: Runner; owner: string | undefin
       <span className="e2e-runner-name">
         <span className={runner.online ? 'e2e-dot e2e-dot-on' : 'e2e-dot'} title={runner.online ? t('online') : t('offline')} />
         <strong>{runner.name}</strong>
-        <span className="e2e-runner-kind">{runner.shared ? t('shared service') : runner.interactive ? t('computer') : t('service')}</span>
+        <span className="e2e-runner-kind">{runner.shared ? t('shared service') : runner.id === hereRunner() ? t('this computer') : runner.interactive ? t('computer') : t('service')}</span>
       </span>
       <span className="muted">
         {[owner, work?.pinnedOnly ? t('only what is sent to it') : '', runner.online ? '' : t('last seen {when}', { when: timeAgo(runner.lastSeenAt) })].filter(Boolean).join(' · ')}
@@ -112,8 +113,9 @@ function RunDialog({ project, settings, onClose }: { project: Project; settings:
   const [ref, setRef] = useState('');
   const [filter, setFilter] = useState('');
   const [video, setVideo] = useState<string>(settings.video);
-  // A runner's id when the job is sent to that one; null leaves it to the queue.
-  const [onRunner, setOnRunner] = useState<string | null>(null);
+  // A runner's id when the job is sent to that one; null leaves it to the queue. Inside the
+  // desktop app the computer it runs on comes first, when it tests this project.
+  const [onRunner, setOnRunner] = useState<string | null>(hereRunner);
   const [busy, run] = useBusy();
   const fits = runners.data ?? [];
   // Who can be named: one's own (connected or not: the job waits), and services that are there.

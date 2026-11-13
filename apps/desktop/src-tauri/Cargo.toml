@@ -15,12 +15,19 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 hub-desktop-core = { path = "../core" }
 serde_json = "1"
-tauri = { version = "2", features = ["tray-icon"] }
+# `unstable` is what Tauri calls a window with more than one webview in it: the local
+# interface, and the server's own web interface beside it (see `src/stage.rs`).
+tauri = { version = "2", features = ["tray-icon", "unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-window-state = "2"
 tokio = { version = "1", features = ["sync"] }
+
+# On Linux Tauri stacks a window's webviews one under another; `stage.rs` lays them out
+# itself, with the same GTK the window is made of.
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
 
 [features]
 default = ["custom-protocol"]

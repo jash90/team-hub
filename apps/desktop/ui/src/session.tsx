@@ -5,13 +5,13 @@ import type { Project } from '@web/bindings/Project.ts';
 import type { User } from '@web/bindings/User.ts';
 import type { ConnectionStatus } from './bindings/ConnectionStatus.ts';
 import type { WorkspaceView } from './bindings/WorkspaceView.ts';
+import { inApp, openExternal, web } from './bridge.ts';
 
 export type View =
-  | { name: 'home' }
-  | { name: 'issue'; key: string }
+  // The tracker: the server's web interface, in the window.
+  | { name: 'web' }
   | { name: 'thread'; id: number }
   | { name: 'new-thread'; key?: string }
-  | { name: 'search'; query: string }
   | { name: 'repos' }
   | { name: 'runners' }
   | { name: 'tests'; project?: string }
@@ -20,14 +20,10 @@ export type View =
 
 function toHash(view: View): string {
   switch (view.name) {
-    case 'issue':
-      return `#/issue/${encodeURIComponent(view.key)}`;
     case 'thread':
       return `#/thread/${view.id}`;
     case 'new-thread':
       return view.key ? `#/new-thread/${encodeURIComponent(view.key)}` : '#/new-thread';
-    case 'search':
-      return `#/search/${encodeURIComponent(view.query)}`;
     case 'repos':
       return '#/repos';
     case 'runners':
@@ -48,14 +44,10 @@ function fromHash(hash: string): View {
   const value = rest ? decodeURIComponent(rest) : '';
 
   switch (name) {
-    case 'issue':
-      return value ? { name: 'issue', key: value } : { name: 'home' };
     case 'thread':
-      return Number.isInteger(Number(value)) && value ? { name: 'thread', id: Number(value) } : { name: 'home' };
+      return Number.isInteger(Number(value)) && value ? { name: 'thread', id: Number(value) } : { name: 'web' };
     case 'new-thread':
       return { name: 'new-thread', key: value || undefined };
-    case 'search':
-      return { name: 'search', query: value };
     case 'repos':
       return { name: 'repos' };
     case 'runners':
@@ -63,11 +55,11 @@ function fromHash(hash: string): View {
     case 'tests':
       return { name: 'tests', project: value || undefined };
     case 'run':
-      return Number.isInteger(Number(value)) && value ? { name: 'run', id: Number(value) } : { name: 'home' };
+      return Number.isInteger(Number(value)) && value ? { name: 'run', id: Number(value) } : { name: 'web' };
     case 'settings':
       return { name: 'settings' };
     default:
-      return { name: 'home' };
+      return { name: 'web' };
   }
 }
 
@@ -100,6 +92,8 @@ type Session = {
   view: View;
   /** The server's address of an issue or a page, to open in the browser. */
   serverUrl: (path: string) => string | null;
+  /** Shows a page of the server in the tracker: `/issue/WEB-12`. In a browser, in a tab. */
+  openPage: (path: string) => void;
 };
 
 const SessionContext = createContext<Session | null>(null);
@@ -126,6 +120,14 @@ export function SessionProvider({ status, workspace, view, go, children }: { sta
       go,
       view,
       serverUrl: (path) => (status.serverUrl ? `${status.serverUrl}${path}` : null),
+      openPage: (path) => {
+        if (inApp) {
+          void web.open(path).catch(() => undefined);
+          go({ name: 'web' });
+        } else if (status.serverUrl) {
+          void openExternal(`${status.serverUrl}${path}`);
+        }
+      },
     };
   }, [status, workspace, view, go]);
 

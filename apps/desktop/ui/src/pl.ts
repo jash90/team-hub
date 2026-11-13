@@ -24,7 +24,6 @@ export const polish: Record<string, string> = {
   // my work
   'offline copy': 'kopia lokalna',
   'The server cannot be reached; this is the copy from {when}.': 'Nie ma połączenia z serwerem; to kopia z {when}.',
-  'The server cannot be reached; this is the copy from {when}. Changes are not possible until it is back.': 'Nie ma połączenia z serwerem; to kopia z {when}. Zmiany będą możliwe, gdy wróci.',
   'Filter my work, Enter searches everything': 'Filtruj moją pracę, Enter szuka wszędzie',
   'Quick filters': 'Szybkie filtry',
   All: 'Wszystko',
@@ -47,11 +46,6 @@ export const polish: Record<string, string> = {
   Connect: 'Połącz',
 
   // an issue
-  'Open in the browser': 'Otwórz w przeglądarce',
-  'Assigned to you': 'Przypisano do Ciebie',
-  'No branch, commit or pull request yet.': 'Nie ma jeszcze gałęzi, commita ani pull requesta.',
-  'Linked pages': 'Powiązane strony',
-  'not run': 'nie uruchomiono',
   Tests: 'Testy',
 
   // a thread
@@ -212,15 +206,6 @@ export const polish: Record<string, string> = {
     'Gdzie system operacyjny ma piaskownicę, powłoka wątku nie ma sieci i może pisać tylko w swoim drzewie roboczym. Gdzie jej nie ma, wątki pracują bez powłoki, chyba że pozwolisz na nią tutaj; wtedy między agentem a tym komputerem stoi już tylko lista odmów. Działa po restarcie.',
 
   // the first view
-  'Pick an issue on the right to read it, or a thread on the left to see what its agent did. Nothing an agent proposes happens before you approve it.':
-    'Wybierz zadanie po prawej, żeby je przeczytać, albo wątek po lewej, żeby zobaczyć, co zrobił jego agent. Nic z tego, co proponuje agent, nie dzieje się, zanim tego nie zatwierdzisz.',
-  'Start here: tie a project to its clone on this computer.': 'Zacznij tutaj: przypisz projektowi jego klon na tym komputerze.',
-  '{count} mapped': 'przypisane: {count}',
-  'Hand an issue to an agent: implement, review, analyse.': 'Przekaż zadanie agentowi: implementacja, przegląd, analiza.',
-  'This computer takes runs delegated on the web.': 'Ten komputer podejmuje zlecenia z przeglądarki.',
-  'This computer does not take runs delegated on the web.': 'Ten komputer nie podejmuje zleceń z przeglądarki.',
-  'The server cannot be reached. You see the copy stored on this computer; threads keep working locally.':
-    'Nie ma połączenia z serwerem. Widzisz kopię zapisaną na tym komputerze; wątki pracują dalej lokalnie.',
   // runners, tests, and work carried out elsewhere (docs/runners.md)
   'This computer': 'Ten komputer',
   'shared service': 'usługa wspólna',
@@ -291,4 +276,15 @@ export const polish: Record<string, string> = {
   'Also take the team’s queued test jobs': 'Bierz też zadania testów z kolejki zespołu',
   'Running a suite is running a repository’s code on this computer, so by default it happens only for the jobs you send here by name. A job gets a folder of its own and only the variables its project’s test settings list; where the system has a sandbox it can write nowhere else and cannot read your keys.':
     'Uruchomienie zestawu to uruchomienie kodu repozytorium na tym komputerze, więc domyślnie dzieje się to tylko dla zadań, które wyślesz tutaj po nazwie. Zadanie dostaje własny folder i tylko zmienne z ustawień testów projektu; gdzie system ma piaskownicę, nie może pisać nigdzie indziej ani czytać Twoich kluczy.',
+  // the tracker: the server's web interface in the window
+  Tracker: 'Tracker',
+  Back: 'Wstecz',
+  Forward: 'Dalej',
+  'Hide threads': 'Ukryj wątki',
+  'Show threads': 'Pokaż wątki',
+  'Open team-hub in a tab': 'Otwórz team-hub w karcie',
+  'Inside the app this place shows the web interface of your team-hub: board, backlog, issues, the knowledge base. A browser cannot show one site inside another, so open it in a tab.':
+    'W aplikacji to miejsce pokazuje interfejs webowy Twojego team-huba: tablicę, backlog, zadania, bazę wiedzy. Przeglądarka nie pokaże jednej strony wewnątrz drugiej, więc otwórz go w karcie.',
+  'The server cannot be reached, so its pages cannot be shown. Threads keep working on this computer.':
+    'Nie można połączyć się z serwerem, więc jego stron nie da się pokazać. Wątki dalej działają na tym komputerze.',
 };

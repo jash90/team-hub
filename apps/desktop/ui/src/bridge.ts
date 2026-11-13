@@ -82,6 +82,39 @@ export function listen(handler: (event: AppEvent) => void): () => void {
   };
 }
 
+/** A command of the window itself, not of the core. In a browser there is no such thing. */
+async function shell<T>(command: string, args?: Record<string, unknown>): Promise<T | undefined> {
+  if (!IN_APP) {
+    return undefined;
+  }
+
+  const { invoke } = await import('@tauri-apps/api/core');
+
+  try {
+    return await invoke<T>(command, args);
+  } catch (reason) {
+    throw new Error(typeof reason === 'string' ? reason : String(reason));
+  }
+}
+
+/**
+ * The server's web interface, which the app shows in the same window, over the place the
+ * local interface gives it (`src-tauri/src/stage.rs`). It is told where to be and which
+ * page to show; it cannot call anything here.
+ */
+export const web = {
+  /** Shows it over this rectangle of the window. */
+  show: (box: { x: number; y: number; width: number; height: number }) => shell<null>('web_show', box),
+  hide: () => shell<null>('web_hide'),
+  /** Opens a page of the server, such as `/issue/WEB-12`. */
+  open: (path: string) => shell<null>('web_open', { path }),
+  /** The page it shows now, as a path; null when it shows none. */
+  location: async () => (await shell<string | null>('web_location')) ?? null,
+  go: (step: 'back' | 'forward' | 'reload') => shell<null>('web_go', { step }),
+  /** Closes it and forgets its sign-in. */
+  forget: () => shell<null>('web_forget'),
+};
+
 /** Lets the person pick a folder. In a browser there is no folder dialog, so it asks for the path. */
 export async function pickFolder(title: string): Promise<string | null> {
   if (IN_APP) {

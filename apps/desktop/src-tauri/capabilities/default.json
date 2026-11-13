@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The main window may call the core, listen to its events, pick a folder for a repository, and open links in the browser.",
-  "windows": ["main"],
+  "description": "The app's own interface may call the core, listen to its events, pick a folder for a repository, and open links in the browser. The server's web interface, the other webview of the same window, is named by no capability and may do none of that.",
+  "webviews": ["main"],
   "permissions": [
     "core:default",
     "window-state:default",

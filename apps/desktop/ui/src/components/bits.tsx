@@ -14,11 +14,23 @@ import { useStored } from '../live.ts';
 import { partsOf, useSession } from '../session.tsx';
 import { kindLabel, stateLabel, stateTone } from '../words.ts';
 
+/** The page of an issue in the tracker. */
+export function issuePath(issueKey: string): string {
+  return `/issue/${encodeURIComponent(issueKey)}`;
+}
+
 export function IssueKeyLink({ issueKey, done }: { issueKey: string; done?: boolean }) {
-  const { go } = useSession();
+  const { openPage } = useSession();
 
   return (
-    <button type="button" className={done ? 'issue-key issue-key-done link-button' : 'issue-key link-button'} onClick={() => go({ name: 'issue', key: issueKey })}>
+    <button
+      type="button"
+      className={done ? 'issue-key issue-key-done link-button' : 'issue-key link-button'}
+      onClick={(event) => {
+        event.stopPropagation();
+        openPage(issuePath(issueKey));
+      }}
+    >
       {issueKey}
     </button>
   );
@@ -26,12 +38,11 @@ export function IssueKeyLink({ issueKey, done }: { issueKey: string; done?: bool
 
 /** One issue in a list: type, key, summary, status; `trailing` holds what the list adds. */
 export function IssueRowLine({ issue, projects, trailing, compact }: { issue: IssueRow; projects: Project[]; trailing?: ReactNode; compact?: boolean }) {
-  const { go, view } = useSession();
+  const { openPage } = useSession();
   const { status, type } = partsOf(projects, issue);
-  const selected = view.name === 'issue' && view.key === issue.key;
 
   return (
-    <div className={selected ? 'issue-line desk-row desk-row-selected' : 'issue-line desk-row'} onClick={() => go({ name: 'issue', key: issue.key })}>
+    <div className="issue-line desk-row" onClick={() => openPage(issuePath(issue.key))}>
       <TypeIcon type={type} />
       <IssueKeyLink issueKey={issue.key} done={status?.category === 'done'} />
       <span className="issue-line-summary" title={issue.summary}>

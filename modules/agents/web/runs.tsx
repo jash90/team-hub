@@ -13,6 +13,7 @@ import type { AgentRunner } from '@/bindings/AgentRunner.ts';
 import type { PersonalKeyState } from '@/bindings/PersonalKeyState.ts';
 import type { AgentSettings } from '@/bindings/AgentSettings.ts';
 import type { JsonValue } from '@/bindings/serde_json/JsonValue.ts';
+import { hereRunner } from '@/desktop.ts';
 import { Icon } from '@/components/icon.tsx';
 import { IssueKey } from '@/components/issue-bits.tsx';
 import { Markdown } from '@/components/markdown.tsx';
@@ -870,8 +871,9 @@ export function StartDialog({ issueKey, projectKey, preset, repo, onClose, onSta
   const [model, setModel] = useState<string | null>(null);
   const [repository, setRepository] = useState(repo);
   const [shared, setShared] = useState(false);
-  // A runner's id when the run is sent to that one; null leaves it to the queue.
-  const [onRunner, setOnRunner] = useState<string | null>(null);
+  // A runner's id when the run is sent to that one; null leaves it to the queue. Inside the
+  // desktop app the computer it runs on comes first, when it takes this work.
+  const [onRunner, setOnRunner] = useState<string | null>(hereRunner);
   const [busy, run] = useBusy();
   const fits = (runners.data ?? []).filter((runner) => runner.kinds.includes(preset.kind) && (runner.projects === null || runner.projects.some((key) => key.toUpperCase() === projectKey)));
   const able = fits.filter((runner) => runner.online);
@@ -1000,7 +1002,7 @@ export function RunnerLine({ runner, owner }: { runner: AgentRunner; owner: stri
     <div className="agents-runner">
       <span className={runner.online ? 'agents-dot agents-dot-on' : 'agents-dot'} title={runner.online ? t('online') : t('offline')} />
       <strong>{runner.name}</strong>
-      <span className="agents-runner-kind">{runner.shared ? t('shared service') : runner.interactive ? t('computer') : t('service')}</span>
+      <span className="agents-runner-kind">{runner.shared ? t('shared service') : runner.id === hereRunner() ? t('this computer') : runner.interactive ? t('computer') : t('service')}</span>
       <span className="muted">
         {owner} · {runner.kinds.map((kind) => t(kind)).join(', ')} · {runner.projects === null ? t('any project') : runner.projects.join(', ')}
         {runner.pinnedOnly && ` · ${t('only what is sent to it')}`}

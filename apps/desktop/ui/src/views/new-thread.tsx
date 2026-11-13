@@ -4,6 +4,7 @@ import { Icon } from '@web/components/icon.tsx';
 import { Button, ErrorNote, Field } from '@web/components/ui.tsx';
 import { t } from '@web/i18n/index.ts';
 import { core } from '../api.ts';
+import { web } from '../bridge.ts';
 import type { ThreadKind } from '../bindings/ThreadKind.ts';
 import { ANY, HERE, namableRunners, WhereSelect } from '../components/where.tsx';
 import { useRemote } from '../live.ts';
@@ -35,6 +36,24 @@ export function NewThreadView({ issueKey }: { issueKey?: string }) {
   const here = where === HERE;
 
   useEffect(() => setKey(issueKey ?? ''), [issueKey]);
+
+  // Started with no issue named while the tracker shows one: that is the issue meant.
+  useEffect(() => {
+    if (issueKey) {
+      return;
+    }
+
+    void web.location().then(
+      (path) => {
+        const shown = path?.match(/^\/issue\/([A-Za-z][A-Za-z0-9]*-\d+)/)?.[1];
+
+        if (shown) {
+          setKey((typed) => typed || shown.toUpperCase());
+        }
+      },
+      () => undefined,
+    );
+  }, [issueKey]);
   useEffect(() => setRepoId(null), [project]);
 
   async function submit(event: FormEvent): Promise<void> {

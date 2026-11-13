@@ -44,6 +44,67 @@
   padding: var(--desk-gap);
 }
 
+/* The tracker: threads, and beside them the place the server's web interface is laid over. */
+.desk-columns-web {
+  grid-template-columns: var(--desk-left) minmax(0, 1fr);
+}
+
+.desk-columns-web.desk-columns-alone {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+}
+
+.desk-columns-no-panel {
+  grid-template-columns: minmax(0, 1fr) var(--desk-right);
+}
+
+.desk-center-web {
+  display: flex;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* What shows through until the first page of the server is there. */
+.desk-web {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.desk-columns-alone .desk-web {
+  border: 0;
+  border-radius: 0;
+}
+
+.desk-web-note {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 24px;
+}
+
+.desk-web-note p {
+  max-width: 60ch;
+}
+
+.desk-web-steps {
+  display: inline-flex;
+  gap: 2px;
+}
+
+/* The web interface lies over the middle and the right of the window, and what it covers
+   cannot be seen: messages come up over the threads, on the left. */
+.toaster {
+  left: 16px;
+  right: auto;
+}
+
 .desk-column,
 .desk-center {
   min-height: 0;

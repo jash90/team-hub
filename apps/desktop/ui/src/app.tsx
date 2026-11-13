@@ -1,5 +1,7 @@
-// The window: a bar across the top and three columns under it. Threads and decisions on the
-// left, the selected view in the middle, my work on the server on the right.
+// The window: a bar across the top and columns under it. Threads and decisions on the left.
+// Beside them the tracker, which is the server's own web interface shown in the window; or,
+// for what belongs to this computer (a thread, repositories, settings), the selected view
+// with my work on the server on the right.
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
 import { Icon } from '@web/components/icon.tsx';
@@ -7,22 +9,21 @@ import { Button, ErrorNote, Spinner, Tag, Toaster, toast } from '@web/components
 import { currentLanguage, setLanguage, t } from '@web/i18n/index.ts';
 import { core } from './api.ts';
 import type { ConnectionStatus } from './bindings/ConnectionStatus.ts';
-import { inApp } from './bridge.ts';
-import { useLive, useRemote } from './live.ts';
+import { inApp, web } from './bridge.ts';
+import { issuePath } from './components/bits.tsx';
+import { useLive, useRemote, useStored } from './live.ts';
 import { SessionProvider, useSession, useView, type View } from './session.tsx';
 import { ThreadsColumn } from './shell/threads-column.tsx';
-import { WorkQueue } from './shell/work-queue.tsx';
+import { WorkQueue, searchPath } from './shell/work-queue.tsx';
 import { ConnectView } from './views/connect.tsx';
-import { HomeView } from './views/home.tsx';
-import { IssueView } from './views/issue.tsx';
 import { NewThreadView } from './views/new-thread.tsx';
 import { ReposView } from './views/repos.tsx';
 import { RunView } from './views/run.tsx';
 import { RunnersView } from './views/runners.tsx';
 import { TestsView } from './views/tests.tsx';
-import { SearchView } from './views/search.tsx';
 import { SettingsView } from './views/settings.tsx';
 import { ThreadView } from './views/thread.tsx';
+import { TrackerView } from './views/tracker.tsx';
 
 function ThemeToggle() {
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
@@ -43,9 +44,10 @@ function ThemeToggle() {
   return <Button variant="ghost" icon={theme === 'dark' ? 'sun' : 'moon'} onClick={toggle} aria-label={t('Switch theme')} title={t('Switch theme')} />;
 }
 
-function TopBar() {
-  const { status, go, view } = useSession();
+function TopBar({ panel, onPanel }: { panel: boolean; onPanel: (shown: boolean) => void }) {
+  const { status, go, view, openPage } = useSession();
   const [words, setWords] = useState('');
+  const tracker = view.name === 'web';
 
   function search(event: FormEvent): void {
     event.preventDefault();
@@ -53,18 +55,37 @@ function TopBar() {
     const text = words.trim();
 
     if (/^[A-Za-z][A-Za-z0-9]{1,9}-\d+$/.test(text)) {
-      go({ name: 'issue', key: text.toUpperCase() });
+      openPage(issuePath(text.toUpperCase()));
     } else if (text) {
-      go({ name: 'search', query: text });
+      openPage(searchPath(text));
     }
   }
 
   return (
     <header className="topbar desk-topbar">
-      <button type="button" className="brand desk-brand" onClick={() => go({ name: 'home' })}>
+      <button type="button" className="brand desk-brand" onClick={() => go({ name: 'web' })}>
         <span className="brand-mark" />
         <span className="brand-name">team-hub</span>
       </button>
+      <Button
+        variant="ghost"
+        icon="menu"
+        onClick={() => onPanel(!panel)}
+        aria-pressed={panel}
+        aria-label={panel ? t('Hide threads') : t('Show threads')}
+        title={panel ? t('Hide threads') : t('Show threads')}
+      />
+      <Button variant={tracker ? 'default' : 'ghost'} icon="board" onClick={() => go({ name: 'web' })}>
+        {t('Tracker')}
+      </Button>
+      {tracker && inApp && (
+        // A page of the server has no browser around it here: these stand in for its buttons.
+        <span className="desk-web-steps">
+          <Button variant="ghost" icon="chevronLeft" onClick={() => void web.go('back')} aria-label={t('Back')} title={t('Back')} />
+          <Button variant="ghost" icon="chevronRight" onClick={() => void web.go('forward')} aria-label={t('Forward')} title={t('Forward')} />
+          <Button variant="ghost" icon="refresh" onClick={() => void web.go('reload')} aria-label={t('Reload')} title={t('Reload')} />
+        </span>
+      )}
       <form className="filter-search desk-search" onSubmit={search} role="search">
         <Icon name="search" size={14} />
         <input className="input" placeholder={t('Search issues, or type a key such as WEB-12')} value={words} onChange={(event) => setWords(event.target.value)} aria-label={t('Search')} />
@@ -94,14 +115,10 @@ function TopBar() {
 
 function Center({ view, onStatus }: { view: View; onStatus: (status: ConnectionStatus) => void }) {
   switch (view.name) {
-    case 'issue':
-      return <IssueView issueKey={view.key} />;
     case 'thread':
       return <ThreadView threadId={view.id} />;
     case 'new-thread':
       return <NewThreadView issueKey={view.key} />;
-    case 'search':
-      return <SearchView query={view.query} />;
     case 'repos':
       return <ReposView />;
     case 'runners':
@@ -113,7 +130,7 @@ function Center({ view, onStatus }: { view: View; onStatus: (status: ConnectionS
     case 'settings':
       return <SettingsView onStatus={onStatus} />;
     default:
-      return <HomeView />;
+      return <TrackerView />;
   }
 }
 
@@ -121,6 +138,7 @@ export function App() {
   const [status, setStatus] = useState<ConnectionStatus | undefined>();
   const [failure, setFailure] = useState<string | undefined>();
   const [view, go] = useView();
+  const [panel, setPanel] = useStored('panel', true);
   const refresh = useCallback(() => {
     core.status().then(setStatus, (reason: unknown) => setFailure(reason instanceof Error ? reason.message : String(reason)));
   }, []);
@@ -163,15 +181,25 @@ export function App() {
   return (
     <SessionProvider status={status} workspace={workspace.data} view={view} go={go}>
       <div className="desk-shell">
-        <TopBar />
-        <div className="desk-columns">
-          <ThreadsColumn />
-          <main className="desk-center">
-            {workspace.error && !workspace.data && <ErrorNote message={workspace.error} />}
-            <Center view={view} onStatus={setStatus} />
-          </main>
-          <WorkQueue />
-        </div>
+        <TopBar panel={panel} onPanel={setPanel} />
+        {view.name === 'web' ? (
+          // The tracker has my work on its own start page, so it takes that column's room too.
+          <div className={panel ? 'desk-columns desk-columns-web' : 'desk-columns desk-columns-web desk-columns-alone'}>
+            {panel && <ThreadsColumn />}
+            <main className="desk-center desk-center-web">
+              <TrackerView />
+            </main>
+          </div>
+        ) : (
+          <div className={panel ? 'desk-columns' : 'desk-columns desk-columns-no-panel'}>
+            {panel && <ThreadsColumn />}
+            <main className="desk-center">
+              {workspace.error && !workspace.data && <ErrorNote message={workspace.error} />}
+              <Center view={view} onStatus={setStatus} />
+            </main>
+            <WorkQueue />
+          </div>
+        )}
       </div>
       <Toaster />
     </SessionProvider>

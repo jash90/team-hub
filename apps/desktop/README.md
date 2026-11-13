@@ -1,9 +1,11 @@
 # team-hub desktop
 
-A developer's cockpit on top of team-hub. The issues assigned to you become **agent threads**:
-an AI agent works on an issue in a local clone of the repository, in a git working tree and
-branch of its own, and whatever should leave your computer (a comment, a status change, a
-push, a pull request) waits for your click.
+team-hub in a window of its own, with what a browser cannot do beside it. The window shows
+the **tracker**, which is your server's own web interface: the same board, backlog, issues
+and knowledge base a browser shows, always the server's version of them. Beside it is a panel
+of **agent threads**: an AI agent works on an issue in a local clone of the repository, in a
+git working tree and branch of its own, and whatever should leave your computer (a comment,
+a status change, a push, a pull request) waits for your click.
 
 The same app is a **runner** for team-hub: work delegated to an AI agent in the web interface
 ("Implement in code", "Review the pull request", a custom task) is claimed by the app on a
@@ -14,8 +16,10 @@ web shows. See [`docs/agent-runs.md`](../../docs/agent-runs.md) and
 ```
 core/        hub-desktop-core: everything that is not a window. No Tauri; shares hub-core with the server.
              Also the `hub` command line, the fake agent and the development server.
-src-tauri/   The window: one command that forwards to the core, the tray, notifications, window state.
-ui/          The interface: React, TypeScript, Vite. Polish and English, light and dark.
+src-tauri/   The window: one command that forwards to the core, the tray, notifications, window state,
+             and the two webviews the window holds (`src/stage.rs`).
+ui/          The app's own interface: threads, decisions, repositories, settings. React, TypeScript,
+             Vite. Polish and English, light and dark. The tracker is not here: it is the server's.
 sidecar/     Node helper that runs one agent turn through the Claude Agent SDK, JSON lines on stdin/stdout;
              launch.mjs starts it from the agent runtime an installed app fetched.
 scripts/     The end-to-end check against a real server; the icon generator; the release's version check
@@ -144,6 +148,46 @@ The code is `src-tauri/src/runtime.rs` (no Tauri in it; `rustc --edition 2021 --
 src-tauri/src/runtime.rs` runs its tests), the dialogs are in `src-tauri/src/main.rs`, and
 `sidecar/launch.mjs` is what the core is given as the helper: it runs the helper from the
 runtime, or answers the thread with the reason why it cannot.
+
+## The window: the tracker and the panel
+
+The window holds two webviews.
+
+- **The app's own interface** (`ui/`), loaded from the files that came with the app: the bar
+  at the top, the threads and decisions on the left, and every view that belongs to this
+  computer (a thread and its diff, a push to look at, repositories, tests on this computer,
+  settings). It is the only one that can call the core.
+- **The tracker**: your server's web interface, loaded from the server, laid over the rest
+  of the window. You sign in to it once, as in a browser, and the sign-in is remembered.
+  Everything the web interface does is there, and a new version of the server is a new
+  version of the tracker, with nothing to install.
+
+What joins the two:
+
+- An issue's key anywhere in the panel opens that issue in the tracker; so does the search
+  field at the top.
+- **New** in the panel, while the tracker shows an issue, starts a thread for that issue.
+- Where the tracker asks which runner should carry out an agent run or a test job, this
+  computer is offered first and named "this computer". That is the ordinary `onRunner` of
+  [`docs/runners.md`](../../docs/runners.md): the run is pinned to the app's runner, the app
+  claims it, and it appears as a thread in the panel.
+- Back, forward and reload for the tracker are in the bar at the top; the button beside the
+  name hides the panel when the tracker should have the whole window.
+
+The tracker **cannot call the app**. Tauri refuses a command that comes from a page which is
+not the app's own unless a capability names that page's address, and none does
+(`src-tauri/capabilities/default.json` names the local webview only); each command also
+checks which webview is calling. The one thing the app tells a page of its server is which
+runner the app is. So a mistake in the web interface, or a server somebody else got into,
+reaches what the server could already reach (it can queue work for this computer's runner,
+inside the sandbox below) and no further: pushes, pull requests, repository folders and the
+settings of the sandbox are decided in the files that came with the app. A link that leads
+away from the server opens in your browser.
+
+On Linux Tauri stacks a window's webviews one under another and ignores positions, so
+`stage.rs` lays the two out itself with a GTK overlay; on macOS and Windows it uses Tauri's
+own placement (the `unstable` feature of the `tauri` crate, which is what Tauri calls more
+than one webview in a window).
 
 ## Connecting to a server
 
@@ -295,7 +339,8 @@ What is and is not kept apart:
   ```
 
   `ui/src/bridge.ts` is the only file that knows whether it talks to Tauri or to that server;
-  both end in `hub_desktop_core::commands::invoke`.
+  both end in `hub_desktop_core::commands::invoke`. A browser cannot show the tracker inside
+  the page, so there the place for it holds a link that opens the server in a tab.
 - `(cd ui && npm run i18n)` lists phrases without Polish.
 
 TypeScript types under `ui/src/bindings` are generated from the Rust ones by `cargo test`;

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Button, ConfirmDialog, ErrorNote, Field, Spinner, Tag, useBusy } from '@web/components/ui.tsx';
 import { currentLanguage, setLanguage, t, timeAgo } from '@web/i18n/index.ts';
 import { core } from '../api.ts';
+import { web } from '../bridge.ts';
 import type { ConnectionStatus } from '../bindings/ConnectionStatus.ts';
 import type { Settings } from '../bindings/Settings.ts';
 import { useRemote } from '../live.ts';
@@ -141,7 +142,13 @@ export function SettingsView({ onStatus }: { onStatus: (status: ConnectionStatus
           body={t('The token is removed from the keychain and the stored copy of the server’s data is deleted. Threads, working trees and repositories stay.')}
           confirm={t('Disconnect')}
           danger
-          onConfirm={async () => onStatus(await core.disconnect())}
+          onConfirm={async () => {
+            const status = await core.disconnect();
+
+            // The tracker's sign-in on this computer goes with the connection.
+            await web.forget().catch(() => undefined);
+            onStatus(status);
+          }}
           onClose={() => setLeaving(false)}
         />
       )}
