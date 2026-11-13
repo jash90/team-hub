@@ -16,6 +16,7 @@ import { type Options, query } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentEvent } from '../../ui/src/bindings/AgentEvent.ts';
 import type { FromSidecar } from '../../ui/src/bindings/FromSidecar.ts';
 import type { ToSidecar } from '../../ui/src/bindings/ToSidecar.ts';
+import { confinement, withoutMentions } from './confine.ts';
 import { HUB_SERVER, hubServer, hubToolNames } from './hub-tools.ts';
 
 type Start = Extract<ToSidecar, { type: 'start' }>;
@@ -50,8 +51,15 @@ const callCore = async (tool: string, input: unknown) => {
   return reply.result;
 };
 
-/** The built-in tools named on the allow list: `Edit(//path/**)` names `Edit`. */
-const builtInTools = (allowed: string[]) => [...new Set(allowed.map((rule) => rule.split('(')[0]).filter((name) => !name.startsWith('mcp__')))];
+/**
+ * The built-in tools named on the allow list: `Edit(//path/**)` names `Edit`. A `Read` rule
+ * covers the tools that search files too, so they are offered wherever reading is.
+ */
+const builtInTools = (allowed: string[]) => {
+  const named = allowed.map((rule) => rule.split('(')[0]).filter((name) => !name.startsWith('mcp__'));
+
+  return [...new Set(named.flatMap((name) => (name === 'Read' ? ['Read', 'Glob', 'Grep'] : [name])))];
+};
 
 export const optionsFor = (start: Start): Options => ({
   cwd: start.cwd,
@@ -65,6 +73,7 @@ export const optionsFor = (start: Start): Options => ({
   tools: builtInTools(start.allowed_tools),
   allowedTools: [...start.allowed_tools, ...hubToolNames(start.hub_tools, start.commit_tool)],
   disallowedTools: start.denied_tools,
+  hooks: confinement(start.cwd, start.allowed_tools),
   canUseTool: async (toolName) => ({
     behavior: 'deny',
     message: `${toolName} is not on this thread's allow list. Nobody can approve it here; do the task without it, or say what you would need.`,
@@ -91,7 +100,7 @@ export const optionsFor = (start: Start): Options => ({
 
 const run = async (start: Start) => {
   try {
-    for await (const message of query({ prompt: start.prompt, options: optionsFor(start) })) {
+    for await (const message of query({ prompt: withoutMentions(start.prompt), options: optionsFor(start) })) {
       if (message.type === 'system' && message.subtype === 'init') {
         emit({ kind: 'session', session_id: message.session_id });
       }
