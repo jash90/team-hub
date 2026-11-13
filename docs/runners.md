@@ -125,7 +125,6 @@ computer comes first and is called "this computer".
   only stores what comes back (events, the report, videos, screenshots).
 - The app can also hand either to another runner: the same `onRunner`, picked from the
   list. It then follows the run or job like the web does.
-- **Runners** shows `GET /api/runners`, with this computer marked.
-- **Tests** shows the project's jobs and starts them; a finished job opens its session
-  (`docs/e2e-jobs.md`) in the browser, where the recording is.
+- **Runners** and **Tests** in the app's bar open the web's own pages in the app's window,
+  with this computer marked and offered first.
 - The work queue shows runs wherever they are carried out, each with its runner's name.

@@ -19,8 +19,6 @@ import { ConnectView } from './views/connect.tsx';
 import { NewThreadView } from './views/new-thread.tsx';
 import { ReposView } from './views/repos.tsx';
 import { RunView } from './views/run.tsx';
-import { RunnersView } from './views/runners.tsx';
-import { TestsView } from './views/tests.tsx';
 import { SettingsView } from './views/settings.tsx';
 import { ThreadView } from './views/thread.tsx';
 import { TrackerView } from './views/tracker.tsx';
@@ -46,9 +44,17 @@ function ThemeToggle() {
 }
 
 function TopBar({ panel, onPanel }: { panel: boolean; onPanel: (shown: boolean) => void }) {
-  const { status, go, view, openPage } = useSession();
+  const { status, go, view, openPage, workspace } = useSession();
   const [words, setWords] = useState('');
   const tracker = view.name === 'web';
+
+  // The tests of the project the tracker shows, or else of the first project there is.
+  async function openTests(): Promise<void> {
+    const shown = inApp ? await web.location().catch(() => null) : null;
+    const key = shown?.match(/^\/p\/([^/?#]+)/)?.[1] ?? workspace?.bootstrap.projects[0]?.key;
+
+    openPage(key ? `/p/${key}/tests` : '/runners');
+  }
 
   function search(event: FormEvent): void {
     event.preventDefault();
@@ -96,10 +102,10 @@ function TopBar({ panel, onPanel }: { panel: boolean; onPanel: (shown: boolean) 
         {status.online ? t('online') : t('offline')}
       </Tag>
       {status.runner.enabled && status.runner.runsApi !== false && <Tag tone="blue" title={status.runner.name}>{t('runner')}</Tag>}
-      <Button variant={view.name === 'runners' ? 'default' : 'ghost'} icon="layers" onClick={() => go({ name: 'runners' })}>
+      <Button variant="ghost" icon="layers" onClick={() => openPage('/runners')}>
         {t('Runners')}
       </Button>
-      <Button variant={view.name === 'tests' ? 'default' : 'ghost'} icon="check" onClick={() => go({ name: 'tests' })}>
+      <Button variant="ghost" icon="check" onClick={() => void openTests()}>
         {t('Tests')}
       </Button>
       <Button variant={view.name === 'repos' ? 'default' : 'ghost'} icon="folder" onClick={() => go({ name: 'repos' })}>
@@ -130,10 +136,6 @@ function Center({ view, onStatus }: { view: View; onStatus: (status: ConnectionS
       return <NewThreadView issueKey={view.key} />;
     case 'repos':
       return <ReposView />;
-    case 'runners':
-      return <RunnersView />;
-    case 'tests':
-      return <TestsView project={view.project} />;
     case 'run':
       return <RunView runId={view.id} />;
     case 'settings':

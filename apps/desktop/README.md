@@ -260,19 +260,20 @@ The app is one of the team's **runners** ([`docs/runners.md`](../../docs/runners
 machine with the repositories that carries out agent runs and test suites, with this
 computer's processor, memory and disk. The same list and the same work as on the web:
 
-- **Runners** shows every runner you may see (`GET /api/runners`): this computer first and
-  marked, other people's computers, services such as the cloud runner; what each takes and
-  what it is carrying out now.
+- **Runners** in the bar opens the tracker's page of runners: every runner you may see,
+  with this computer marked, other people's computers, services such as the cloud runner;
+  what each takes and what it is carrying out now.
 - **Where** on a new thread: *This computer* (the default: the agent works here, with your
   own model sign-in), another runner that takes that kind of work for the project, or any
   that fits. Work sent elsewhere starts nothing here; the app follows the run (what the
   agent said, its proposals) and can decide what the web can decide: changes to the issue,
   and the push or pull request of a runner nobody sits at.
 - **My work** lists your runs wherever they are carried out, each with its runner's name.
-- **Tests** lists a project's test jobs and starts the suite: on this computer (the
-  default), on a runner by name, or on any that fits. A job is followed live (state, step,
-  the tail of its log) and can be cancelled; a finished one opens its page on the web,
-  where the results, recordings and traces are.
+- **Tests** in the bar opens the tracker's page of test jobs, for the project the tracker
+  shows or else the first one: it starts the suite on this computer (offered first while
+  this computer takes test jobs), on a runner by name, or on any that fits, follows a job
+  live and cancels it. The app had views of its own for these two until 0.3.0; the
+  tracker's pages do the same and more, so they are gone.
 
 ### Test suites on this computer
 
@@ -540,8 +541,6 @@ Actions. Its first run is its first test.
   accessibility interface does not count as a person's click for a link that asks for a
   new window), and the installed, signed app rather than a development build. On Windows
   nobody has seen any of it.
-- Where the tracker's own pages and the panel show the same thing (runners, tests), they
-  are still two lists.
 - What the core says in its own words (for example "Working tree ready…") is English in the
   Polish interface too.
 
