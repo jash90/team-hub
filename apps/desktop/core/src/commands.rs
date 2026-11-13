@@ -120,6 +120,13 @@ struct OpenPullRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct RecordPullRequest {
+    id: i64,
+    url: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Runs {
     #[serde(default)]
     mine: bool,
@@ -136,7 +143,7 @@ fn answer<T: Serialize>(value: CoreResult<T>) -> CoreResult<Value> {
 }
 
 /// Every command the interface may call.
-pub const COMMANDS: [&str; 36] = [
+pub const COMMANDS: [&str; 37] = [
     "status",
     "connect",
     "disconnect",
@@ -172,6 +179,7 @@ pub const COMMANDS: [&str; 36] = [
     "push",
     "pull_request_preview",
     "open_pull_request",
+    "record_pull_request",
     "runs",
 ];
 
@@ -316,6 +324,11 @@ async fn dispatch(desktop: &Desktop, command: &str, args: Value) -> CoreResult<V
             let OpenPullRequest { id, title, body } = arguments(command, args)?;
 
             desktop.run(move |core| answer(core.open_pull_request(id, &title, &body))).await
+        }
+        "record_pull_request" => {
+            let RecordPullRequest { id, url } = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.record_pull_request(id, &url))).await
         }
         "runs" => {
             let Runs { mine } = arguments(command, args)?;

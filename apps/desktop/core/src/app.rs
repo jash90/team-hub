@@ -687,7 +687,7 @@ impl Core {
             run_id: None,
             prompt: policy::first_prompt(new.kind, Some((&view.issue, project)), &key, &view.issue.row.summary, &new.instructions),
         };
-        let run = self.create_run(&key, new.kind, &seed.instructions, &model, repo.github_repo.as_deref());
+        let run = self.create_run(&key, new.kind, &seed.instructions, &model, &Self::repo_name(&repo));
         let thread = self.runtime().enqueue(&seed)?;
 
         match run {
@@ -703,9 +703,18 @@ impl Core {
         self.store.thread(thread.id)
     }
 
-    fn create_run(&self, key: &str, kind: ThreadKind, instructions: &str, model: &str, repo: Option<&str>) -> CoreResult<AgentRun> {
+    /// The repository a run is for, as "owner/name". A run always names one: without it the
+    /// server may carry out a `custom` run itself, and this one needs the code.
+    fn repo_name(repo: &RepoMapping) -> String {
+        let from_remote = || git::inspect(Path::new(&repo.path)).ok().and_then(|found| found.remote_url).and_then(|url| git::repo_of_remote(&url));
+        let from_folder = || format!("local/{}", Path::new(&repo.path).file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default());
+
+        repo.github_repo.clone().or_else(from_remote).unwrap_or_else(from_folder)
+    }
+
+    fn create_run(&self, key: &str, kind: ThreadKind, instructions: &str, model: &str, repo: &str) -> CoreResult<AgentRun> {
         let client = self.client()?;
-        let new = NewRun { kind: RunKind::of_thread(kind), instructions: instructions.to_string(), model: Some(model.to_string()), repo: repo.map(String::from), shared: false };
+        let new = NewRun { kind: RunKind::of_thread(kind), instructions: instructions.to_string(), model: Some(model.to_string()), repo: Some(repo.to_string()), shared: false };
         let run = self.seen(client.create_run(key, &new));
 
         if run.as_ref().is_err_and(CoreError::is_not_found) {
@@ -736,9 +745,9 @@ impl Core {
             self.store.set_run(thread_id, None)?;
 
             let instructions = text.unwrap_or("Resumed in the desktop app.");
-            let repo = self.store.repo(thread.repo_id).ok().and_then(|repo| repo.github_repo);
+            let repo = self.store.repo(thread.repo_id).map(|repo| Self::repo_name(&repo)).unwrap_or_else(|_| "local/unknown".to_string());
 
-            if let Ok(run) = self.create_run(&thread.issue_key, thread.kind, instructions, &thread.model, repo.as_deref()) {
+            if let Ok(run) = self.create_run(&thread.issue_key, thread.kind, instructions, &thread.model, &repo) {
                 lock(&self.runner).attach.insert(run.id, thread_id);
             }
         }
@@ -842,11 +851,23 @@ impl Core {
             self.store.decide_proposal(existing.id, ProposalState::Rejected, Some("Replaced by a newer proposal of the thread"), &Value::Null)?;
         }
 
-        let remote_id = match (kind.is_remote(), thread.run_id) {
-            (true, Some(run_id)) => self.client().and_then(|client| self.seen(client.add_run_proposal(run_id, kind.as_str(), &payload))).ok().map(|proposal| proposal.id),
+        let remote = match (kind.is_remote(), thread.run_id) {
+            (true, Some(run_id)) => match self.client().and_then(|client| self.seen(client.add_run_proposal(run_id, kind.as_str(), &payload))) {
+                Ok(proposal) => Some(proposal),
+                // The server checked the proposal against the project and refused it (an unknown
+                // status, say): the agent reads why and can correct it.
+                Err(CoreError::Api { status: 400 | 422, message, .. }) => return Err(CoreError::not_possible(message)),
+                Err(_) => None,
+            },
             _ => None,
         };
-        let proposal = self.store.add_proposal(thread.id, kind, &payload, remote_id)?;
+        let proposal = self.store.add_proposal(thread.id, kind, &payload, remote.as_ref().map(|proposal| proposal.id))?;
+
+        // A kind the project trusts is applied by the server at once.
+        if let Some(remote) = remote.filter(|remote| remote.state != RunProposalState::Pending) {
+            self.apply_run_detail(thread, &AgentRunDetail { run: self.client()?.run(remote.run_id)?.run, events: Vec::new(), proposals: vec![remote] })?;
+        }
+
         let what = match kind {
             ProposalKind::Comment => "a comment on the issue",
             ProposalKind::Transition => "a status change",
@@ -1145,6 +1166,23 @@ impl Core {
         Ok(result)
     }
 
+    /// Notes the pull request the person opened in the browser, so the thread and its run show it.
+    pub fn record_pull_request(&self, thread_id: i64, url: &str) -> CoreResult<Thread> {
+        let url = url.trim();
+
+        if !url.starts_with("https://") || url.contains(char::is_whitespace) {
+            return Err(CoreError::not_possible("The address of a pull request starts with https://"));
+        }
+
+        self.store.set_pull_request(thread_id, url)?;
+
+        let event = self.store.add_event(thread_id, EventKind::Status, &format!("Pull request: {url}"), &json!({ "url": url }), false)?;
+
+        self.emit(AppEvent::ThreadEvent { thread_id, event });
+        self.settle_local(thread_id, ProposalKind::PullRequest, ProposalState::Approved, &json!({ "url": url }))?;
+        self.store.thread(thread_id)
+    }
+
     // ---------- the runner: docs/agent-runs.md ----------
 
     fn identity(&self) -> CoreResult<RunnerIdentity> {
@@ -1283,11 +1321,19 @@ impl Core {
         Ok(())
     }
 
-    fn patch_of(thread: &Thread) -> RunPatch {
+    /// What the run should say. A thread that is done while its push or pull request still
+    /// waits for the person keeps the run `waiting`: a run that has ended takes no more
+    /// writes, and the branch and the pull request are reported when they exist.
+    fn patch_of(&self, thread: &Thread) -> RunPatch {
         let finished = matches!(thread.state, ThreadState::Done | ThreadState::Failed | ThreadState::Waiting | ThreadState::Stopped);
+        let decided_here = self.store.proposals(thread.id).unwrap_or_default().iter().any(|proposal| !proposal.kind.is_remote() && proposal.state == ProposalState::Pending);
+        let state = match thread.state {
+            ThreadState::Done if decided_here => Some(RunState::Waiting),
+            state => RunState::of_thread(state),
+        };
 
         RunPatch {
-            state: RunState::of_thread(thread.state),
+            state,
             summary: thread.summary.clone().filter(|_| finished),
             branch: thread.branch.clone(),
             pull_request_url: thread.pull_request_url.clone(),
@@ -1304,11 +1350,14 @@ impl Core {
         let (Some(run_id), Ok(client)) = (thread.run_id, self.client()) else { return false };
 
         for event in self.store.unmirrored_events(thread.id).unwrap_or_default() {
-            match self.seen(client.add_run_event(run_id, RunEventKind::of_thread(event.kind), &event.text, &event.data)) {
-                // What the person said here comes back in the run's events; it is not news then.
-                Ok(remote_id) if event.kind == EventKind::Answer => {
-                    let _ = self.store.set_answers_seen(thread.id, remote_id);
-                }
+            // Answers on a run come from people through the web's own call; what the person
+            // said to the thread here is told as a line of the runner.
+            let (kind, text) = match event.kind {
+                EventKind::Answer => (RunEventKind::Status, format!("Said in the desktop app: {}", hub_core::text::truncate(&event.text.replace('\n', " "), 400))),
+                kind => (RunEventKind::of_thread(kind), event.text.clone()),
+            };
+
+            match self.seen(client.add_run_event(run_id, kind, &text, &event.data)) {
                 Ok(_) => {}
                 Err(error) if error.is_offline() => return false,
                 // The server refused this one (the run is over, or it is not ours any more);
@@ -1321,7 +1370,7 @@ impl Core {
 
         let Ok(private) = self.store.thread_private(thread.id) else { return false };
         let sent: RunPatch = serde_json::from_value(private.run_sent).unwrap_or_default();
-        let now = Self::patch_of(thread);
+        let now = self.patch_of(thread);
         let patch = now.changed_since(&sent);
 
         if patch.is_empty() {
@@ -1353,7 +1402,19 @@ impl Core {
             let Ok(detail) = self.seen(client.run(run_id)) else { continue };
             let live = matches!(thread.state, ThreadState::Queued | ThreadState::Running | ThreadState::Waiting);
 
-            if live && (detail.run.cancel_requested || detail.run.state == RunState::Cancelled) {
+            let cancelled = detail.run.cancel_requested || detail.run.state == RunState::Cancelled;
+
+            if cancelled {
+                for proposal in self.store.proposals(thread.id).unwrap_or_default() {
+                    if proposal.state == ProposalState::Pending {
+                        let _ = self.store.decide_proposal(proposal.id, ProposalState::Rejected, Some("The run was cancelled"), &Value::Null);
+                    }
+                }
+
+                self.emit(AppEvent::ThreadChanged { thread_id: thread.id });
+            }
+
+            if live && cancelled {
                 to_stop.push(thread.id);
 
                 continue;

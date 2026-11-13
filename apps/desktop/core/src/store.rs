@@ -336,7 +336,7 @@ impl Store {
     pub fn threads_with_live_runs(&self) -> CoreResult<Vec<Thread>> {
         self.threads_where(
             "t.run_id IS NOT NULL AND (t.state IN ('queued', 'running', 'waiting')
-                 OR EXISTS (SELECT 1 FROM proposal p WHERE p.thread_id = t.id AND p.state = 'pending' AND p.remote_id IS NOT NULL))",
+                 OR EXISTS (SELECT 1 FROM proposal p WHERE p.thread_id = t.id AND p.state = 'pending'))",
             "t.id",
         )
     }
@@ -413,10 +413,16 @@ impl Store {
         self.update("UPDATE thread SET pull_request_url = ?2 WHERE id = ?1", params![id, url])
     }
 
-    /// The outcome of one turn; tokens, cost and turns add up over the thread's life.
+    /// The outcome of one turn. Turns add up. Tokens and cost are the session's running
+    /// totals as the agent reports them: a resumed session that carries its totals over
+    /// reports at least what is stored and replaces it; one that starts counting again is added.
     pub fn record_result(&self, id: i64, summary: &str, input_tokens: i64, output_tokens: i64, cost_usd: f64, turns: i64) -> CoreResult<()> {
         self.update(
-            "UPDATE thread SET summary = ?2, input_tokens = input_tokens + ?3, output_tokens = output_tokens + ?4, cost_usd = cost_usd + ?5, turns = turns + ?6
+            "UPDATE thread SET summary = ?2,
+                    input_tokens = CASE WHEN ?3 >= input_tokens THEN ?3 ELSE input_tokens + ?3 END,
+                    output_tokens = CASE WHEN ?4 >= output_tokens THEN ?4 ELSE output_tokens + ?4 END,
+                    cost_usd = CASE WHEN ?5 >= cost_usd THEN ?5 ELSE cost_usd + ?5 END,
+                    turns = turns + ?6
              WHERE id = ?1",
             params![id, summary, input_tokens, output_tokens, cost_usd, turns],
         )

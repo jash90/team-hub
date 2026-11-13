@@ -184,6 +184,10 @@ impl Inner {
             (None, Some(said)) => format!("{}\n\n{said}", private.first_prompt),
             (None, None) => private.first_prompt,
         };
+        let rules = match policy::repository_instructions(&worktree) {
+            Some(own) => format!("{}\n\n# The repository's own instructions (CLAUDE.md)\n\n{own}", policy::rules(thread.kind)),
+            None => policy::rules(thread.kind),
+        };
 
         Ok(StartThread {
             thread: thread.id,
@@ -192,7 +196,7 @@ impl Inner {
             model: thread.model.clone(),
             resume: thread.session_id.clone(),
             max_turns: self.config.max_turns,
-            rules: policy::rules(thread.kind),
+            rules,
             allowed_tools: policy::allowed_tools(thread.kind, &cwd, shell),
             denied_tools: denied,
             sandbox: sandboxed.then(|| SandboxPolicy { writable: access.writable, protected: access.protected, unreadable }),
@@ -207,6 +211,12 @@ impl Inner {
         let mut command = Command::new(&self.config.program);
 
         command.args(&self.config.arguments).envs(&self.config.env).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
+
+        // The agent and its shell inherit the helper's environment: the app's own token and
+        // the usual tokens of code hosts and clouds are not part of it.
+        for name in policy::WITHHELD_VARIABLES {
+            command.env_remove(name);
+        }
 
         #[cfg(unix)]
         command.process_group(0);

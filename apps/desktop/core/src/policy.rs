@@ -58,6 +58,38 @@ const PRIVATE_IN_HOME: [&str; 14] = [
     "Library/Keychains",
 ];
 
+/// Never passed on to the helper process, and so never to the agent or its shell.
+pub const WITHHELD_VARIABLES: [&str; 12] = [
+    "TEAM_HUB_TOKEN",
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "GH_ENTERPRISE_TOKEN",
+    "GITLAB_TOKEN",
+    "NPM_TOKEN",
+    "NODE_AUTH_TOKEN",
+    "CARGO_REGISTRY_TOKEN",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+];
+
+const MAX_INSTRUCTIONS: u64 = 40_000;
+
+/// The repository's `CLAUDE.md`, read by the app itself: the helper loads no settings from
+/// disk (a repository's settings can carry hooks), so its working rules are passed on as
+/// text. A link is not followed.
+pub fn repository_instructions(worktree: &Path) -> Option<String> {
+    let file = worktree.join("CLAUDE.md");
+    let meta = std::fs::symlink_metadata(&file).ok()?;
+
+    if !meta.is_file() || meta.len() > MAX_INSTRUCTIONS {
+        return None;
+    }
+
+    std::fs::read_to_string(file).ok().map(|text| text.trim().to_string()).filter(|text| !text.is_empty())
+}
+
 /// Whether this system can confine a thread's shell commands.
 pub fn sandbox_state() -> SandboxState {
     let on_path = |program: &str| {

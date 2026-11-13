@@ -128,6 +128,12 @@ enum ThreadCommand {
     Diff { id: i64 },
     /// Answer a thread's question or tell it more, and follow it.
     Say { id: i64, text: String },
+    /// Note the pull request opened for the thread's branch, so the thread and its run show it.
+    Pr {
+        id: i64,
+        #[arg(long)]
+        url: String,
+    },
     /// Remove the thread's working tree (the branch stays).
     Remove { id: i64 },
 }
@@ -439,6 +445,12 @@ async fn run(cli: Cli, desktop: &Desktop) -> CoreResult<ExitCode> {
                 desktop.run(move |core| core.say_to_thread(id, Some(&text))).await?;
 
                 return Ok(outcome(&follow(desktop, id).await?));
+            }
+            ThreadCommand::Pr { id, url } => {
+                let thread = desktop.run(move |core| core.record_pull_request(id, &url)).await?;
+
+                desktop.tick(true).await?;
+                println!("{}", line_of_thread(&thread));
             }
             ThreadCommand::Remove { id } => {
                 desktop.remove_worktree(id).await?;
