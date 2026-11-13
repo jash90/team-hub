@@ -20,6 +20,7 @@ import { Icon, type IconName } from '@/components/icon.tsx';
 import { IssueKey, IssueLine, canEdit } from '@/components/issue-bits.tsx';
 import { Button, Dialog, Empty, ErrorNote, Field, Picker, SettingsCard, Spinner, Tabs, Tag, attempt, copyText, toast, useBusy } from '@/components/ui.tsx';
 import { countOf, formatDateTime, t, timeAgo } from '@/i18n/index.ts';
+import { translateServer } from '@/i18n/server.ts';
 import type { WebModule } from '@/modules.ts';
 import { useProject, useRemote, useSession, useStored } from '@/session.tsx';
 
@@ -322,7 +323,7 @@ function CodeView() {
                   {repo.lastEventAt ? t('last event {when}', { when: timeAgo(repo.lastEventAt) }) : t('no webhook events yet')}
                   {repo.lastSyncedAt && ` · ${t('synced {when}', { when: timeAgo(repo.lastSyncedAt) })}`}
                 </span>
-                {repo.syncError && <span className="drift-note">{repo.syncError}</span>}
+                {repo.syncError && <span className="drift-note">{translateServer(repo.syncError)}</span>}
                 {data.tokenConfigured && canEdit(project) && (
                   <Button size="sm" icon="refresh" disabled={syncing !== null} onClick={() => void sync(repo.id)}>
                     {syncing === repo.id ? t('Syncing…') : t('Sync now')}
@@ -408,7 +409,7 @@ function ProjectSettings({ project }: { project: Project }) {
                 </td>
                 <td className="muted">
                   {repo.lastEventAt ? t('last event {when}', { when: timeAgo(repo.lastEventAt) }) : t('no webhook events yet')}
-                  {repo.syncError && <span className="drift-note"> {repo.syncError}</span>}
+                  {repo.syncError && <span className="drift-note"> {translateServer(repo.syncError)}</span>}
                 </td>
                 <td className="cell-actions">
                   <Button size="sm" variant="ghost" icon="trash" aria-label={t('Disconnect')} onClick={() => void attempt(() => api.del(`/api/m/github/repos/${repo.id}`)).then(() => code.reload())} />
@@ -568,8 +569,8 @@ function AdminSettings() {
                 </td>
                 <td className="muted">{delivery.repo}</td>
                 <td>
-                  {delivery.outcome}
-                  {delivery.detail && <span className="muted"> · {delivery.detail}</span>}
+                  {translateServer(delivery.outcome)}
+                  {delivery.detail && <span className="muted"> · {delivery.detail.split('; ').map(translateServer).join('; ')}</span>}
                 </td>
               </tr>
             ))}

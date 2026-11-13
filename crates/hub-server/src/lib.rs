@@ -30,6 +30,8 @@ pub fn modules() -> Vec<Arc<dyn Module>> {
     modules.push(Arc::new(hub_mod_confluence::ConfluenceModule));
     #[cfg(feature = "jira")]
     modules.push(Arc::new(hub_mod_jira::JiraModule));
+    #[cfg(feature = "timeline")]
+    modules.push(Arc::new(hub_mod_timeline::TimelineModule));
     #[cfg(feature = "reports")]
     modules.push(Arc::new(hub_mod_reports::ReportsModule));
     #[cfg(feature = "e2e")]

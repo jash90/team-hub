@@ -23,6 +23,7 @@ import { Icon } from '@/components/icon.tsx';
 import { PRIORITIES } from '@/components/issue-bits.tsx';
 import { Button, ErrorNote, Field, Picker, SettingsCard, Spinner, Tag, toast, useBusy } from '@/components/ui.tsx';
 import { countOf, formatDateTime, t, timeAgo } from '@/i18n/index.ts';
+import { translateServer } from '@/i18n/server.ts';
 import type { WebModule } from '@/modules.ts';
 import { Link } from '@/router.tsx';
 import { useLive, useRemote, useSession } from '@/session.tsx';
@@ -366,7 +367,7 @@ function Connection({ settings, onSaved }: { settings: JiraSettings; onSaved: (s
         <p className={result.ok ? 'jira-result jira-result-ok' : 'jira-result jira-result-bad'} role="status">
           <Icon name={result.ok ? 'check' : 'alert'} />
           <span>
-            {result.ok ? t('Connected.') : t(result.message)}
+            {result.ok ? t('Connected.') : translateServer(result.message)}
             {result.ok && result.deployment && ` ${result.deployment === 'cloud' ? t('This is Jira Cloud: REST v3, texts in ADF.') : t('This is Jira Server or Data Center: REST v2, texts in wiki markup.')}`}
             {result.ok && result.version && ` ${t('Version {version}.', { version: result.version })}`}
           </span>
@@ -634,7 +635,7 @@ function FromCsv({ blocked, onStarted }: { blocked: boolean; onStarted: (job: Ji
               <strong>{t('Rows that need a look')}</strong>
               <ul>
                 {preview.problems.map((problem) => (
-                  <li key={problem}>{problem}</li>
+                  <li key={problem}>{translateServer(problem)}</li>
                 ))}
               </ul>
             </div>
@@ -727,7 +728,7 @@ function Notes({ title, notes }: { title: string; notes: JiraNote[] }) {
             {notes.map((note) => (
               <tr key={`${note.key}:${note.reason}`}>
                 <td className="mono jira-note-key">{note.key}</td>
-                <td>{t(note.reason)}</td>
+                <td>{translateServer(note.reason)}</td>
               </tr>
             ))}
           </tbody>
@@ -773,7 +774,7 @@ function JobCard({ job, onClose }: { job: JiraJob; onClose: () => void }) {
         </p>
       </div>
 
-      {job.error && <ErrorNote message={t(job.error)} />}
+      {job.error && <ErrorNote message={translateServer(job.error)} />}
 
       <Facts
         items={[
@@ -814,7 +815,7 @@ function JobCard({ job, onClose }: { job: JiraJob; onClose: () => void }) {
               </strong>
               <ul>
                 {report.unmapped.map((line) => (
-                  <li key={line}>{line}</li>
+                  <li key={line}>{translateServer(line)}</li>
                 ))}
               </ul>
             </div>

@@ -50,6 +50,7 @@ const SCREENS: Record<string, Screens> = {
   wiki: () => import('../../modules/wiki/web/index.tsx'),
   confluence: () => import('../../modules/confluence/web/index.tsx'),
   jira: () => import('../../modules/jira/web/index.tsx'),
+  timeline: () => import('../../modules/timeline/web/index.tsx'),
   reports: () => import('../../modules/reports/web/index.tsx'),
   e2e: () => import('../../modules/e2e/web/index.tsx'),
   agents: () => import('../../modules/agents/web/index.tsx'),

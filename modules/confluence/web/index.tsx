@@ -9,6 +9,7 @@ import type { ConfluenceTestResult } from '@/bindings/ConfluenceTestResult.ts';
 import { Icon } from '@/components/icon.tsx';
 import { Button, ErrorNote, Field, Picker, SettingsCard, Spinner, Tag, attempt, toast, useBusy } from '@/components/ui.tsx';
 import { formatDateTime, t, timeAgo } from '@/i18n/index.ts';
+import { translateServer } from '@/i18n/server.ts';
 import type { WebModule } from '@/modules.ts';
 import { Link } from '@/router.tsx';
 import { useRemote } from '@/session.tsx';
@@ -40,7 +41,7 @@ function Report({ report }: { report: ConfluenceImportReport }) {
           <ul>
             {report.failed.map((failure, index) => (
               <li key={index}>
-                <strong>{failure.title || t('(no title)')}</strong>: {failure.reason}
+                <strong>{failure.title || t('(no title)')}</strong>: {translateServer(failure.reason)}
               </li>
             ))}
           </ul>
@@ -131,7 +132,7 @@ function Connection({ settings, onSaved }: { settings: ConfluenceSettings; onSav
           <div className={result.ok ? 'confluence-answer confluence-answer-ok' : 'confluence-answer confluence-answer-failed'} role="status">
             <Icon name={result.ok ? 'check' : 'alert'} />
             <span>
-              <strong>{result.ok ? t('It works.') : t('It does not work.')}</strong> {result.message}
+              <strong>{result.ok ? t('It works.') : t('It does not work.')}</strong> {translateServer(result.message)}
             </span>
           </div>
         )}

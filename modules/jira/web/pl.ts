@@ -190,14 +190,4 @@ export const polish: Record<string, string> = {
   'Past imports': 'Wcześniejsze importy',
   When: 'Kiedy',
   Report: 'Raport',
-
-  // What the server says about a job or an issue.
-  'Jira rejected the token': 'Jira odrzuciła token',
-  'Jira refused access; the token\'s account may not be allowed to see this': 'Jira odmówiła dostępu; konto, do którego należy token, może nie mieć do tego uprawnień',
-  'Jira has nothing at that address; check the address and the project key': 'Pod tym adresem Jira nic nie ma; sprawdź adres i klucz projektu',
-  'Edited here after it was imported; the newer version in Jira was not applied': 'Edytowane tutaj po imporcie; nowsza wersja z Jiry nie została zastosowana',
-  'An issue with this key already exists here and did not come from Jira': 'Zadanie o tym kluczu już tu istnieje i nie pochodzi z Jiry',
-  'The server stopped while this import was running. Run it again: what was already imported is kept.':
-    'Serwer zatrzymał się w trakcie tego importu. Uruchom go ponownie: to, co już zaimportowano, zostaje.',
-  'The import stopped unexpectedly; what it had imported is kept': 'Import zatrzymał się nieoczekiwanie; to, co zaimportował, zostaje',
 };

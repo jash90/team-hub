@@ -1,3 +1,6 @@
+import { translateServer } from './i18n/server.ts';
+
+/** A refusal from the server. `message` is in the language of the interface: the server's English is translated on arrival. */
 export class ApiError extends Error {
   status: number;
   code: string;
@@ -38,7 +41,10 @@ async function send<T>(method: string, path: string, body?: BodyInit, headers: R
   if (!response.ok) {
     const error = (data as ErrorBody | null)?.error;
 
-    throw new ApiError(response.status, error?.code ?? 'error', error?.message ?? (typeof data === 'string' && data ? data : response.statusText));
+    // The server's own messages are English; this is the one place they all come through.
+    const message = error?.message ? translateServer(error.message) : typeof data === 'string' && data ? data : response.statusText;
+
+    throw new ApiError(response.status, error?.code ?? 'error', message);
   }
 
   return data as T;

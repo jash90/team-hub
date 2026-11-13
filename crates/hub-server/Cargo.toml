@@ -12,11 +12,12 @@ path = "src/main.rs"
 # and the features of the modules it depends on. `cargo build --no-default-features` builds
 # the tracker alone; `--no-default-features --features github,wiki` picks modules.
 [features]
-default = ["github", "wiki", "confluence", "jira", "reports", "e2e", "agents"]
+default = ["github", "wiki", "confluence", "jira", "timeline", "reports", "e2e", "agents"]
 github = ["dep:hub-mod-github"]
 wiki = ["dep:hub-mod-wiki"]
 confluence = ["dep:hub-mod-confluence", "wiki"]
 jira = ["dep:hub-mod-jira"]
+timeline = ["dep:hub-mod-timeline"]
 reports = ["dep:hub-mod-reports"]
 e2e = ["dep:hub-mod-e2e"]
 agents = ["dep:hub-mod-agents"]
@@ -28,6 +29,7 @@ hub-mod-github = { path = "../../modules/github", optional = true }
 hub-mod-wiki = { path = "../../modules/wiki", optional = true }
 hub-mod-confluence = { path = "../../modules/confluence", optional = true }
 hub-mod-jira = { path = "../../modules/jira", optional = true }
+hub-mod-timeline = { path = "../../modules/timeline", optional = true }
 hub-mod-reports = { path = "../../modules/reports", optional = true }
 hub-mod-e2e = { path = "../../modules/e2e", optional = true }
 hub-mod-agents = { path = "../../modules/agents", optional = true }

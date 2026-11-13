@@ -16,6 +16,7 @@ import { IssueKey } from '@/components/issue-bits.tsx';
 import { Markdown } from '@/components/markdown.tsx';
 import { Avatar, Button, Dialog, ErrorNote, Field, Picker, Spinner, Tag, useBusy } from '@/components/ui.tsx';
 import { currentLanguage, formatDateTime, t, timeAgo } from '@/i18n/index.ts';
+import { translateServer } from '@/i18n/server.ts';
 import { Link } from '@/router.tsx';
 import { useRemote, useSession, type Remote } from '@/session.tsx';
 
@@ -133,8 +134,8 @@ function statusText(text: string): string {
     [/^Rejected: (.+)$/, (found) => t('Rejected: {what}', { what: what(found[1]) })],
     [/^Done in the runner's app: (.+)$/, (found) => t('Done in the desktop app: {what}', { what: what(found[1]) })],
     [/^Declined in the runner's app: (.+)$/, (found) => t('Declined in the desktop app: {what}', { what: what(found[1]) })],
-    [/^Could not apply (.+?): (.+)$/, (found) => t('Could not apply ({what}): {why}', { what: what(found[1]), why: found[2] })],
-    [/^A proposal was refused: (.+)$/, (found) => t('A proposal was refused: {why}', { why: found[1] })],
+    [/^Could not apply (.+?): (.+)$/, (found) => t('Could not apply ({what}): {why}', { what: what(found[1]), why: translateServer(found[2]) })],
+    [/^A proposal was refused: (.+)$/, (found) => t('A proposal was refused: {why}', { why: translateServer(found[1]) })],
     [/^Cancelled$/, () => t('Cancelled')],
     [/^Asked to stop$/, () => t('Asked to stop')],
     [/^The runner stopped answering; the run is queued again$/, () => t('The runner stopped answering; the run is queued again')],
@@ -149,7 +150,8 @@ function statusText(text: string): string {
     }
   }
 
-  return text;
+  // Whatever else the server writes on a run (and nothing a runner wrote itself).
+  return translateServer(text);
 }
 
 export function isFinished(state: AgentRunState): boolean {
@@ -411,7 +413,7 @@ function ProposalResult({ proposal }: { proposal: AgentProposal }) {
         {proposal.state === 'failed' && t('Could not be applied')}
         {proposal.decidedAt && ` · ${timeAgo(proposal.decidedAt)}`}
       </span>
-      {proposal.note && <span className={proposal.state === 'failed' ? 'agents-failure' : undefined}>{proposal.note}</span>}
+      {proposal.note && <span className={proposal.state === 'failed' ? 'agents-failure' : undefined}>{translateServer(proposal.note)}</span>}
       {commit && (
         <span>
           {t('Pushed at')} <code>{commit.slice(0, 12)}</code>
@@ -515,7 +517,7 @@ function Stream({ events, skip }: { events: AgentRunEvent[]; skip: string | null
         </div>,
       );
     } else if (event.kind === 'error') {
-      blocks.push(<ErrorNote key={event.id} message={event.text} />);
+      blocks.push(<ErrorNote key={event.id} message={translateServer(event.text)} />);
     } else if (event.kind === 'answer') {
       blocks.push(
         <div key={event.id} className="agents-answer">

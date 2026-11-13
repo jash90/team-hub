@@ -1280,6 +1280,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "hub-mod-timeline"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "http-body-util",
+ "hub-app",
+ "hub-core",
+ "rayon",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "ts-rs",
+]
+
+[[package]]
 name = "hub-mod-wiki"
 version = "0.1.0"
 dependencies = [
@@ -1315,6 +1333,7 @@ dependencies = [
  "hub-mod-github",
  "hub-mod-jira",
  "hub-mod-reports",
+ "hub-mod-timeline",
  "hub-mod-wiki",
  "rayon",
  "serde",

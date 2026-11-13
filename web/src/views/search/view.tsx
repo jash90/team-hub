@@ -8,6 +8,7 @@ import { Icon } from '../../components/icon.tsx';
 import { PRIORITIES } from '../../components/issue-bits.tsx';
 import { Button, Empty, ErrorNote, Menu, Spinner } from '../../components/ui.tsx';
 import { countOf, t } from '../../i18n/index.ts';
+import { translateServer } from '../../i18n/server.ts';
 import { navigate, setParam, usePath, useSearchParams } from '../../router.tsx';
 import { changesIssues, useRemote, useSession } from '../../session.tsx';
 import { BulkDialog, SaveFilterDialog } from './dialogs.tsx';
@@ -123,7 +124,7 @@ export function SearchView({ scoped }: { scoped?: boolean }) {
 
       <QueryBar advanced={advanced} setAdvanced={setAdvanced} text={text} setText={setText} error={error !== null} run={run} chips={chips} words={words} setWords={setWords} applyChips={applyChips} fields={fields} />
 
-      {error && <ErrorNote message={`${error.message} (${t('at character {position}', { position: error.position + 1 })})`} />}
+      {error && <ErrorNote message={`${translateServer(error.message)} (${t('at character {position}', { position: error.position + 1 })})`} />}
       {result.error && <ErrorNote message={result.error} />}
       {!result.data && !result.error && <Spinner />}
 

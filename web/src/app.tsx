@@ -7,6 +7,7 @@ import type { QuickHit } from './bindings/QuickHit.ts';
 import { Icon, type IconName } from './components/icon.tsx';
 import { Avatar, Button, Drawer, Empty, ErrorNote, Menu, Popover, Spinner, Toaster, attempt, toast } from './components/ui.tsx';
 import { currentLanguage, setLanguage, t, timeAgo } from './i18n/index.ts';
+import { translateServer } from './i18n/server.ts';
 import { whenIdle } from './lazy.tsx';
 import { loadModules, useModules, type NavEntry } from './modules.ts';
 import { Link, matchRoute, navigate, setParam, usePath, useSearchParams, type Params } from './router.tsx';
@@ -536,7 +537,7 @@ function Notifications() {
                   }
                 }}
               >
-                <span>{item.text}</span>
+                <span>{translateServer(item.text)}</span>
                 <span className="muted">{timeAgo(item.createdAt)}</span>
               </button>
             ))}
