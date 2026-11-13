@@ -14,12 +14,10 @@ COPY assets/ /srv/assets/
 # Fail the build, not the deploy, when the Caddyfile is wrong.
 RUN caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
-# Nothing here needs root: the port is above 1024 and nothing is written
-# except Caddy's own state, which goes to /tmp.
-ENV PORT=8080 \
-    XDG_CONFIG_HOME=/tmp/caddy/config \
-    XDG_DATA_HOME=/tmp/caddy/data
-USER nobody
+# The process runs as the image's own user, as the official image does. A
+# static file server needs no more than that; switching to another user was
+# left out because it could not be tried without a Docker daemon.
+ENV PORT=8080
 
 EXPOSE 8080
 
