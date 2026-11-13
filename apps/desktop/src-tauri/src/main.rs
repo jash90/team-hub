@@ -4,9 +4,12 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod environment;
+
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use hub_desktop_core::config::Paths;
+use hub_desktop_core::config::{self, Paths};
 use hub_desktop_core::model::AppEvent;
 use hub_desktop_core::secrets::OsKeychain;
 use hub_desktop_core::{commands, Desktop, OpenOptions};
@@ -14,6 +17,7 @@ use serde_json::Value;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_notification::NotificationExt;
 use tokio::sync::broadcast::error::RecvError;
 
@@ -87,7 +91,37 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// The helper's script among the files installed with the app (see `bundle.resources` in
+/// `tauri.conf.json`), when it is there.
+fn installed_script(app: &tauri::App) -> Option<PathBuf> {
+    let resources = app.path().resource_dir().ok()?;
+    // One folder at a time: on Windows the resource folder comes in the `\\?\` form, in which
+    // a `/` would be part of a name.
+    let script = environment::plain_path(&resources.join("sidecar").join("src").join("main.ts"));
+
+    script.is_file().then_some(script)
+}
+
+/// Whether `TEAM_HUB_SIDECAR` replaces the helper, read the way the core reads it.
+fn helper_is_replaced() -> bool {
+    std::env::var(config::SIDECAR_VARIABLE).is_ok_and(|line| !line.trim().is_empty())
+}
+
+/// Says so in a dialog when the Node of the settings is missing or cannot run the helper,
+/// instead of leaving it to the first thread to fail. Asked on a thread of its own, so the
+/// window does not wait for Node to answer.
+fn warn_about_node(app: AppHandle, node: String) {
+    std::thread::spawn(move || {
+        if let Some(problem) = environment::node_problem(&node) {
+            app.dialog().message(problem).title("team-hub: agent threads cannot start").kind(MessageDialogKind::Warning).show(|_| {});
+        }
+    });
+}
+
 fn main() {
+    // Before anything else runs: it changes this process's environment.
+    environment::adopt_shell_path();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
@@ -95,12 +129,30 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let paths = Paths::from_env()?;
+
+            paths.create()?;
+
+            let node = config::load_settings(&paths)?.node_command;
+            let script = installed_script(app);
+            let replaced = helper_is_replaced();
             // The core starts tasks when it opens, so it opens inside the runtime.
             let mut options = OpenOptions::new(paths, Arc::new(OsKeychain));
 
-            options.sidecar_script = app.path().resource_dir().ok().map(|resources| resources.join("sidecar/src/main.ts"));
+            // The installed script is run where it is. Left to itself the core would first
+            // copy the scripts into a folder beside them, and an installed app does not write
+            // into its own folder: on macOS that is the signed bundle, elsewhere it is often
+            // not the person's to write to.
+            if let (Some(script), false) = (&script, replaced) {
+                options.helper = Some((node.clone(), vec![script.to_string_lossy().into_owned()]));
+            }
+
+            options.sidecar_script = script;
 
             let desktop = tauri::async_runtime::block_on(async { Desktop::open(options) })?;
+
+            if !replaced {
+                warn_about_node(app.handle().clone(), node);
+            }
 
             forward_events(app.handle().clone(), &desktop);
             tray(app.handle())?;
