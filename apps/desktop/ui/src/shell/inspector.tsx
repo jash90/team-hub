@@ -58,7 +58,7 @@ export function ThreadItem({ thread, detail }: { thread: Thread; detail?: boolea
 type List = 'decide' | 'working' | 'threads';
 
 export function Inspector() {
-  const { go } = useSession();
+  const { go, view } = useSession();
   const work = useThreadWork();
   const [chosen, setChosen] = useState<List | null>(null);
   const [filter, setFilter] = useState('');
@@ -103,7 +103,8 @@ export function Inspector() {
                     {thread && <span className="desk-item-text">{thread.issueSummary}</span>}
                   </span>
                 </button>
-                <ProposalCard proposal={proposal} />
+                {/* The tracker's page lies above this interface, and would cover a dialog. */}
+                <ProposalCard proposal={proposal} onReview={view.name === 'web' ? () => go({ name: 'thread', id: proposal.threadId }) : undefined} />
               </section>
             );
           })}

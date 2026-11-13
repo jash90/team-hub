@@ -54,7 +54,8 @@ function ProposalBody({ proposal }: { proposal: Proposal }) {
   }
 }
 
-export function ProposalCard({ proposal, onDecided }: { proposal: Proposal; onDecided?: () => void }) {
+/** `onReview` replaces the dialog of a push or a pull request, where a dialog cannot be shown. */
+export function ProposalCard({ proposal, onDecided, onReview }: { proposal: Proposal; onDecided?: () => void; onReview?: () => void }) {
   const [busy, run] = useBusy();
   const [dialog, setDialog] = useState<'push' | 'pull_request' | null>(null);
   const pending = proposal.state === 'pending';
@@ -80,7 +81,7 @@ export function ProposalCard({ proposal, onDecided }: { proposal: Proposal; onDe
       {pending && (
         <div className="desk-proposal-actions">
           {outgoing ? (
-            <Button variant="primary" size="sm" icon="eye" onClick={() => setDialog(proposal.kind === 'push' ? 'push' : 'pull_request')}>
+            <Button variant="primary" size="sm" icon="eye" onClick={() => (onReview ? onReview() : setDialog(proposal.kind === 'push' ? 'push' : 'pull_request'))}>
               {proposal.kind === 'push' ? t('Review and push…') : t('Review and open…')}
             </Button>
           ) : (
