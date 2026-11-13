@@ -171,9 +171,8 @@ fn end(tx: &Tx, held: &Held, state: E2eJobState, error: Option<&str>) -> ApiResu
         (state.as_str(), error, &tx.now, held.job.id),
     )?;
 
-    // A job started by a scheduled task (`task_id`) reports back here once the schedule
-    // service exists: `hub_app::services::schedule::finish(tx, task_id, outcome)` with the
-    // run's summary and link when `state` is succeeded, and with `error` otherwise.
+    // A job that a scheduled task started is that task's attempt: the schedule hears how it ended.
+    crate::scheduled::ended(tx, &job_by_id(tx, held.job.id)?, state, error)?;
 
     announce(tx, held.project_id, held.job.id, state)
 }

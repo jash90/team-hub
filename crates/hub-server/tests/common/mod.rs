@@ -73,7 +73,15 @@ impl Client {
 
     /// A request with a raw body and extra headers, as another system would send it.
     pub async fn send_raw(&mut self, path: &str, headers: &[(&str, String)], body: Vec<u8>) -> (StatusCode, Value) {
-        let mut request = Request::builder().method(Method::POST).uri(path).header(header::CONTENT_TYPE, "application/json");
+        let mut request = Request::builder().method(Method::POST).uri(path);
+
+        if !headers.iter().any(|(name, _)| name.eq_ignore_ascii_case("content-type")) {
+            request = request.header(header::CONTENT_TYPE, "application/json");
+        }
+
+        if let Some(bearer) = &self.bearer {
+            request = request.header(header::AUTHORIZATION, format!("Bearer {bearer}"));
+        }
 
         for (name, value) in headers {
             request = request.header(*name, value);

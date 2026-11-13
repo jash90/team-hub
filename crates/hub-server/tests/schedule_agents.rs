@@ -98,7 +98,7 @@ async fn the_kind_comes_with_its_form() {
     assert_eq!(kind["module"], "agents");
     assert_eq!(
         fields,
-        [("query", "query"), ("limit", "number"), ("kind", "select"), ("instructions", "textarea"), ("repo", "text"), ("shared", "boolean")]
+        [("query", "query"), ("limit", "number"), ("kind", "select"), ("instructions", "textarea"), ("repo", "text"), ("shared", "boolean"), ("onRunner", "text")]
     );
     assert_eq!(kind["fields"][0]["required"], true);
     assert_eq!(kind["fields"][1]["default"], 5);

@@ -11,7 +11,8 @@ use axum::response::IntoResponse;
 use axum::Router;
 use hub_app::auth::ModuleScope;
 use hub_app::{ApiError, App, Module};
-use tower_http::compression::CompressionLayer;
+use tower_http::compression::predicate::{NotForContentType, Predicate};
+use tower_http::compression::{CompressionLayer, DefaultPredicate};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 
@@ -83,7 +84,8 @@ pub fn build_router(app: App) -> Router {
         .nest("/api", api.fallback(api::not_found))
         .nest("/hooks", hooks.fallback(api::not_found))
         .fallback_service(web)
-        .layer(CompressionLayer::new())
+        // A recording is compressed already, and a player or a download wants its length.
+        .layer(CompressionLayer::new().compress_when(DefaultPredicate::new().and(NotForContentType::const_new("video/"))))
         .layer(fixed_header("x-content-type-options", "nosniff"))
         .layer(fixed_header("x-frame-options", "DENY"))
         .layer(fixed_header("referrer-policy", "same-origin"))

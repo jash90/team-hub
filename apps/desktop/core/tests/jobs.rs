@@ -317,7 +317,8 @@ async fn the_output_reaches_the_log_while_the_suite_runs_and_a_cancel_ends_it_wi
 
     let done = hub.job(job);
 
-    assert_eq!((&done["state"], &done["error"]), (&json!("cancelled"), &json!("Cancelled.")));
+    assert_eq!(done["state"], "cancelled");
+    assert!(hub.job_log(job).iter().any(|line| line.starts_with("step ")));
     assert!(done["runId"].is_null());
     assert!(!group_alive(group), "the suite and the sleep it started are gone");
     assert!(!bench.data.path().join("jobs").join(job.to_string()).exists());
@@ -469,7 +470,9 @@ async fn a_shared_runner_checks_a_job_out_with_the_requesters_token_or_fails_wit
 
     assert!(runner.run_next(&mut stopped).await.unwrap());
     assert_eq!(hub.job(job)["state"], "succeeded", "{:#?}", hub.job_log(job));
-    assert_eq!((&hub.state().e2e.claims[0]["shared"], &hub.state().e2e.claims[0]["interactive"]), (&json!(true), &json!(false)));
+    let claim = hub.state().e2e.claims[0].clone();
+
+    assert_eq!((&claim["shared"], &claim["interactive"]), (&json!(true), &json!(false)));
     assert_eq!(holds(bench.data.path(), PERSON_GITHUB_TOKEN), Vec::<PathBuf>::new());
 
     // Another person's token cannot read the repository: their job fails, although the

@@ -95,6 +95,13 @@ pub fn kinds() -> Vec<TaskKind> {
                 kind: TaskFieldType::Boolean,
                 ..TaskField::default()
             },
+            TaskField {
+                name: "onRunner".to_string(),
+                label: "Runner".to_string(),
+                hint: Some("The id of the runner that carries it out, as the Runners page shows it. Leave empty for any runner that fits.".to_string()),
+                kind: TaskFieldType::Text,
+                ..TaskField::default()
+            },
         ],
     }]
 }

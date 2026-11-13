@@ -2707,6 +2707,11 @@ td > .picker-field {
   color: var(--ink);
 }
 
+.runner-id {
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .runner-dot {
   flex: none;
   width: 10px;

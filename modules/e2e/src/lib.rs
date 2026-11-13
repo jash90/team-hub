@@ -9,6 +9,7 @@ pub mod model;
 pub mod report;
 pub mod routes;
 pub mod runners;
+pub mod scheduled;
 mod schema;
 mod seed;
 pub mod session;
@@ -196,6 +197,14 @@ impl Module for E2eModule {
             })),
             _ => None,
         }
+    }
+
+    fn task_kinds(&self) -> Vec<hub_core::schedule::TaskKind> {
+        scheduled::kinds()
+    }
+
+    fn start_task(&self, app: &App, task: &hub_core::schedule::ScheduledTask, actor: &AuthUser) -> Option<ApiResult<hub_core::schedule::TaskStarted>> {
+        (task.kind == scheduled::JOB_KIND).then(|| scheduled::start(app, task, actor))
     }
 
     fn runners(&self, connection: &Connection, viewer: &AuthUser, now: chrono::DateTime<chrono::Utc>) -> ApiResult<Vec<hub_core::runners::Runner>> {

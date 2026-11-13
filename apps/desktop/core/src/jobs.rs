@@ -53,6 +53,8 @@ static ANSI: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\x1b\[[0-9;?]*[ -/]
 pub struct TestJob {
     pub id: i64,
     pub project_key: String,
+    #[serde(default)]
+    pub state: String,
     pub repo: String,
     #[serde(rename = "ref")]
     pub reference: String,
@@ -72,6 +74,19 @@ fn default_install() -> String {
 
 fn default_timeout() -> u64 {
     30
+}
+
+impl TestJob {
+    /// A person asked for the job to stop. A job that is held is only marked; the answer to
+    /// the runner's next write says so, by the mark or by the state it has then.
+    fn is_called_off(&self) -> bool {
+        self.cancel_requested || self.state == "cancelled"
+    }
+}
+
+/// A write to a job that has already ended is answered 409: it is over, whoever ended it.
+fn is_over(error: &CoreError) -> bool {
+    matches!(error, CoreError::Api { status: 409, .. })
 }
 
 /// `E2eSettings` with the values of the secrets, as the claim hands them out.
@@ -556,12 +571,11 @@ impl JobRunner {
         session.step = step;
 
         let (id, patch) = (session.id, JobPatch { state: starting.then_some("running"), step: Some(step), commit: None });
-        let job = self.api(move |client| client.patch_job(id, &patch)).await.map_err(|error| Failure::because(format!("The server could not be told about the job: {error}")))?;
-
-        if job.cancel_requested {
-            Err(Failure::Cancelled)
-        } else {
-            Ok(())
+        match self.api(move |client| client.patch_job(id, &patch)).await {
+            Ok(job) if job.is_called_off() => Err(Failure::Cancelled),
+            Ok(_) => Ok(()),
+            Err(error) if is_over(&error) => Err(Failure::Cancelled),
+            Err(error) => Err(Failure::because(format!("The server could not be told about the job: {error}"))),
         }
     }
 
@@ -573,8 +587,9 @@ impl JobRunner {
         let (id, lines) = (session.id, std::mem::take(&mut session.waiting));
         let kept = lines.clone();
 
-        // Lines the server did not take are tried again with the next ones.
-        if self.api(move |client| client.job_log(id, &lines)).await.is_err() {
+        // Lines the server could not take now are tried again with the next ones; a job
+        // that has ended takes none, and they are let go.
+        if self.api(move |client| client.job_log(id, &lines)).await.is_err_and(|error| !is_over(&error)) {
             session.waiting = kept;
         }
     }
@@ -583,7 +598,10 @@ impl JobRunner {
     async fn cancelled(&self, session: &Session) -> bool {
         let (id, patch) = (session.id, JobPatch { step: Some(session.step), ..Default::default() });
 
-        self.api(move |client| client.patch_job(id, &patch)).await.is_ok_and(|job| job.cancel_requested)
+        match self.api(move |client| client.patch_job(id, &patch)).await {
+            Ok(job) => job.is_called_off(),
+            Err(error) => is_over(&error),
+        }
     }
 
     async fn carry_out(
@@ -770,7 +788,17 @@ impl JobRunner {
             }
         }
 
-        let mut child = command.spawn().map_err(|error| Failure::because(format!("{program} could not be started: {error}")))?;
+        let mut child = command.spawn().map_err(|error| {
+            // The usual reason beside a missing program: the job's user cannot get to its folder.
+            let hint = match (&self.options.user, error.kind()) {
+                (JobUser::Other { name, .. }, std::io::ErrorKind::PermissionDenied) => {
+                    format!(". User {name} has to be able to pass through every folder above {}", self.options.folders.jobs.display())
+                }
+                _ => String::new(),
+            };
+
+            Failure::because(format!("{program} could not be started: {error}{hint}"))
+        })?;
         let group = child.id();
         let (lines, mut printed) = mpsc::unbounded_channel::<String>();
 

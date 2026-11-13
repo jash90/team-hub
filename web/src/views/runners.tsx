@@ -92,6 +92,9 @@ function RunnerCard({ runner, owner }: { runner: Runner; owner: string | null })
           {runner.interactive ? t('computer') : t('service')}
         </Tag>
         {runner.shared && <Tag tone="green" title={t('The team’s runner: it takes anyone’s work and carries it out with that person’s own keys (Settings → My keys).')}>{t('shared')}</Tag>}
+        <code className="runner-id" title={t('The runner’s id: what a scheduled task names to send its work to this runner.')}>
+          {runner.id}
+        </code>
         <span className="filter-spacer" />
         <span className="muted">
           {[owner, runner.version ? `v${runner.version}` : null, runner.online ? t('connected') : t('last heard from {when}', { when: timeAgo(runner.lastSeenAt) })].filter(Boolean).join(' · ')}

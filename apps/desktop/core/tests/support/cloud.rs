@@ -192,6 +192,14 @@ async fn patch_job(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPat
         return error(StatusCode::CONFLICT, "The job is finished");
     }
 
+    // A held job that was called off is only marked; it ends with its runner's next write.
+    if state.e2e.jobs[index]["cancelRequested"] == true {
+        state.e2e.jobs[index]["state"] = json!("cancelled");
+        state.e2e.jobs[index]["finishedAt"] = json!(NOW);
+
+        return Json(state.e2e.jobs[index].clone()).into_response();
+    }
+
     if !body.as_object().is_some_and(|fields| fields.keys().all(|name| ["state", "step", "commit", "error"].contains(&name.as_str()))) {
         return error(StatusCode::BAD_REQUEST, "A job takes state, step, commit and error");
     }
@@ -218,8 +226,10 @@ async fn patch_job(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPat
 async fn job_log(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i64>, Json(body): Json<Value>) -> Response {
     let mut state = guard!(state, headers);
 
-    if job_index(&state, id).is_none() {
-        return error(StatusCode::NOT_FOUND, "No such job");
+    let Some(index) = job_index(&state, id) else { return error(StatusCode::NOT_FOUND, "No such job") };
+
+    if matches!(state.e2e.jobs[index]["state"].as_str(), Some("succeeded" | "failed" | "cancelled")) {
+        return error(StatusCode::CONFLICT, "The job is finished");
     }
 
     let lines: Vec<String> =
@@ -289,8 +299,12 @@ async fn finish_job(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPa
     let mut state = guard!(state, headers);
     let Some(index) = job_index(&state, id) else { return error(StatusCode::NOT_FOUND, "No such job") };
     let job = &state.e2e.jobs[index];
-    // The contract does not say which call ends a job that was cancelled while it ran; here
-    // the runner's `finish` does, and the job reads as cancelled rather than failed.
+
+    // A job that has already ended is answered as it ended, so a runner may always finish.
+    if matches!(job["state"].as_str(), Some("succeeded" | "failed" | "cancelled")) {
+        return Json(job.clone()).into_response();
+    }
+
     let ended = match (job["cancelRequested"] == true, body["error"].as_str(), job["runId"].is_null()) {
         (true, _, _) => "cancelled",
         (false, None, false) => "succeeded",

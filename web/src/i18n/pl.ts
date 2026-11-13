@@ -407,6 +407,7 @@ export const pl: Record<string, string> = {
     'Moduł wyłączony tutaj zachowuje dane, ale jego nawigacja, panel w zadaniach i oznaczenia na kartach znikają z tego projektu. Inne projekty pozostają bez zmian.',
   'No modules are switched on for this instance.': 'W tej instancji nie włączono żadnych modułów.',
   Runners: 'Runnery',
+  'The runner’s id: what a scheduled task names to send its work to this runner.': 'Identyfikator runnera: podaje się go w czynności harmonogramu, żeby wysłać jej pracę na ten runner.',
   'My keys': 'Moje klucze',
   'A shared runner belongs to the team and has no keys of its own: it works on your agent runs and test jobs with yours, so your runs are billed to you and reach only what you can reach. The keys are stored encrypted, are never shown again, and leave the server only to a shared runner that has taken your work. The desktop app does not need them.':
     'Wspólny runner należy do zespołu i nie ma własnych kluczy: Twoje zadania agentów i testy wykonuje na Twoich kluczach, więc koszt idzie na Twoje konto, a runner sięga tylko tam, gdzie Ty masz dostęp. Klucze są przechowywane zaszyfrowane, nigdy nie są pokazywane ponownie i opuszczają serwer wyłącznie do wspólnego runnera, który podjął Twoją pracę. Aplikacja desktopowa ich nie potrzebuje.',
