@@ -111,6 +111,8 @@ export const web = {
   /** The page it shows now, as a path; null when it shows none. */
   location: async () => (await shell<string | null>('web_location')) ?? null,
   go: (step: 'back' | 'forward' | 'reload') => shell<null>('web_go', { step }),
+  /** The language and the theme chosen in the app's own bar apply to it too. */
+  set: (what: 'language' | 'theme', value: string) => shell<null>('web_set', { what, value }),
   /** Closes it and forgets its sign-in. */
   forget: () => shell<null>('web_forget'),
 };

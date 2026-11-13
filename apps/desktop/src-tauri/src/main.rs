@@ -465,6 +465,7 @@ fn main() {
             stage::web_open,
             stage::web_location,
             stage::web_go,
+            stage::web_set,
             stage::web_forget
         ])
         .run(context)

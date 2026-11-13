@@ -173,6 +173,7 @@ What joins the two:
   claims it, and it appears as a thread in the panel.
 - Back, forward and reload for the tracker are in the bar at the top; the button beside the
   name hides the panel when the tracker should have the whole window.
+- The language and the theme are chosen in the app's bar, and the tracker follows.
 
 The tracker **cannot call the app**. Tauri refuses a command that comes from a page which is
 not the app's own unless a capability names that page's address, and none does
@@ -491,6 +492,19 @@ each action, the Tauri configuration against the schema) on a machine that canno
 Actions. Its first run is its first test.
 
 ## What is not done
+
+- **The window with the tracker in it has run on Linux only**, on a virtual screen: the two
+  webviews side by side, signing in to the tracker and staying signed in after a restart,
+  opening an issue from the panel, resizing, hiding the panel, the language switch, and a
+  page of the server trying every command of the app and being refused each one. On macOS
+  and Windows the same code places the tracker with Tauri's own calls, which compile and
+  have not been run by anybody.
+- The app is connected twice: the core with an API token, and the tracker by signing in
+  with your password, once. The app does not make its own token from that sign-in yet.
+- The tracker needs the server: offline, the panel and the threads keep working and the
+  tracker shows the browser engine's own error page.
+- Where the tracker's own pages and the panel show the same thing (runs, runners, tests),
+  they are still two lists; a run's page in the tracker does not link to its thread here.
 
 - No installer was installed and tried by a person, on any system, and none is signed with a
   developer certificate. The release workflow has not run yet. Node and npm have to be

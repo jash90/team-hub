@@ -19,6 +19,7 @@
 }
 
 .desk-brand {
+  white-space: nowrap;
   border: 0;
   background: none;
   padding: 0 8px 0 0;
@@ -42,20 +43,6 @@
   flex: 1;
   min-height: 0;
   padding: var(--desk-gap);
-}
-
-/* The tracker: threads, and beside them the place the server's web interface is laid over. */
-.desk-columns-web {
-  grid-template-columns: var(--desk-left) minmax(0, 1fr);
-}
-
-.desk-columns-web.desk-columns-alone {
-  grid-template-columns: minmax(0, 1fr);
-  padding: 0;
-}
-
-.desk-columns-no-panel {
-  grid-template-columns: minmax(0, 1fr) var(--desk-right);
 }
 
 .desk-center-web {
@@ -799,4 +786,55 @@ h3.desk-pad {
 
 .desk-run-event.is-error {
   color: var(--red, #c0392b);
+}
+
+/* The tracker: threads, and beside them the place the server's web interface is laid over.
+   After the rules for narrow windows, and stronger than them: at any width the place for
+   the web interface is as tall as the window allows, and the page inside does the scrolling. */
+.desk-columns.desk-columns-web {
+  grid-template-columns: var(--desk-left) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-auto-rows: auto;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.desk-columns.desk-columns-web.desk-columns-alone {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+}
+
+.desk-columns-web > .desk-left {
+  grid-column: 1;
+  grid-row: 1;
+  position: static;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.desk-columns-web > .desk-center {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desk-columns-alone > .desk-center {
+  grid-column: 1;
+}
+
+/* The local views with the panel of threads hidden. */
+.desk-columns.desk-columns-no-panel {
+  grid-template-columns: minmax(0, 1fr) var(--desk-right);
+}
+
+@media (max-width: 1280px) {
+  .desk-columns.desk-columns-no-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desk-columns-no-panel > .desk-center,
+  .desk-columns-no-panel > .desk-right {
+    grid-column: 1;
+  }
 }

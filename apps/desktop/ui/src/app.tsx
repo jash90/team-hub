@@ -33,6 +33,7 @@ function ThemeToggle() {
 
     document.documentElement.dataset.theme = next;
     setTheme(next);
+    void web.set('theme', next).catch(() => undefined);
 
     try {
       window.localStorage.setItem('team-hub:theme', next);
@@ -104,7 +105,15 @@ function TopBar({ panel, onPanel }: { panel: boolean; onPanel: (shown: boolean) 
       <Button variant={view.name === 'repos' ? 'default' : 'ghost'} icon="folder" onClick={() => go({ name: 'repos' })}>
         {t('Repositories')}
       </Button>
-      <Button variant="ghost" icon="globe" onClick={() => setLanguage(currentLanguage() === 'pl' ? 'en' : 'pl')} aria-label={t('Language')} title={t('Language')}>
+      <Button variant="ghost" icon="globe" onClick={() => {
+          const next = currentLanguage() === 'pl' ? 'en' : 'pl';
+
+          // The tracker follows; told first, because the app's own interface reloads next.
+          void web
+            .set('language', next)
+            .catch(() => undefined)
+            .then(() => setLanguage(next));
+        }} aria-label={t('Language')} title={t('Language')}>
         {currentLanguage().toUpperCase()}
       </Button>
       <ThemeToggle />

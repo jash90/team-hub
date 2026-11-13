@@ -137,6 +137,8 @@ async fn web(app: &AppHandle, shell: &Shell, stage: &Stage) -> Result<Webview, S
 
 /// Shows the server's web interface over this part of the local interface, in the local
 /// interface's own units.
+// The four numbers are the command's arguments, as the interface sends them.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn web_show(
     app: AppHandle,
@@ -226,6 +228,32 @@ pub async fn web_go(app: AppHandle, webview: Webview, step: String) -> Result<()
     match app.get_webview(WEB) {
         Some(view) => view.eval(script).map_err(|error| error.to_string()),
         None => Ok(()),
+    }
+}
+
+/// The language and the theme are chosen once, in the app's own bar, and the web interface
+/// follows: it keeps both under these names in its page storage, and reads them when a page
+/// loads.
+#[tauri::command]
+pub async fn web_set(app: AppHandle, webview: Webview, stage: State<'_, Stage>, what: String, value: String) -> Result<(), String> {
+    local_only(&webview)?;
+
+    let key = match (what.as_str(), value.as_str()) {
+        ("language", "en" | "pl") => "team-hub:language",
+        ("theme", "light" | "dark") => "team-hub:theme",
+        _ => return Err("A language (en, pl) or a theme (light, dark).".to_string()),
+    };
+    let server = stage.server.lock().await.clone();
+    let view = app.get_webview(WEB);
+
+    match (server, view) {
+        // Only on a page of the server: the storage is that of the page it runs in.
+        (Some(server), Some(view)) if view.url().is_ok_and(|now| same_origin(&now, &server)) => view
+            .eval(format!(
+                "try {{ if (window.localStorage.getItem('{key}') !== '{value}') {{ window.localStorage.setItem('{key}', '{value}'); window.location.reload(); }} }} catch (error) {{}}"
+            ))
+            .map_err(|error| error.to_string()),
+        _ => Ok(()),
     }
 }
 
@@ -369,5 +397,36 @@ mod layout {
                 }
             });
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn url(text: &str) -> Url {
+        Url::parse(text).unwrap()
+    }
+
+    #[test]
+    fn a_page_is_the_servers_by_scheme_host_and_port() {
+        let server = url("https://hub.example.com");
+
+        assert!(same_origin(&url("https://hub.example.com/issue/WEB-1?x=1"), &server));
+        assert!(same_origin(&url("https://hub.example.com:443/"), &server));
+        assert!(!same_origin(&url("http://hub.example.com/"), &server));
+        assert!(!same_origin(&url("https://hub.example.com.evil.test/"), &server));
+        assert!(!same_origin(&url("https://hub.example.com:8443/"), &server));
+        assert!(!same_origin(&url("https://evil.test/https://hub.example.com/"), &server));
+    }
+
+    #[test]
+    fn the_introduction_is_for_the_servers_pages_and_says_which_runner_the_app_is() {
+        let script = introduction(&url("http://127.0.0.1:8080/"), "desktop-1\"; alert(1); \"", "0.1.1");
+
+        assert!(script.starts_with("if (window.location.origin === \"http://127.0.0.1:8080\")"));
+        // The runner's id is data: it cannot end the text it is written in.
+        assert!(script.contains(r#""runnerId":"desktop-1\"; alert(1); \"""#));
+        assert!(script.contains(r#""version":"0.1.1""#));
     }
 }
