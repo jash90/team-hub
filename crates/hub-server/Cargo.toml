@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 hub-core.workspace = true
 hub-app.workspace = true
+hub-mod-github = { path = "../../modules/github" }
 axum.workspace = true
 chrono.workspace = true
 rayon.workspace = true
@@ -24,5 +25,8 @@ futures-util = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }
 
 [dev-dependencies]
+hmac.workspace = true
+sha2.workspace = true
+hex.workspace = true
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"

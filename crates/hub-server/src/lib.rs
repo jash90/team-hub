@@ -16,7 +16,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 
 /// Every module compiled into this build, in the order they are loaded.
 pub fn modules() -> Vec<Arc<dyn Module>> {
-    Vec::new()
+    vec![Arc::new(hub_mod_github::GithubModule)]
 }
 
 /// Wraps a module's routes so that they do not exist while the module is switched off.

@@ -653,6 +653,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "hub-mod-agents"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "http-body-util",
+ "hub-app",
+ "hub-core",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "ts-rs",
+]
+
+[[package]]
+name = "hub-mod-confluence"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64",
+ "http-body-util",
+ "hub-app",
+ "hub-core",
+ "hub-mod-wiki",
+ "rayon",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "ts-rs",
+ "ureq",
+]
+
+[[package]]
 name = "hub-mod-github"
 version = "0.1.0"
 dependencies = [
@@ -676,18 +713,58 @@ dependencies = [
 ]
 
 [[package]]
+name = "hub-mod-reports"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "http-body-util",
+ "hub-app",
+ "hub-core",
+ "rayon",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "ts-rs",
+]
+
+[[package]]
+name = "hub-mod-wiki"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "http-body-util",
+ "hub-app",
+ "hub-core",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "ts-rs",
+]
+
+[[package]]
 name = "hub-server"
 version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
  "futures-util",
+ "hex",
+ "hmac",
  "http-body-util",
  "hub-app",
  "hub-core",
+ "hub-mod-github",
  "rayon",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "tokio-stream",
  "tower",

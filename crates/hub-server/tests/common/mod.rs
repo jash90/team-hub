@@ -71,6 +71,21 @@ impl Client {
         (status, value)
     }
 
+    /// A request with a raw body and extra headers, as another system would send it.
+    pub async fn send_raw(&mut self, path: &str, headers: &[(&str, String)], body: Vec<u8>) -> (StatusCode, Value) {
+        let mut request = Request::builder().method(Method::POST).uri(path).header(header::CONTENT_TYPE, "application/json");
+
+        for (name, value) in headers {
+            request = request.header(*name, value);
+        }
+
+        let response = self.router.clone().oneshot(request.body(Body::from(body)).expect("a valid request")).await.expect("the router answers");
+        let status = response.status();
+        let bytes = response.into_body().collect().await.expect("a readable body").to_bytes();
+
+        (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    }
+
     pub async fn get(&mut self, path: &str) -> Value {
         let (status, value) = self.send(Method::GET, path, None).await;
         assert_eq!(status, StatusCode::OK, "GET {path}: {value}");
