@@ -132,7 +132,7 @@ A runner authenticates with an API token and acts as that person.
 | `POST /runners/heartbeat` `{ runnerId, name, kinds, projects?, version }` | `{ ok: true }`; call every 30–60 s |
 | `POST /runs/claim` `{ runnerId, kinds, projects?, runId? }` | `AgentRunDetail` of the oldest matching queued run, now `claimed` by this runner; `null` when there is none. With `runId`, that run or nothing. A run is offered to the requester's own runners, or to anyone's when it is `shared`. |
 | `POST /issues/{key}/runs` `{ …, runnerId }` | `AgentRun` created already `claimed` by the caller's own runner (which must have sent a heartbeat), for a runner that starts its own work: no other runner can take it in between. |
-| `POST /runs/{id}/events` `{ kind, text, data? }` | `{ id }` — a `question` puts the run in `waiting` |
+| `POST /runs/{id}/events` `{ kind, text, data? }` | `{ id }` — a `question` puts the run in `waiting`. An `answer` is what the person said to the agent in the runner's own app, recorded as said by them; it answers no pending question (409 then: use `POST /runs/{id}/answer`). |
 | `POST /runs/{id}/proposals` `{ kind, payload }` | `AgentProposal` |
 | `PATCH /runs/{id}` `{ state?, summary?, branch?, pullRequestUrl?, model?, inputTokens?, outputTokens?, costUsd? }` | `AgentRun` — read `cancelRequested` from the answer and stop when it is set |
 | `GET /runs/{id}` | `AgentRunDetail` — where answers and decisions show up |

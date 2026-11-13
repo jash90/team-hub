@@ -1488,16 +1488,27 @@ impl Core {
         let mut posted = false;
 
         for event in self.store.unmirrored_events(thread.id).unwrap_or_default() {
-            // Answers on a run come from people through the web's own call; what the person
-            // said to the thread here is told as a line of the runner.
-            let (kind, text) = match event.kind {
-                EventKind::Answer => {
-                    (RunEventKind::Status, format!("Said in the desktop app: {}", hub_core::text::truncate(&event.text.replace('\n', " "), 400)))
-                }
-                kind => (RunEventKind::of_thread(kind), event.text.clone()),
-            };
+            // What the person said to the thread here goes to the run as said by them. It
+            // comes back among the run's answers, so it is marked as seen, or the thread would
+            // hear it a second time. An older server takes answers only through its own call
+            // for a pending question; there it is told as a line of the runner.
+            let mut outcome = self.seen(client.add_run_event(run_id, RunEventKind::of_thread(event.kind), &event.text, &event.data));
 
-            match self.seen(client.add_run_event(run_id, kind, &text, &event.data)) {
+            if event.kind == EventKind::Answer {
+                match &outcome {
+                    Ok(answer_id) => {
+                        let _ = self.store.set_answers_seen(thread.id, *answer_id);
+                    }
+                    Err(error) if error.is_bad_request() => {
+                        let line = format!("Said in the desktop app: {}", hub_core::text::truncate(&event.text.replace('\n', " "), 400));
+
+                        outcome = self.seen(client.add_run_event(run_id, RunEventKind::Status, &line, &event.data));
+                    }
+                    Err(_) => {}
+                }
+            }
+
+            match outcome {
                 Ok(_) => posted = true,
                 Err(error) if error.is_offline() => return false,
                 // The server refused this one (the run is over, or it is not ours any more);

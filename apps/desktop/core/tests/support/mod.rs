@@ -110,6 +110,8 @@ pub fn repo(label: &str) -> Repo {
 pub struct HubState {
     pub token: String,
     pub runs_api: bool,
+    /// An older server: runners cannot record what the person said.
+    pub refuses_runner_answers: bool,
     pub issues: BTreeMap<String, Issue>,
     pub project: Project,
     pub runs: Vec<Value>,
@@ -671,9 +673,17 @@ async fn add_run_event(State(state): Shared, headers: HeaderMap, UrlPath(id): Ur
 
     let kind = body["kind"].as_str().unwrap_or_default().to_string();
 
-    if kind == "answer" {
+    // Like the server: what the person said in the runner's app is theirs, but it answers no
+    // pending question. A server from before that took no answers from runners at all.
+    if kind == "answer" && state.refuses_runner_answers {
         return error(StatusCode::BAD_REQUEST, "Answers come from people, not from runners");
     }
+
+    if kind == "answer" && state.runs[index]["pendingQuestion"] == true {
+        return error(StatusCode::CONFLICT, "The run waits for an answer to its question; give it as the answer");
+    }
+
+    let actor = (kind == "answer").then_some(1);
 
     if kind == "question" {
         state.runs[index]["state"] = json!("waiting");
@@ -682,7 +692,7 @@ async fn add_run_event(State(state): Shared, headers: HeaderMap, UrlPath(id): Ur
         state.runs[index]["state"] = json!("running");
     }
 
-    let event = state.add_event(id, &kind, body["text"].as_str().unwrap_or_default(), body["data"].clone(), None);
+    let event = state.add_event(id, &kind, body["text"].as_str().unwrap_or_default(), body["data"].clone(), actor);
 
     Json(json!({ "id": event })).into_response()
 }
@@ -800,6 +810,7 @@ impl FakeHub {
         let state = Arc::new(Mutex::new(HubState {
             token: TOKEN.to_string(),
             runs_api: true,
+            refuses_runner_answers: false,
             issues: issues.into_iter().map(|issue| (issue.row.key.clone(), issue)).collect(),
             project: project(),
             runs: Vec::new(),

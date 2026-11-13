@@ -677,7 +677,11 @@ async fn a_run_goes_to_its_requesters_runner_and_a_shared_one_to_exactly_one_of_
             .0,
         StatusCode::FORBIDDEN
     );
-    assert_eq!(world.send(&world.token, Method::POST, &events, Some(json!({ "kind": "answer", "text": "No" }))).await.0, StatusCode::BAD_REQUEST);
+
+    // What the person tells the agent in the runner's app is recorded as said by them.
+    world.post(&events, json!({ "kind": "answer", "text": "Keep it small." })).await;
+    let said = world.run(private_id).await["events"].as_array().unwrap().last().cloned().unwrap();
+    assert_eq!((&said["kind"], &said["text"], &said["actorId"]), (&json!("answer"), &json!("Keep it small."), &json!(world.admin.id)));
 
     let event = world.post(&events, json!({ "kind": "tool", "text": "cargo test", "data": { "exitCode": 0 } })).await;
     assert!(event["id"].is_i64());
@@ -686,6 +690,9 @@ async fn a_run_goes_to_its_requesters_runner_and_a_shared_one_to_exactly_one_of_
     world.post(&events, json!({ "kind": "question", "text": "Should the fix cover Safari 17 too?" })).await;
     let asked = world.run(private_id).await;
     assert_eq!((&asked["run"]["state"], &asked["run"]["pendingQuestion"]), (&json!("waiting"), &json!(true)));
+
+    // A pending question is answered with the call that lets the run go on, not with an event.
+    assert_eq!(world.send(&world.token, Method::POST, &events, Some(json!({ "kind": "answer", "text": "Yes" }))).await.0, StatusCode::CONFLICT);
 
     let answered = world.post(&format!("/runs/{private_id}/answer"), json!({ "text": "Yes, both." })).await;
     let last = answered["events"].as_array().unwrap().last().unwrap();

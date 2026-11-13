@@ -42,6 +42,11 @@ impl CoreError {
         matches!(self, Self::Api { status: 404 | 405, .. })
     }
 
+    /// The server understood the request and will not take it in this form.
+    pub fn is_bad_request(&self) -> bool {
+        matches!(self, Self::Api { status: 400 | 422, .. })
+    }
+
     pub fn is_offline(&self) -> bool {
         matches!(self, Self::Offline(_))
     }

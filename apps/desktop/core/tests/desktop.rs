@@ -767,9 +767,29 @@ async fn a_finished_thread_can_be_told_more_in_the_same_session_and_gets_a_new_r
     assert_eq!(hub.run(second_run)["run"]["state"], "succeeded");
     assert_eq!(hub.run(second_run)["run"]["instructions"], "Also cover the empty password.");
     assert_eq!(texts(hub.run(second_run)["events"].as_array().unwrap(), "message"), vec!["Continuing. You said: Also cover the empty password."]);
-    assert_eq!(texts(hub.run(second_run)["events"].as_array().unwrap(), "status")[0], "Said in the desktop app: Also cover the empty password.");
-    assert!(texts(hub.run(second_run)["events"].as_array().unwrap(), "answer").is_empty());
+    // What was said here is on the run as said by the person, and is not heard a second time.
+    assert_eq!(texts(hub.run(second_run)["events"].as_array().unwrap(), "answer"), vec!["Also cover the empty password."]);
+    assert!(!texts(hub.run(second_run)["events"].as_array().unwrap(), "status").iter().any(|line| line.starts_with("Said in the desktop app")));
+    bench.desktop.tick(true).await.unwrap();
+    assert_eq!(bench.desktop.run(move |core| core.thread(id)).await.unwrap().thread.turns, 6, "the thread does not answer its own echo");
     assert_eq!(git(std::path::Path::new(&second.repo_path), &["rev-list", "--count", "origin/main..feature/WEB-1-login-form-validation"]), "1");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn on_a_server_that_takes_no_answers_from_runners_what_was_said_is_a_line_of_the_runner() {
+    let (bench, hub, _repo) = ready("follow-up-old-server").await;
+    hub.state().refuses_runner_answers = true;
+    let id = start(&bench, "WEB-1", ThreadKind::Analyse, "[fake:analyse]").await;
+    bench.until_state(id, ThreadState::Done).await;
+
+    bench.desktop.tick(true).await.unwrap();
+    bench.desktop.run(move |core| core.say_to_thread(id, Some("Also cover the empty password."))).await.unwrap();
+
+    let second = bench.until(id, "a second turn", |thread| thread.state == ThreadState::Done && thread.turns == 6).await;
+    let events = hub.run(second.run_id.unwrap())["events"].clone();
+
+    assert_eq!(texts(events.as_array().unwrap(), "status")[0], "Said in the desktop app: Also cover the empty password.");
+    assert!(texts(events.as_array().unwrap(), "answer").is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread")]

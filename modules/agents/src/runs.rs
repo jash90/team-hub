@@ -397,15 +397,24 @@ pub fn record(tx: &Tx, row: &RunRow, event: &NewEvent) -> ApiResult<Id> {
     let id = row.run.id;
     let text = event.text.trim();
 
-    if event.kind == AgentEventKind::Answer {
-        return Err(ApiError::bad_request("Answers come from people, not from runners"));
-    }
+    // What the person said to the agent in the runner's own app is theirs: the runner acts
+    // as that person. It answers no question; a pending one is answered through `answer`,
+    // which is also what lets the run go on. The server's own runs have no such person.
+    let said_by = if event.kind == AgentEventKind::Answer {
+        if row.run.pending_question {
+            return Err(ApiError::conflict("The run waits for an answer to its question; give it as the answer"));
+        }
+
+        Some(row.runner_user_id.ok_or_else(|| ApiError::bad_request("Answers come from people"))?)
+    } else {
+        None
+    };
 
     if text.is_empty() || text.len() > MAX_EVENT_TEXT {
         return Err(ApiError::bad_request("An event needs a text of reasonable length"));
     }
 
-    let event_id = add_event(tx, id, event.kind, text, Some(&event.data), None)?;
+    let event_id = add_event(tx, id, event.kind, text, Some(&event.data), said_by)?;
 
     if event.kind == AgentEventKind::Question {
         tx.execute("UPDATE agent_run SET question_pending = 1 WHERE id = ?1", [id])?;
