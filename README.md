@@ -148,5 +148,6 @@ Known gaps in what is there:
   imports, the GitHub API calls, and the server's own agent runs (a fake model). The
   desktop app has run on Linux only; its macOS and Windows sandboxes, the tray,
   notifications and installers are unverified.
-- Texts that come from the server (errors, notifications, agent status lines) are English
-  even when the interface is in Polish.
+- The server writes English. The interface puts its errors, notifications and status lines
+  into Polish as they arrive, from a dictionary the build checks against the server's
+  sources. The descriptions of agent tools, which the agent itself reads, stay English.

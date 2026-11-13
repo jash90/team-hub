@@ -14,7 +14,8 @@
 //
 //  - ROOTS, FIELD_ROOTS and CALL_ROOTS below name the places a text is handed to: the message
 //    of an `ApiError` or a `QueryError`, the text of a notification, the text of an agent
-//    run's event, and the lines of import reports and of the webhook log;
+//    run's event, the lines of import reports and of the webhook log, what a module says
+//    about itself;
 //  - a function that passes one of its own parameters on to such a place becomes such a place
 //    itself (`ApiError::bad_request(message)`, `notify_watchers(.., text, ..)`,
 //    `tell_requester(.., text)`, `requeue(.., why)`), also when the parameter is only a part
@@ -30,7 +31,8 @@
 // has, so that a typo in a key or an entry for a message long gone does not sit there unseen.
 //
 // Run by `npm run build`; on its own with `npm run check:messages`. `--list` prints every
-// text found and where, `--dynamic` the calls whose text is only known at run time.
+// text found and where, `--dynamic` the calls whose text is only known at run time, `--extra`
+// the dictionary entries for texts that reach the interface some other way.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -54,6 +56,8 @@ const FIELD_ROOTS = [
   { struct: 'JiraTestResult', field: 'message', what: 'connection test' },
   { struct: 'ConfluenceTestResult', field: 'message', what: 'connection test' },
   { struct: 'Ingested', field: 'outcome', assigned: true, what: 'webhook log' },
+  { struct: 'ModuleMeta', field: 'name', what: 'module' },
+  { struct: 'ModuleMeta', field: 'description', what: 'module' },
 ];
 /** And for texts handed to something that is not a function of ours: a list, an enum variant. */
 const CALL_ROOTS = [
@@ -93,7 +97,7 @@ function sources() {
     for (const name of readdirSync(join(root, group)).sort()) {
       const src = join(root, group, name, 'src');
 
-      if (statSync(src, { throwIfNoEntry: false })?.isDirectory()) {
+      if (statSync(join(root, group, name)).isDirectory() && statSync(src, { throwIfNoEntry: false })?.isDirectory()) {
         found.push(...rustFiles(src).map((path) => ({ path, unit: `${group}/${name}` })));
       }
     }
@@ -368,8 +372,9 @@ function addSink(sink) {
   const id = `${sink.fn.file.path}:${sink.fn.at}#${sink.arg}`;
   const known = sinks.get(id);
 
-  // Seen as a whole text after having been seen as a piece: the stricter reading wins.
-  if (!known || (known.part && !sink.part)) {
+  // Seen as a whole text after having been seen as a piece, or as something a person reads
+  // after having been seen as a diagnostic: the stricter reading wins.
+  if (!known || (known.part && !sink.part) || (known.exempt && !sink.exempt)) {
     sinks.set(id, sink);
     queue.push(sink);
   }
@@ -451,10 +456,16 @@ function normalise(template) {
   return template.replace(/\{\{|\}\}|\{[^{}]*\}/g, (found) => (found === '{{' ? '\u0001' : found === '}}' ? '\u0002' : '{}'));
 }
 
-/** Where the local `name` of `fn` was last given a value before `before`: the range of that expression. */
+/**
+ * Where the local `name` of `fn` was last given a value before `before`: the range of that
+ * expression, and for `let (a, name) = …` which element of the tuple it is.
+ */
 function local(file, fn, name, before) {
-  const lets = [...file.masked.slice(fn.body[0], before).matchAll(new RegExp(`\\blet\\s+(?:mut\\s+)?${name}\\b[^=;]*=(?!=)`, 'g'))];
-  const last = lets[lets.length - 1];
+  const body = file.masked.slice(fn.body[0], before);
+  const plain = [...body.matchAll(new RegExp(`\\blet\\s+(?:mut\\s+)?${name}\\b[^=;]*=(?!=)`, 'g'))].pop();
+  const names = (match) => match[1].split(',').map((part) => part.replace(/^\s*(mut\s+)?/, '').trim());
+  const tuple = [...body.matchAll(/\blet\s+\(([^()]*)\)[^=;]*=(?!=)/g)].filter((match) => names(match).includes(name)).pop();
+  const last = [plain, tuple].filter(Boolean).sort((a, b) => b.index - a.index)[0];
 
   if (!last) {
     return null;
@@ -467,17 +478,49 @@ function local(file, fn, name, before) {
     nest += file.masked[end] in OPEN ? 1 : ')]}'.includes(file.masked[end]) ? -1 : 0;
   }
 
-  return [start, end];
+  return { range: [start, end], pick: last === tuple ? names(tuple).indexOf(name) : null };
+}
+
+/**
+ * Whether `name`, read at `at`, was bound again after `from` by something still open there: a
+ * closure's parameter (`|error| … error`) or a pattern (`Some(note) => … note`). Such a name
+ * is not the `let` or the parameter further up.
+ */
+function rebound(file, name, from, at) {
+  const between = file.masked.slice(from, at);
+  const bindings = [
+    ...between.matchAll(new RegExp(`\\|[^|\\n]*\\b${name}\\b[^|\\n]*\\|`, 'g')),
+    ...between.matchAll(new RegExp(`\\(\\s*(?:ref\\s+|mut\\s+)?${name}\\s*\\)\\s*(?:=>|=(?!=)|if\\b)`, 'g')),
+  ];
+
+  return bindings.some((binding) => {
+    let nest = 0;
+
+    // Still open: nothing since has closed more brackets than it opened.
+    for (const char of between.slice(binding.index + binding[0].length)) {
+      nest += char in OPEN ? 1 : ')]}'.includes(char) ? -1 : 0;
+
+      if (nest < 0) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 }
 
 /** The variable `name`, read at `at`: a local is followed to its value, a parameter makes its function a sink. */
 function variable(file, name, at, sink, depth) {
   const fn = enclosing(file, at);
-  const range = fn && depth < 5 ? local(file, fn, name, at) : null;
+  const given = fn && depth < 5 ? local(file, fn, name, at) : null;
+
+  if (fn && rebound(file, name, given ? given.range[1] : fn.body[0], at)) {
+    return false;
+  }
 
   // A `let` of the same name shadows the parameter.
-  if (range) {
-    return follow(file, range[0], range[1], sink, depth + 1);
+  if (given) {
+    return follow(file, given.range[0], given.range[1], sink, depth + 1, given.pick);
   }
 
   const param = fn?.params.findIndex((candidate) => candidate.name === name) ?? -1;
@@ -496,7 +539,7 @@ function variable(file, name, at, sink, depth) {
  * recorded, a parameter of the function around it makes that function a sink. Returns
  * whether anything was learnt.
  */
-function follow(file, from, to, sink, depth = 0) {
+function follow(file, from, to, sink, depth = 0, pick = null) {
   [from, to] = bare(file.masked, from, to);
   const text = file.masked.slice(from, to);
 
@@ -504,14 +547,17 @@ function follow(file, from, to, sink, depth = 0) {
     return variable(file, text, from, sink, depth);
   }
 
-  return values(file, from, to, sink, depth);
+  return values(file, from, to, sink, depth, pick);
 }
 
 /** Wrappers a value is still a value inside of: `Some("…")`, `x.unwrap_or("…")`, `truncate(text, 140)`. */
 const TRANSPARENT = /(^|[^\w.!])(Some|Ok|Err|String::from|Cow::Borrowed|Cow::Owned|Box::new|truncate|hub_core::text::truncate)?$|\.\s*(unwrap_or|unwrap_or_else|map_or|map_or_else|then_some|then|or)$/;
 
-/** Literals, constants and `format!` templates in value position anywhere in the expression. */
-function values(file, from, to, sink, depth) {
+/**
+ * Literals, constants and `format!` templates in value position anywhere in the expression.
+ * With `pick`, the expression gives tuples and only that element of each is the value.
+ */
+function values(file, from, to, sink, depth, pick = null) {
   const { masked } = file;
   let learnt = false;
   let at = from;
@@ -561,7 +607,11 @@ function values(file, from, to, sink, depth) {
       const close = closing(masked, at);
 
       // `Some("a") => …` is a pattern to match, not a value.
-      for (const [start, end] of /^\s*(=>|\|(?!\|)|if\b)/.test(masked.slice(close + 1, to)) ? [] : split(masked, at + 1, close)) {
+      const pattern = /^\s*(=>|\|(?!\|)|if\b)/.test(masked.slice(close + 1, to));
+      const tuple = pick !== null && /[^\w.!]$|^$/.test(masked.slice(from, at).trimEnd());
+      const parts = split(masked, at + 1, close);
+
+      for (const [start, end] of pattern ? [] : tuple ? parts.slice(pick, pick + 1) : parts) {
         // `|| "…"` and `|x| "…"`: what a closure gives.
         const closure = /^\s*(move\s+)?\|[^|]*\|/.exec(masked.slice(start, end));
 
@@ -855,12 +905,14 @@ for (const message of checked) {
 
   // Where the server puts one of its own phrases into the template, the phrase must come out in Polish.
   for (const [hole, phrases] of message.fills) {
-    for (const phrase of phrases) {
+    const left = [...phrases].filter((phrase) => {
       const filled = sample(key, (index) => (index === hole ? phrase : null)).text;
 
-      if (Object.hasOwn(exact, phrase) && exact[phrase] !== phrase && translator.source(filled) === key && translator.translate(filled).includes(phrase)) {
-        problems.push({ message, why: `the Polish of "${key}" leaves "${phrase}" in English; write that part as {t:…}` });
-      }
+      return Object.hasOwn(exact, phrase) && exact[phrase] !== phrase && translator.source(filled) === key && translator.translate(filled).includes(phrase);
+    });
+
+    if (left.length > 0) {
+      problems.push({ message, why: `the Polish of "${key}" leaves in English what the server puts there (${left.slice(0, 3).map((phrase) => `"${phrase}"`).join(', ')}${left.length > 3 ? ', …' : ''}); write that part as {t:…}` });
     }
   }
 }
@@ -873,6 +925,14 @@ const strays = [
   ...Object.keys(exact).filter((key) => !written.has(key) && ![...written].some((literal) => literal.includes(key))),
   ...Object.keys(patterns).filter((key) => !shapes.has(normalise(key))),
 ];
+
+// And each pattern on its own: the Polish puts back exactly the parts its key names.
+const uneven = Object.entries(patterns).filter(([key, polish]) => {
+  const named = [...key.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
+  const put = new Set([...polish.matchAll(/\{(?:t:)?(\w+)\}/g)].map((match) => match[1]));
+
+  return new Set(named).size !== named.length || named.length !== put.size || named.some((name) => !put.has(name));
+});
 
 const staticCount = checked.filter((message) => !message.template).length;
 const kinds = {};
@@ -922,16 +982,19 @@ if (strays.length > 0) {
   console.error('\nThe key must be the server\'s text letter for letter; remove the entry if the server no longer says it.');
 }
 
-if (problems.length > 0 || strays.length > 0) {
+if (uneven.length > 0) {
+  console.error(`${problems.length + strays.length > 0 ? '\n' : ''}Patterns of ${relative(root, dictionaryPath)} whose Polish does not use each variable part of the key, once named (${uneven.length}):\n`);
+  console.error(uneven.map(([key, polish]) => `  ${JSON.stringify(key)}\n      ${JSON.stringify(polish)}`).join('\n'));
+}
+
+if (problems.length > 0 || strays.length > 0 || uneven.length > 0) {
   process.exit(1);
 }
 
-const count = (what, kind) => `${kinds[kind] ?? 0} ${what}`;
 const extra = Object.keys(exact).length + Object.keys(patterns).length - used.size;
 
 console.log(
   `server messages: ok (${checked.length} texts from ${files.length} Rust files have Polish: ${staticCount} exact, ${checked.length - staticCount} patterns; ` +
-    `${count('in errors', 'error')}, ${count('in notifications', 'notification')}, ${count('in run events', 'run event')}, ` +
-    `${(kinds['import report'] ?? 0) + (kinds['connection test'] ?? 0) + (kinds['webhook log'] ?? 0)} in import reports and logs; ` +
-    `${exempt.length} internal diagnostics exempt; ${extra} more entries match texts that reach the interface by other ways)`,
+    `by where they go: ${Object.entries(kinds).map(([kind, count]) => `${kind} ${count}`).join(', ')}; ` +
+    `${exempt.length} internal diagnostics exempt; ${extra} more entries are for texts that reach the interface some other way)`,
 );

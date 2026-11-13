@@ -12,6 +12,7 @@ import type { Project } from '@/bindings/Project.ts';
 import type { JsonValue } from '@/bindings/serde_json/JsonValue.ts';
 import { Button, ErrorNote, Field, Picker, SettingsCard, Spinner, Tag, attempt, copyText, useBusy } from '@/components/ui.tsx';
 import { t } from '@/i18n/index.ts';
+import { translateServer } from '@/i18n/server.ts';
 import { Link } from '@/router.tsx';
 import { useRemote, useSession } from '@/session.tsx';
 
@@ -111,7 +112,7 @@ export function AgentsSettings() {
   const tools = useRemote(() => api.get<AgentToolInfo[]>('/api/m/agents/tools'), []);
   const { boot } = useSession();
   const groups = [...new Set((tools.data ?? []).map((tool) => tool.module))];
-  const moduleName = (id: string) => (id === OWN_MODULE ? t('Issues and projects') : (boot.modules.find((module) => module.id === id)?.name ?? id));
+  const moduleName = (id: string) => (id === OWN_MODULE ? t('Issues and projects') : translateServer(boot.modules.find((module) => module.id === id)?.name ?? id));
 
   return (
     <>

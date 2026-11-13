@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run check:boundaries && tsc --noEmit && vite build",
+    "build": "npm run check:boundaries && npm run check:messages && tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "check:boundaries": "node scripts/check-boundaries.mjs"
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check:messages": "node scripts/check-server-messages.mjs"
   },
   "dependencies": {
     "react": "^19.3.1",

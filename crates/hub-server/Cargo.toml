@@ -56,7 +56,7 @@ required-features = ["github", "wiki"]
 
 [[test]]
 name = "all_modules"
-required-features = ["github", "wiki", "confluence", "reports", "agents"]
+required-features = ["github", "wiki", "confluence", "timeline", "reports", "agents"]
 
 [dev-dependencies]
 hmac.workspace = true

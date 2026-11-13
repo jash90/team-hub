@@ -20,6 +20,29 @@
  * This file imports nothing: the build's check loads it as it is.
  */
 export const exact: Record<string, string> = {
+  // ---- modules, as Settings lists them ----
+  'AI agents (MCP)': 'Agenci AI (MCP)',
+  'Lets coding agents such as Claude Code read and update issues through the Model Context Protocol.':
+    'Pozwala agentom programistycznym, takim jak Claude Code, czytać i zmieniać zadania przez Model Context Protocol.',
+  'Confluence import': 'Import z Confluence',
+  'Imports Confluence spaces into the knowledge base and keeps the copy up to date.': 'Importuje przestrzenie Confluence do bazy wiedzy i utrzymuje kopię na bieżąco.',
+  'Tests (e2e)': 'Testy (e2e)',
+  'Runs of the e2e testing framework, each test linked to the issues it verifies: results on issues, cards and a project page.':
+    'Przebiegi frameworka testów e2e, w których każdy test jest powiązany z zadaniami, które sprawdza: wyniki przy zadaniach, na kartach i na stronie projektu.',
+  GitHub: 'GitHub',
+  'Pull requests, branches and commits on issues; workflow rules driven by code; drift between status and code.':
+    'Pull requesty, gałęzie i commity przy zadaniach; reguły workflow sterowane kodem; rozbieżności między statusem a kodem.',
+  'Jira import': 'Import z Jiry',
+  'Brings projects over from Jira with their issue keys, history, comments, sprints and versions.': 'Przenosi projekty z Jiry razem z kluczami zadań, historią, komentarzami, sprintami i wersjami.',
+  Reports: 'Raporty',
+  'Burndown, velocity, cumulative flow, cycle time and workload, computed from the issue history.':
+    'Wykres spalania, prędkość, przepływ skumulowany, czas realizacji i obciążenie, liczone z historii zadań.',
+  Timeline: 'Oś czasu',
+  "A project's epics as bars on a time axis, from start date to due date, with sprints and releases behind them.":
+    'Epiki projektu jako paski na osi czasu, od daty rozpoczęcia do terminu, na tle sprintów i wydań.',
+  'Knowledge base': 'Baza wiedzy',
+  'Spaces of Markdown pages with history and search, linked to the issues they describe.': 'Przestrzenie stron w Markdownie, z historią i wyszukiwaniem, powiązane z zadaniami, które opisują.',
+
   // ---- things by name, as they appear in "{what} not found" and similar ----
   Project: 'projekt',
   project: 'projekt',
@@ -326,15 +349,15 @@ export const patterns: Record<string, string> = {
   '{key} moved to {status}: {summary}': 'Zmiana statusu {key} na „{status}”: {summary}',
   'the agent finished: {outcome}': 'agent zakończył pracę: {t:outcome}',
   'the agent asks: {question}': 'agent pyta: {question}',
-  'the agent proposes {what}': 'agent proponuje: {t:what}',
+  'the agent proposes {what}': 'propozycja agenta: {t:what}',
 
   // ---- issues, projects, sprints ----
   'Enable the "{module}" module first': 'Najpierw włącz moduł „{module}”',
   'The "{module}" module depends on this one': 'Od tego modułu zależy moduł „{module}”',
   '"{text}" is not a date (expected YYYY-MM-DD)': '„{text}” nie jest datą (oczekiwany format: RRRR-MM-DD)',
   'The summary is longer than {max} characters': 'Tytuł ma więcej niż {max} znaków',
-  '{issue} does not exist': 'Zadanie {issue} nie istnieje',
-  '{issue} is not in this project': 'Zadanie {issue} nie należy do tego projektu',
+  '{key} does not exist': 'Zadanie {key} nie istnieje',
+  '{key} is not in this project': 'Zadanie {key} nie należy do tego projektu',
   'The workflow does not allow moving from "{from}" to "{to}"': 'Workflow nie pozwala na przejście z „{from}” do „{to}”',
   'The key {projectKey} is already taken': 'Klucz {projectKey} jest już zajęty',
   '"{name}" is still running; complete it first': 'Sprint „{name}” jeszcze trwa; najpierw go zakończ',
@@ -377,6 +400,8 @@ export const patterns: Record<string, string> = {
   'Proposed {what}': 'Propozycja: {t:what}',
   'Approved: {what}': 'Zatwierdzono: {t:what}',
   'Rejected: {what}': 'Odrzucono: {t:what}',
+  "Done in the runner's app: {what}": 'Wykonano w aplikacji desktopowej: {t:what}',
+  "Declined in the runner's app: {what}": 'Odrzucono w aplikacji desktopowej: {t:what}',
   'Could not apply {what}: {why}': 'Nie udało się zastosować ({t:what}): {t:why}',
   'A proposal was refused: {why}': 'Propozycja nie została przyjęta: {t:why}',
 
@@ -417,7 +442,7 @@ export const patterns: Record<string, string> = {
     'Projekt o kluczu {projectKey} już tu istnieje. Wybierz „Importuj do istniejącego projektu”, żeby dodać do niego zadania z Jiry.',
   'An import of {projectKey} is still running; wait for it or cancel it': 'Import projektu {projectKey} jeszcze trwa; poczekaj na jego koniec albo go anuluj',
   'The file has no issues of {projectKey}': 'W pliku nie ma zadań projektu {projectKey}',
-  'Connected to {title} at {address}': 'Połączono z {title} ({address})',
+  'Connected to {title} at {address}': 'Połączono: {title} ({address})',
 
   // ---- Jira import: the report ----
   'Row {line} has no issue key': 'Wiersz {line} nie ma klucza zadania',

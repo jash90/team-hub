@@ -171,6 +171,12 @@ every page waits for: keep a heavy part that only one page needs behind `lazyVie
 - **Text**: English in place through `t('…', { name })`; `modules/<id>/web/pl.ts` holds the
   Polish for every phrase the module uses (the key is the English text). Dates and durations
   come from `@/i18n/index.ts` (`formatDate`, `formatDateTime`, `timeAgo`, `countOf`).
+- **What the server says**: a module's Rust half writes English too (error messages,
+  notification texts, status lines). The interface translates them on arrival with
+  `translateServer` from `@/i18n/server.ts`; errors from `api` already are. The Polish for
+  them is in `web/src/i18n/server.pl.ts`, and `npm run build` fails when a message in the
+  Rust sources has no entry there, or an entry has no message. Wrap in `translateServer`
+  only what the server wrote, never what a person did.
 - **Looks**: reuse the application's classes (`view`, `view-head`, `panel`, `panel-head`,
   `table`, `tag`, `form`, `inline-form`, `muted`, …) and its CSS variables (`--surface`,
   `--sunk`, `--ink`, `--muted`, `--line`, `--accent`, `--green`, `--amber`, `--red`,

@@ -6,6 +6,7 @@ import type { ModuleInfo } from '../bindings/ModuleInfo.ts';
 import type { User } from '../bindings/User.ts';
 import { Avatar, Button, Dialog, Field, Picker, SettingsCard, Tabs, Tag, attempt, copyText, toast, useBusy } from '../components/ui.tsx';
 import { currentLanguage, formatDate, setLanguage, t, timeAgo } from '../i18n/index.ts';
+import { translateServer } from '../i18n/server.ts';
 import { useModules } from '../modules.ts';
 import { navigate } from '../router.tsx';
 import { useRemote, useSession } from '../session.tsx';
@@ -312,7 +313,7 @@ function Modules() {
   async function toggle(module: ModuleInfo): Promise<void> {
     await attempt(() => api.put(`/api/admin/modules/${module.id}`, { enabled: !module.enabled }));
     await refresh();
-    toast(module.enabled ? t('{name} switched off', { name: module.name }) : t('{name} switched on', { name: module.name }));
+    toast(module.enabled ? t('{name} switched off', { name: translateServer(module.name) }) : t('{name} switched on', { name: translateServer(module.name) }));
   }
 
   return (
@@ -321,17 +322,17 @@ function Modules() {
         {boot.modules.map((module) => (
           <div key={module.id} className="module-row">
             <div>
-              <strong>{module.name}</strong> <span className="muted">v{module.version}</span>
+              <strong>{translateServer(module.name)}</strong> <span className="muted">v{module.version}</span>
               {module.dependsOn.length > 0 && (
                 <span className="muted">
                   {' '}
                   · {t('needs')} {module.dependsOn.join(', ')}
                 </span>
               )}
-              <p className="muted">{module.description}</p>
+              <p className="muted">{translateServer(module.description)}</p>
             </div>
             <label className="switch">
-              <input type="checkbox" checked={module.enabled} onChange={() => void toggle(module)} aria-label={module.name} />
+              <input type="checkbox" checked={module.enabled} onChange={() => void toggle(module)} aria-label={translateServer(module.name)} />
               <span />
             </label>
           </div>

@@ -27,7 +27,7 @@ async fn every_module_has_its_part_of_the_demo() {
     let enabled: Vec<String> =
         client.get("/api/bootstrap").await["modules"].as_array().unwrap().iter().map(|module| module["id"].as_str().unwrap().to_string()).collect();
 
-    for id in ["github", "wiki", "confluence", "reports", "agents"] {
+    for id in ["github", "wiki", "confluence", "timeline", "reports", "agents"] {
         assert!(enabled.iter().any(|module| module == id), "{id} is not loaded: {enabled:?}");
     }
 
@@ -41,6 +41,11 @@ async fn every_module_has_its_part_of_the_demo() {
     let burndown = client.get("/api/m/reports/projects/WEB/burndown").await;
     assert_eq!(burndown["sprint"]["name"], "WEB Sprint 2");
     assert!(burndown["days"].as_array().is_some_and(|days| days.len() >= 5));
+
+    let timeline = client.get("/api/m/timeline/projects/WEB").await;
+    assert_eq!(timeline["epics"].as_array().map(Vec::len), Some(3));
+    assert!(timeline["epics"][0]["start"].is_string() && timeline["epics"][0]["derived"]["start"] == false, "the demo's epics are planned");
+    assert_eq!(client.get("/api/issues/WEB-1").await["panels"]["timeline"]["due"], timeline["epics"][0]["due"]);
 
     let hits = client.get("/api/quick?q=blik").await;
     let kinds: Vec<&str> = hits.as_array().unwrap().iter().map(|hit| hit["kind"].as_str().unwrap()).collect();

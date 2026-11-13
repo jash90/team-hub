@@ -1,6 +1,7 @@
 import { api } from '../../api.ts';
 import type { Project } from '../../bindings/Project.ts';
 import { t } from '../../i18n/index.ts';
+import { translateServer } from '../../i18n/server.ts';
 import { useSession } from '../../session.tsx';
 import { Card, useChange } from './parts.tsx';
 
@@ -16,14 +17,14 @@ export function Modules({ project }: { project: Project }) {
         {modules.map((module) => (
           <div key={module.id} className="module-row">
             <div>
-              <strong>{module.name}</strong>
-              <p className="muted">{module.description}</p>
+              <strong>{translateServer(module.name)}</strong>
+              <p className="muted">{translateServer(module.description)}</p>
             </div>
             <label className="switch">
               <input
                 type="checkbox"
                 checked={!project.disabledModules.includes(module.id)}
-                aria-label={module.name}
+                aria-label={translateServer(module.name)}
                 onChange={(event) => void change(() => api.put(`/api/projects/${project.key}/modules/${module.id}`, { enabled: event.target.checked }))}
               />
               <span />
