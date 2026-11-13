@@ -5,6 +5,7 @@ pub mod notifications;
 pub mod overview;
 pub mod project_modules;
 pub mod projects;
+pub mod schedule;
 pub mod search;
 pub mod sprints;
 pub mod users;

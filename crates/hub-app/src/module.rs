@@ -4,6 +4,7 @@
 use axum::Router;
 use chrono::{DateTime, Utc};
 use hub_core::query::{Clause, QueryFieldInfo};
+use hub_core::schedule::{ScheduledTask, TaskKind, TaskStarted};
 use hub_core::{IssueRow, QuickHit};
 use rusqlite::types::Value;
 use rusqlite::Connection;
@@ -104,6 +105,22 @@ pub trait Module: Send + Sync + 'static {
 
     /// Runs one of this module's tools as `user`; none when the tool is not the module's.
     fn call_tool(&self, _app: &App, _user: &AuthUser, _name: &str, _arguments: &serde_json::Value) -> Option<ApiResult<serde_json::Value>> {
+        None
+    }
+
+    /// What this module can run on a schedule (`docs/schedule.md`). The id of a kind is
+    /// "<module id>.<name>", and its `module` the module's id; anything else is left out.
+    fn task_kinds(&self) -> Vec<TaskKind> {
+        Vec::new()
+    }
+
+    /// Starts a task of one of this module's kinds; none when the kind is not the module's.
+    /// `actor` is the person the task runs as, acting through this module, so the usual
+    /// access checks apply. Called outside any transaction, and never while the module is
+    /// off for the instance or for the task's project. Starting is quick: work that takes
+    /// long is handed on, the answer is `TaskStarted::Running`, and the module reports the
+    /// end with `services::schedule::finish`.
+    fn start_task(&self, _app: &App, _task: &ScheduledTask, _actor: &AuthUser) -> Option<ApiResult<TaskStarted>> {
         None
     }
 

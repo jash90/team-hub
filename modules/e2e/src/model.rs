@@ -304,39 +304,47 @@ pub fn count_tests(tests: &[E2eTest]) -> E2eCounts {
     }
 }
 
+const RESULT_COLUMNS: &str = "e.id, e.test_id, t.title, t.file, coalesce(e.line, t.line), e.variant, e.status, e.duration_ms, e.attempts, e.message, e.error_code,
+    e.agent_steps, e.model_calls, e.model_tokens, e.cost_usd, e.videos, e.screenshots, e.session IS NOT NULL";
+
+fn map_result(row: &Row) -> rusqlite::Result<E2eRunResult> {
+    let status: String = row.get(6)?;
+
+    Ok(E2eRunResult {
+        id: row.get(0)?,
+        test_id: row.get(1)?,
+        title: row.get(2)?,
+        file: row.get(3)?,
+        line: row.get(4)?,
+        variant: row.get(5)?,
+        status: E2eStatus::parse(&status).unwrap_or(E2eStatus::Skipped),
+        duration_ms: row.get(7)?,
+        attempts: row.get(8)?,
+        message: row.get(9)?,
+        error_code: row.get(10)?,
+        agent_steps: row.get(11)?,
+        model_calls: row.get(12)?,
+        model_tokens: row.get(13)?,
+        cost_usd: row.get(14)?,
+        videos: row.get(15)?,
+        screenshots: row.get(16)?,
+        has_session: row.get(17)?,
+        issues: Vec::new(),
+    })
+}
+
 /// The tests of one run, failures first.
 pub fn run_results(connection: &Connection, viewer: &AuthUser, run_id: Id) -> ApiResult<Vec<E2eRunResult>> {
     let tests = "SELECT test_id FROM e2e_result WHERE run_id = ?";
     let issues = test_issues(connection, viewer, tests, vec![Value::Integer(run_id)])?;
     let mut results = query_all(
         connection,
-        "SELECT e.id, e.test_id, t.title, t.file, coalesce(e.line, t.line), e.variant, e.status, e.duration_ms, e.attempts, e.message, e.error_code,
-                e.agent_steps, e.model_calls, e.model_tokens, e.cost_usd
-         FROM e2e_result e JOIN e2e_test t ON t.id = e.test_id WHERE e.run_id = ?1
-         ORDER BY CASE e.status WHEN 'failed' THEN 0 WHEN 'flaky' THEN 1 WHEN 'passed' THEN 2 ELSE 3 END, t.file, t.title, e.variant",
+        &format!(
+            "SELECT {RESULT_COLUMNS} FROM e2e_result e JOIN e2e_test t ON t.id = e.test_id WHERE e.run_id = ?1
+             ORDER BY CASE e.status WHEN 'failed' THEN 0 WHEN 'flaky' THEN 1 WHEN 'passed' THEN 2 ELSE 3 END, t.file, t.title, e.variant"
+        ),
         [run_id],
-        |row| {
-            let status: String = row.get(6)?;
-
-            Ok(E2eRunResult {
-                id: row.get(0)?,
-                test_id: row.get(1)?,
-                title: row.get(2)?,
-                file: row.get(3)?,
-                line: row.get(4)?,
-                variant: row.get(5)?,
-                status: E2eStatus::parse(&status).unwrap_or(E2eStatus::Skipped),
-                duration_ms: row.get(7)?,
-                attempts: row.get(8)?,
-                message: row.get(9)?,
-                error_code: row.get(10)?,
-                agent_steps: row.get(11)?,
-                model_calls: row.get(12)?,
-                model_tokens: row.get(13)?,
-                cost_usd: row.get(14)?,
-                issues: Vec::new(),
-            })
-        },
+        map_result,
     )?;
 
     for result in &mut results {
@@ -344,6 +352,17 @@ pub fn run_results(connection: &Connection, viewer: &AuthUser, run_id: Id) -> Ap
     }
 
     Ok(results)
+}
+
+/// One result of a run, with the issues its test verifies.
+pub fn run_result(connection: &Connection, viewer: &AuthUser, result_id: Id) -> ApiResult<Option<E2eRunResult>> {
+    let found =
+        query_one(connection, &format!("SELECT {RESULT_COLUMNS} FROM e2e_result e JOIN e2e_test t ON t.id = e.test_id WHERE e.id = ?1"), [result_id], map_result)?;
+    let Some(mut result) = found else { return Ok(None) };
+
+    result.issues = test_issues(connection, viewer, "?", vec![Value::Integer(result.test_id)])?.remove(&result.test_id).unwrap_or_default();
+
+    Ok(Some(result))
 }
 
 /// The tests that verify the issues selected by `condition` (on the issue aliased `i`), each

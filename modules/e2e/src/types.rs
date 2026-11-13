@@ -1,5 +1,7 @@
 //! The shapes this module sends to the web interface and to agents.
 
+use std::collections::BTreeMap;
+
 use hub_core::Id;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -251,6 +253,11 @@ pub struct E2eRunResult {
     pub model_calls: i64,
     pub model_tokens: i64,
     pub cost_usd: Option<f64>,
+    /// Recordings and screenshots the report names for this result.
+    pub videos: i64,
+    pub screenshots: i64,
+    /// The report told the steps of this result, so it has a session to open.
+    pub has_session: bool,
     pub issues: Vec<E2eIssueRef>,
 }
 
@@ -259,6 +266,8 @@ pub struct E2eRunResult {
 #[ts(export)]
 pub struct E2eRunDetail {
     pub run: E2eRun,
+    /// The job that produced the run, when one did.
+    pub job_id: Option<Id>,
     /// Failures first, then flaky, passed and skipped tests.
     pub results: Vec<E2eRunResult>,
 }
@@ -341,4 +350,321 @@ pub struct E2eIngestResult {
     pub linked_issues: Vec<String>,
     /// The run's page in team-hub.
     pub url: String,
+}
+
+// ---------- test jobs ----------
+
+/// Which attempts are recorded as video. The names are the framework's `--video` modes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "kebab-case")]
+#[ts(export)]
+pub enum E2eVideoMode {
+    On,
+    RetainOnFailure,
+    OnFirstRetry,
+    Off,
+}
+
+impl E2eVideoMode {
+    pub const ALL: [E2eVideoMode; 4] = [Self::On, Self::RetainOnFailure, Self::OnFirstRetry, Self::Off];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::On => "on",
+            Self::RetainOnFailure => "retain-on-failure",
+            Self::OnFirstRetry => "on-first-retry",
+            Self::Off => "off",
+        }
+    }
+
+    pub fn parse(text: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|mode| mode.as_str() == text)
+    }
+}
+
+/// Which tests keep a trace page (`trace.md`). The names are the framework's `--trace` modes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "kebab-case")]
+#[ts(export)]
+pub enum E2eTraceMode {
+    On,
+    RetainOnFailure,
+    Off,
+}
+
+impl E2eTraceMode {
+    pub const ALL: [E2eTraceMode; 3] = [Self::On, Self::RetainOnFailure, Self::Off];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::On => "on",
+            Self::RetainOnFailure => "retain-on-failure",
+            Self::Off => "off",
+        }
+    }
+
+    pub fn parse(text: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|mode| mode.as_str() == text)
+    }
+}
+
+/// How a project's suite is run by a runner.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct E2eSettings {
+    /// `owner/name`; none: no jobs for this project.
+    pub repo: Option<String>,
+    /// The branch, tag or commit a job runs unless it names another.
+    #[serde(rename = "ref")]
+    pub git_ref: String,
+    /// Where the suite's `package.json` is, from the repository root; empty for the root.
+    pub directory: String,
+    pub install_command: String,
+    /// Extra arguments for `e2e run`.
+    pub run_args: String,
+    pub video: E2eVideoMode,
+    pub trace: E2eTraceMode,
+    /// Plain variables for the suite.
+    pub env: BTreeMap<String, String>,
+    /// Names of the stored secrets; their values leave the server only for a runner that claims a job.
+    pub secret_names: Vec<String>,
+    pub timeout_minutes: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum E2eJobState {
+    Queued,
+    Claimed,
+    Running,
+    /// The suite ran and its report arrived; its tests may have failed.
+    Succeeded,
+    /// The suite could not be run: clone, install, no report, timeout, a runner that went quiet.
+    Failed,
+    Cancelled,
+}
+
+impl E2eJobState {
+    pub const ALL: [E2eJobState; 6] = [Self::Queued, Self::Claimed, Self::Running, Self::Succeeded, Self::Failed, Self::Cancelled];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Queued => "queued",
+            Self::Claimed => "claimed",
+            Self::Running => "running",
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn parse(text: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|state| state.as_str() == text)
+    }
+
+    /// Nothing more happens to the job.
+    pub fn ended(self) -> bool {
+        matches!(self, Self::Succeeded | Self::Failed | Self::Cancelled)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct E2eJob {
+    pub id: Id,
+    pub project_key: String,
+    pub state: E2eJobState,
+    pub repo: String,
+    #[serde(rename = "ref")]
+    pub git_ref: String,
+    /// The commit the runner checked out, once it has said.
+    pub commit: Option<String>,
+    /// Test files or a `--grep` pattern, as typed.
+    pub filter: Option<String>,
+    pub video: String,
+    pub trace: String,
+    pub requested_by: Id,
+    pub runner_name: Option<String>,
+    /// The stored run, once the report has arrived.
+    pub run_id: Option<Id>,
+    pub error: Option<String>,
+    pub cancel_requested: bool,
+    /// What the runner is doing: "cloning", "installing", "running", "uploading".
+    pub step: Option<String>,
+    pub created_at: String,
+    pub started_at: Option<String>,
+    pub finished_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct E2eLogLine {
+    pub seq: i64,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct E2eJobDetail {
+    pub job: E2eJob,
+    /// The lines after `after`; every line still kept when the request names none.
+    pub log: Vec<E2eLogLine>,
+    /// Earlier lines of the job were dropped: only the newest are kept.
+    pub log_truncated: bool,
+}
+
+// ---------- the session of one test result ----------
+
+/// An error as the report tells it: the code, the message, and what an assertion expected and saw.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export)]
+pub struct E2eSessionError {
+    pub code: Option<String>,
+    pub message: String,
+    pub locator: Option<String>,
+    pub expected: Option<String>,
+    pub observed: Option<String>,
+    pub file: Option<String>,
+    pub line: Option<i64>,
+}
+
+/// Something a step did or saw: an engine action, a navigation of the app, a poll of an assertion.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export)]
+pub struct E2eSessionEvent {
+    /// `engine` (an action), `navigation` (where the app went) or `poll` (what an assertion read).
+    pub kind: String,
+    pub detail: String,
+    pub failed: bool,
+    pub duration_ms: i64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export)]
+pub struct E2eSessionStep {
+    pub index: i64,
+    /// `locator.tap`, `expect.toHaveText`, `agent.act`, …
+    pub api: String,
+    pub label: String,
+    /// `passed`, `failed` or `cancelled`.
+    pub status: String,
+    pub started_at: Option<String>,
+    pub duration_ms: i64,
+    pub file: Option<String>,
+    pub line: Option<i64>,
+    /// The hook the step ran in (`beforeEach`, `afterEach`); none for a step of the test body.
+    pub phase: Option<String>,
+    pub error: Option<E2eSessionError>,
+    /// What an agent step said about what it did or judged.
+    pub explanation: Option<String>,
+    pub events: Vec<E2eSessionEvent>,
+    /// Events the report had beyond the ones kept.
+    pub more_events: i64,
+    /// Where the app was after the step.
+    pub location: Option<String>,
+    /// How the screen differs from the step before's, first lines.
+    pub changes: Vec<String>,
+    pub more_changes: i64,
+    /// Ids (the report's) of the artifacts the step produced, such as a screenshot.
+    pub artifacts: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export)]
+pub struct E2eSessionLogLine {
+    /// `error`, `warn`, `info`, `log`, `debug`.
+    pub level: String,
+    pub text: String,
+    pub at: Option<String>,
+    /// The index of the step that was running; none before the first step.
+    pub step: Option<i64>,
+}
+
+/// A file the report names for an attempt.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export)]
+pub struct E2eSessionArtifact {
+    /// The report's id of the artifact; steps and the failure refer to it.
+    #[serde(rename = "ref")]
+    pub report_id: String,
+    /// The report's kind: `video`, `screenshot`, `log` or `download`.
+    pub kind: String,
+    /// As the report names it; none for a recording a hosted service keeps (see `url`).
+    pub path: Option<String>,
+    pub url: Option<String>,
+    /// When a recording began: a step is at `step.startedAt − startedAt` in it.
+    pub started_at: Option<String>,
+    /// The uploaded file (`GET /artifacts/{id}`), once the runner has sent it.
+    #[serde(skip_deserializing)]
+    pub artifact_id: Option<Id>,
+    #[serde(skip_deserializing)]
+    pub size: Option<i64>,
+}
+
+/// What the runner saw when the failure landed.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export)]
+pub struct E2eSessionFailure {
+    pub url: Option<String>,
+    /// The report's ids of the screenshot and of the screen's text, both among the attempt's artifacts.
+    pub screenshot: Option<String>,
+    pub screen: Option<String>,
+    pub nodes: Option<i64>,
+    /// Screen lines of the nodes closest to what a failed locator asked for.
+    pub candidates: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export)]
+pub struct E2eSessionAttempt {
+    pub index: i64,
+    /// `passed`, `failed`, `timed-out`, `interrupted`, `skipped`.
+    pub status: String,
+    pub started_at: Option<String>,
+    pub duration_ms: i64,
+    pub error: Option<E2eSessionError>,
+    /// What else failed, such as a teardown after the test's own failure.
+    pub also_failed: Vec<E2eSessionError>,
+    pub steps: Vec<E2eSessionStep>,
+    /// Steps the report had beyond the ones kept.
+    pub more_steps: i64,
+    pub app_log: Vec<E2eSessionLogLine>,
+    pub more_app_log: i64,
+    pub failure: Option<E2eSessionFailure>,
+    pub artifacts: Vec<E2eSessionArtifact>,
+    /// What the engine said it ran on, such as `browser`.
+    pub environment: BTreeMap<String, String>,
+}
+
+/// One test result with everything its report said happened, for the session view.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct E2eSession {
+    pub run: E2eRun,
+    pub result: E2eRunResult,
+    pub tags: Vec<String>,
+    /// Empty for a result whose report carried no steps: JUnit, or a test that never started.
+    pub attempts: Vec<E2eSessionAttempt>,
+    /// The uploaded `trace.md` of the test, when the runner has sent one.
+    pub trace_artifact_id: Option<Id>,
+    /// The job that produced the run, when one did, and whether it is still at work (so a
+    /// missing file may yet arrive).
+    pub job_id: Option<Id>,
+    pub job_active: bool,
+    pub can_edit: bool,
+    /// The issue type "Create bug" uses, when the project has one called Bug.
+    pub bug_type_id: Option<Id>,
 }

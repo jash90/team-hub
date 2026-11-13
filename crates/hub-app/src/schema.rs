@@ -300,4 +300,41 @@ CREATE TABLE project_module_off (
     PRIMARY KEY (project_id, module_id)
 ) WITHOUT ROWID;
 "#,
+    r#"
+-- Recurring work of a project (docs/schedule.md). What a task does is its kind's business,
+-- and the kind belongs to a module: `config` is whatever that kind's form holds.
+CREATE TABLE scheduled_task (
+    id INTEGER PRIMARY KEY,
+    project_id INTEGER NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    config TEXT NOT NULL DEFAULT '{}',
+    slot TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    run_as INTEGER NOT NULL REFERENCES user (id),
+    state TEXT NOT NULL DEFAULT 'idle',
+    last_started_at TEXT,
+    last_finished_at TEXT,
+    last_error TEXT,
+    -- What the module said when it started work that is still going on.
+    progress TEXT,
+    -- The last attempt that worked; a failure leaves these three alone.
+    result_at TEXT,
+    result_summary TEXT,
+    result_link TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX scheduled_task_by_project ON scheduled_task (project_id, id);
+
+-- The day, in the schedule's time zone, a project's slot last ran for. A slot is due when
+-- its time has passed today and this is not today yet.
+CREATE TABLE schedule_slot_run (
+    project_id INTEGER NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+    slot TEXT NOT NULL,
+    ran_for TEXT NOT NULL,
+    ran_at TEXT NOT NULL,
+    PRIMARY KEY (project_id, slot)
+) WITHOUT ROWID;
+"#,
 ];

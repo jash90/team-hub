@@ -7,6 +7,7 @@ pub mod keys;
 pub mod query;
 pub mod rank;
 pub mod release_notes;
+pub mod schedule;
 pub mod smart_commits;
 pub mod text;
 pub mod types;

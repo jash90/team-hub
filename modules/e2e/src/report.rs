@@ -11,6 +11,7 @@ use rayon::prelude::*;
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::session::{self, Session};
 use crate::types::{E2eRunStatus, E2eStatus};
 
 const MAX_MESSAGE_CHARS: usize = 4000;
@@ -43,6 +44,8 @@ pub struct ParsedResult {
     pub notes: Vec<String>,
     /// Issue keys the title, tags and annotations mention; filled by [`ParsedRun::find_issue_keys`].
     pub issue_keys: Vec<String>,
+    /// What the report says happened, attempt by attempt; none for a report without steps (JUnit).
+    pub session: Option<Session>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -84,14 +87,14 @@ impl ParsedRun {
     }
 }
 
-fn cut(text: &str, max_chars: usize) -> String {
+pub(crate) fn cut(text: &str, max_chars: usize) -> String {
     match text.char_indices().nth(max_chars) {
         Some((end, _)) => format!("{}…", &text[..end]),
         None => text.to_string(),
     }
 }
 
-fn clean(text: Option<&str>, max_chars: usize) -> Option<String> {
+pub(crate) fn clean(text: Option<&str>, max_chars: usize) -> Option<String> {
     text.map(str::trim).filter(|text| !text.is_empty()).map(|text| cut(text, max_chars))
 }
 
@@ -174,9 +177,9 @@ struct DocUsage {
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
-struct DocSource {
-    file: Option<String>,
-    line: Option<f64>,
+pub(crate) struct DocSource {
+    pub(crate) file: Option<String>,
+    pub(crate) line: Option<f64>,
 }
 
 #[derive(Deserialize, Default)]
@@ -189,6 +192,7 @@ struct DocSkip {
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 struct DocResult {
+    id: Option<String>,
     test_id: Option<String>,
     title_path: Vec<String>,
     file: Option<String>,
@@ -208,10 +212,17 @@ struct DocResult {
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 struct DocAttempt {
+    index: Option<f64>,
     status: Option<String>,
+    started_at: Option<String>,
     duration_ms: Option<f64>,
     error: Option<DocError>,
+    secondary_errors: Vec<DocError>,
     steps: Vec<DocStep>,
+    app_log: Vec<DocLogLine>,
+    failure: Option<DocFailure>,
+    artifacts: Vec<DocArtifact>,
+    environment: Option<Value>,
 }
 
 #[derive(Deserialize, Default)]
@@ -224,10 +235,15 @@ struct DocGroup {
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 struct DocGroupAttempt {
+    index: Option<f64>,
     status: Option<String>,
+    started_at: Option<String>,
     cut_retry: Option<bool>,
     error: Option<DocError>,
+    secondary_errors: Vec<DocError>,
     members: Vec<DocMember>,
+    artifacts: Vec<DocArtifact>,
+    environment: Option<Value>,
 }
 
 #[derive(Deserialize, Default)]
@@ -235,35 +251,100 @@ struct DocGroupAttempt {
 struct DocMember {
     test_id: Option<String>,
     status: Option<String>,
+    started_at: Option<String>,
     duration_ms: Option<f64>,
     error: Option<DocError>,
+    secondary_errors: Vec<DocError>,
     steps: Vec<DocStep>,
+    app_log: Vec<DocLogLine>,
+    failure: Option<DocFailure>,
 }
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
-struct DocError {
-    code: Option<String>,
-    message: Option<String>,
+pub(crate) struct DocError {
+    pub(crate) code: Option<String>,
+    pub(crate) message: Option<String>,
     phase: Option<String>,
-    source: Option<DocSource>,
-    details: Option<DocDetails>,
+    pub(crate) source: Option<DocSource>,
+    pub(crate) details: Option<DocDetails>,
 }
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
-struct DocDetails {
-    locator: Option<String>,
-    expected: Option<String>,
-    observed: Option<String>,
+pub(crate) struct DocDetails {
+    pub(crate) locator: Option<String>,
+    pub(crate) expected: Option<String>,
+    pub(crate) observed: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
-struct DocStep {
+pub(crate) struct DocStep {
+    pub(crate) index: Option<f64>,
     kind: Option<String>,
+    pub(crate) api: Option<String>,
+    pub(crate) label: Option<String>,
+    pub(crate) status: Option<String>,
+    pub(crate) started_at: Option<String>,
+    pub(crate) duration_ms: Option<f64>,
+    pub(crate) source: Option<DocSource>,
+    pub(crate) phase: Option<String>,
+    pub(crate) explanation: Option<String>,
+    pub(crate) error: Option<DocError>,
+    pub(crate) events: Vec<DocEvent>,
+    pub(crate) screen: Option<DocScreen>,
+    pub(crate) artifacts: Vec<String>,
     metrics: Option<DocMetrics>,
     model: Option<DocModel>,
+}
+
+/// What a step did (`engine`), what it polled (`poll`), where the app went (`navigation`).
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub(crate) struct DocEvent {
+    pub(crate) kind: Option<String>,
+    pub(crate) status: Option<String>,
+    pub(crate) duration_ms: Option<f64>,
+    pub(crate) detail: Option<String>,
+}
+
+/// How the screen a step last saw differs from the step before's.
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub(crate) struct DocScreen {
+    pub(crate) location: Option<String>,
+    pub(crate) changes: Vec<String>,
+    pub(crate) more: Option<f64>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub(crate) struct DocLogLine {
+    pub(crate) level: Option<String>,
+    pub(crate) text: Option<String>,
+    pub(crate) at: Option<String>,
+    pub(crate) step: Option<f64>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub(crate) struct DocFailure {
+    pub(crate) url: Option<String>,
+    pub(crate) nodes: Option<f64>,
+    pub(crate) screen: Option<String>,
+    pub(crate) screenshot: Option<String>,
+    pub(crate) candidates: Vec<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub(crate) struct DocArtifact {
+    pub(crate) id: Option<String>,
+    pub(crate) kind: Option<String>,
+    pub(crate) path: Option<String>,
+    pub(crate) url: Option<String>,
+    pub(crate) started_at: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -283,16 +364,25 @@ struct DocModel {
 
 /// One attempt of a test, wherever the report keeps it: on the result, or, for a member of a
 /// serial group, on the group's attempts.
-struct AttemptView<'a> {
-    status: &'a str,
-    duration_ms: i64,
+pub(crate) struct AttemptView<'a> {
+    pub(crate) index: i64,
+    pub(crate) status: &'a str,
+    pub(crate) started_at: Option<&'a str>,
+    pub(crate) duration_ms: i64,
     /// A retry that was interrupted or never reached this test; it is not the verdict.
     cut: bool,
-    error: Option<&'a DocError>,
-    steps: &'a [DocStep],
+    pub(crate) error: Option<&'a DocError>,
+    /// What else failed: the test's own, then (for a serial member) its group's.
+    pub(crate) secondary_errors: Vec<&'a DocError>,
+    pub(crate) steps: &'a [DocStep],
+    pub(crate) app_log: &'a [DocLogLine],
+    pub(crate) failure: Option<&'a DocFailure>,
+    /// A serial member shares the artifacts of its group's attempt: the group records as one unit.
+    pub(crate) artifacts: &'a [DocArtifact],
+    pub(crate) environment: Option<&'a Value>,
 }
 
-fn whole(number: Option<f64>) -> i64 {
+pub(crate) fn whole(number: Option<f64>) -> i64 {
     number.filter(|number| number.is_finite()).map(|number| number.round() as i64).unwrap_or(0)
 }
 
@@ -301,12 +391,20 @@ fn attempt_views<'a>(result: &'a DocResult, groups: &HashMap<&str, &'a DocGroup>
         return result
             .attempts
             .iter()
-            .map(|attempt| AttemptView {
+            .enumerate()
+            .map(|(position, attempt)| AttemptView {
+                index: attempt.index.map(|index| whole(Some(index))).unwrap_or(position as i64),
                 status: attempt.status.as_deref().unwrap_or(""),
+                started_at: attempt.started_at.as_deref(),
                 duration_ms: whole(attempt.duration_ms),
                 cut: false,
                 error: attempt.error.as_ref(),
+                secondary_errors: attempt.secondary_errors.iter().collect(),
                 steps: &attempt.steps,
+                app_log: &attempt.app_log,
+                failure: attempt.failure.as_ref(),
+                artifacts: &attempt.artifacts,
+                environment: attempt.environment.as_ref(),
             })
             .collect();
     };
@@ -315,15 +413,23 @@ fn attempt_views<'a>(result: &'a DocResult, groups: &HashMap<&str, &'a DocGroup>
     group
         .attempts
         .iter()
-        .map(|attempt| {
+        .enumerate()
+        .map(|(position, attempt)| {
             let member = attempt.members.iter().find(|member| member.test_id.is_some() && member.test_id == result.test_id);
 
             AttemptView {
+                index: attempt.index.map(|index| whole(Some(index))).unwrap_or(position as i64),
                 status: member.and_then(|member| member.status.as_deref()).or(attempt.status.as_deref()).unwrap_or(""),
+                started_at: member.and_then(|member| member.started_at.as_deref()).or(attempt.started_at.as_deref()),
                 duration_ms: whole(member.and_then(|member| member.duration_ms)),
                 cut: attempt.cut_retry.unwrap_or(false),
                 error: member.and_then(|member| member.error.as_ref()).or(attempt.error.as_ref()),
+                secondary_errors: member.into_iter().flat_map(|member| member.secondary_errors.iter()).chain(attempt.secondary_errors.iter()).collect(),
                 steps: member.map(|member| member.steps.as_slice()).unwrap_or(&[]),
+                app_log: member.map(|member| member.app_log.as_slice()).unwrap_or(&[]),
+                failure: member.and_then(|member| member.failure.as_ref()),
+                artifacts: &attempt.artifacts,
+                environment: attempt.environment.as_ref(),
             }
         })
         .collect()
@@ -476,6 +582,7 @@ fn read_result(result: &DocResult, groups: &HashMap<&str, &DocGroup>, variants: 
         cost_usd: if costs.is_empty() { None } else { Some(costs.iter().sum()) },
         notes,
         issue_keys: Vec::new(),
+        session: Some(session::build(result.id.as_deref(), &views)),
     })
 }
 
@@ -717,6 +824,7 @@ pub fn parse_junit(bytes: &[u8]) -> ApiResult<ParsedRun> {
                 cost_usd: None,
                 notes: Vec::new(),
                 issue_keys: Vec::new(),
+                session: None,
             }
         })
         .collect();

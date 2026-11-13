@@ -217,10 +217,12 @@ pub fn store_run(tx: &Tx, poster: Option<&AuthUser>, project_id: Id, run: &Parse
             |row| row.get(0),
         )?;
 
+        let session = result.session.as_ref();
+
         tx.execute(
             "INSERT INTO e2e_result (run_id, test_id, variant, status, duration_ms, attempts, line, message, error_code, agent_steps, model_calls,
-                                     model_tokens, cost_usd)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                                     model_tokens, cost_usd, session, videos, screenshots)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
             rusqlite::params![
                 run_id,
                 test_id,
@@ -235,6 +237,9 @@ pub fn store_run(tx: &Tx, poster: Option<&AuthUser>, project_id: Id, run: &Parse
                 result.model_calls,
                 result.model_tokens,
                 result.cost_usd,
+                session.map(|session| session.to_stored()).transpose()?,
+                session.map(|session| session.videos()).unwrap_or(0),
+                session.map(|session| session.screenshots()).unwrap_or(0),
             ],
         )?;
 

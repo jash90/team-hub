@@ -83,4 +83,89 @@ CREATE TABLE e2e_unlinked (
     issue_id INTEGER NOT NULL REFERENCES issue (id) ON DELETE CASCADE,
     PRIMARY KEY (test_id, issue_id)
 );
-"#];
+"#,
+// Test jobs: a project's test settings, the jobs runners carry out, what a job logs, the
+// files a run's report names, and what a result remembers of its session.
+r#"
+-- How a project's suite is run. No row: the defaults, and no repository.
+CREATE TABLE e2e_settings (
+    project_id INTEGER PRIMARY KEY REFERENCES project (id) ON DELETE CASCADE,
+    repo TEXT,
+    git_ref TEXT NOT NULL,
+    directory TEXT NOT NULL,
+    install_command TEXT NOT NULL,
+    run_args TEXT NOT NULL,
+    video TEXT NOT NULL,
+    trace TEXT NOT NULL,
+    -- Plain variables as a JSON object. Secret values are in the core's `secret` table,
+    -- named `e2e:<project id>:<name>`.
+    env TEXT NOT NULL DEFAULT '{}',
+    timeout_minutes INTEGER NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- One request to run the suite, from the moment somebody asks to the moment a runner is done.
+CREATE TABLE e2e_job (
+    id INTEGER PRIMARY KEY,
+    project_id INTEGER NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+    state TEXT NOT NULL,
+    repo TEXT NOT NULL,
+    git_ref TEXT NOT NULL,
+    commit_sha TEXT,
+    filter TEXT,
+    video TEXT NOT NULL,
+    trace TEXT NOT NULL,
+    requested_by INTEGER NOT NULL REFERENCES user (id),
+    -- The scheduled task that asked for the job, when one did.
+    task_id INTEGER,
+    -- Who claimed it: the name it gave, and the person whose token it sent. Only that
+    -- person's token may write to the job.
+    runner_id TEXT,
+    runner_name TEXT,
+    runner_user_id INTEGER REFERENCES user (id) ON DELETE SET NULL,
+    run_id INTEGER REFERENCES e2e_run (id) ON DELETE SET NULL,
+    error TEXT,
+    cancel_requested INTEGER NOT NULL DEFAULT 0,
+    step TEXT,
+    -- The number of the newest log line, and the newest one open pages were told about.
+    log_seq INTEGER NOT NULL DEFAULT 0,
+    log_announced_seq INTEGER NOT NULL DEFAULT 0,
+    log_announced_at TEXT,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    finished_at TEXT,
+    -- When the runner last wrote to the job; a runner that goes quiet fails it.
+    heard_at TEXT
+);
+
+CREATE INDEX e2e_job_by_project ON e2e_job (project_id, id);
+CREATE INDEX e2e_job_by_state ON e2e_job (state, id);
+
+-- The newest lines of a job's output; older ones are dropped as new ones arrive.
+CREATE TABLE e2e_job_log (
+    job_id INTEGER NOT NULL REFERENCES e2e_job (id) ON DELETE CASCADE,
+    seq INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    PRIMARY KEY (job_id, seq)
+) WITHOUT ROWID;
+
+-- A file a run's report names, uploaded after the report. `path` is the report's own; the
+-- bytes are on disk under <data>/e2e-artifacts/<run id>/<stored>, a name made here.
+CREATE TABLE e2e_artifact (
+    id INTEGER PRIMARY KEY,
+    run_id INTEGER NOT NULL REFERENCES e2e_run (id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    stored TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (run_id, path)
+);
+
+-- What the report says happened in the test, attempt by attempt, as JSON (see `session.rs`);
+-- and how many recordings and screenshots it names, so a list can say without reading that.
+ALTER TABLE e2e_result ADD COLUMN session TEXT;
+ALTER TABLE e2e_result ADD COLUMN videos INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE e2e_result ADD COLUMN screenshots INTEGER NOT NULL DEFAULT 0;
+"#,
+];
