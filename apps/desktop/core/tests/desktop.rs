@@ -671,6 +671,53 @@ async fn a_push_goes_out_only_after_the_click_and_only_the_commit_that_was_shown
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn without_gh_the_pull_request_is_opened_by_the_server_or_finished_in_the_browser() {
+    let (bench, hub, repo) = ready("server-pr").await;
+    let path = repo.clone.to_string_lossy().into_owned();
+
+    // The clone's origin reads as a GitHub address; pushes still go to the folder.
+    git(&repo.clone, &["config", &format!("url.{}.pushInsteadOf", repo.origin.to_string_lossy()), "https://github.com/acme/web.git"]);
+    git(&repo.clone, &["config", "remote.origin.url", "https://github.com/acme/web.git"]);
+    bench.desktop.run(move |core| core.map_repo("WEB", Some("acme/web"), &path)).await.unwrap();
+
+    let id = start(&bench, "WEB-1", ThreadKind::Implement, "").await;
+    let thread = bench.until_state(id, ThreadState::Done).await;
+    let branch = thread.branch.clone().unwrap();
+    let commit = bench.desktop.run(move |core| core.push_preview(id)).await.unwrap().commit;
+
+    bench.desktop.run(move |core| core.push(id, &commit, false)).await.unwrap();
+
+    // The server does not know the repository: only the browser is left.
+    let preview = bench.desktop.run(move |core| core.pull_request_preview(id)).await.unwrap();
+    assert_eq!((preview.pushed, preview.can_create, preview.server_repo), (true, false, None));
+
+    // It knows it but has no token: the person still gets the page to finish on, and nothing is recorded.
+    hub.state().issues.get_mut("WEB-1").unwrap().panels.insert("github".into(), json!({ "prs": [], "repos": [{ "id": 3, "fullName": "Acme/Web" }] }));
+    hub.state().github_token_missing = true;
+
+    let preview = bench.desktop.run(move |core| core.pull_request_preview(id)).await.unwrap();
+    assert_eq!((preview.can_create, preview.server_repo), (true, Some(3)));
+
+    let by_hand = bench.desktop.run(move |core| core.open_pull_request(id, "WEB-1 Login", "Adds validation.")).await.unwrap();
+    assert_eq!(by_hand.url, None);
+    assert!(by_hand.browser_url.as_deref().is_some_and(|url| url.starts_with("https://github.com/acme/web/compare/main...")), "{by_hand:?}");
+    assert_eq!(bench.thread(id).await.pull_request_url, None);
+
+    // With a token the server opens it, for exactly the branch that was pushed.
+    hub.state().github_token_missing = false;
+
+    let opened = bench.desktop.run(move |core| core.open_pull_request(id, "WEB-1 Login", "Adds validation.")).await.unwrap();
+    assert_eq!((opened.url.as_deref(), opened.browser_url), (Some("https://github.com/acme/web/pull/12"), None));
+    assert_eq!(bench.thread(id).await.pull_request_url.as_deref(), Some("https://github.com/acme/web/pull/12"));
+
+    let asked = hub.state().writes.iter().rev().find(|(_, path, _)| path.ends_with("/pull-request")).map(|(_, _, body)| body.clone()).unwrap();
+    assert_eq!(asked, json!({ "repoId": 3, "head": branch, "base": "main", "title": "WEB-1 Login", "body": "Adds validation." }));
+
+    bench.desktop.tick(true).await.unwrap();
+    assert_eq!(hub.run(thread.run_id.unwrap())["run"]["pullRequestUrl"], "https://github.com/acme/web/pull/12");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn a_push_that_touches_ci_or_looks_like_a_secret_needs_a_second_confirmation() {
     let (bench, _hub, repo) = ready("risky").await;
     let id = start(&bench, "WEB-1", ThreadKind::Implement, "[fake:risky]").await;

@@ -243,6 +243,11 @@ impl HubClient {
         Ok(answer["id"].as_i64().unwrap_or_default())
     }
 
+    /// Asks the server to open a pull request for the issue with its own GitHub token.
+    pub fn open_pull_request(&self, issue_key: &str, new: &Value) -> CoreResult<Value> {
+        self.post(&format!("/api/m/github/issues/{}/pull-request", encode(issue_key)), new)
+    }
+
     pub fn add_run_proposal(&self, id: i64, kind: &str, payload: &Value) -> CoreResult<RunProposal> {
         self.post(&format!("{AGENTS}/runs/{id}/proposals"), &json!({ "kind": kind, "payload": payload }))
     }

@@ -316,6 +316,20 @@ async fn fake_github() -> String {
                           "updated_at": "2026-11-01T08:00:00Z" }
                     ])),
                 )
+            })
+            .post(|Json(body): Json<Value>| async move {
+                if body["head"] == "nowhere" {
+                    return (StatusCode::UNPROCESSABLE_ENTITY, Json(json!({ "message": "Validation Failed" })));
+                }
+
+                (
+                    StatusCode::CREATED,
+                    Json(json!({
+                        "number": 9, "title": body["title"], "body": body["body"], "state": "open", "draft": body["draft"],
+                        "user": { "login": "team-hub-bot" }, "head": { "ref": body["head"], "sha": "s9" }, "base": { "ref": body["base"] },
+                        "html_url": "https://github.com/acme/web/pull/9", "created_at": "2026-11-13T08:00:00Z", "updated_at": "2026-11-13T08:00:00Z"
+                    })),
+                )
             }),
         )
         .route(
@@ -413,4 +427,41 @@ async fn the_demo_shows_code_next_to_issues() {
     let dashboard = client.get("/api/dashboard").await;
     assert_eq!(dashboard["ext"]["github"]["pulls"][0]["number"], 57);
     assert_eq!(client.get("/api/issues/WEB-10").await["panels"]["github"]["branches"][0]["name"], "feature/WEB-10-platnosc-blik");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_pull_request_can_be_opened_for_an_issue_with_the_instances_token() {
+    let mut hub = Hub::new().await;
+    let key = hub.issue("Card payments").await;
+    let api = fake_github().await;
+    let repo = hub.client.get("/api/m/github/projects/WEB").await["repos"][0]["id"].as_i64().unwrap();
+    let path = format!("/api/m/github/issues/{key}/pull-request");
+
+    assert_eq!(hub.client.refused(Method::POST, &path, Some(json!({ "repoId": repo, "head": "feature/cards" }))).await, StatusCode::CONFLICT, "no token");
+    hub.client.put("/api/m/github/settings", json!({ "apiUrl": api, "token": "ghp_test_token" })).await;
+
+    for refused in [json!({ "repoId": repo, "head": "bad name" }), json!({ "repoId": repo, "head": "main", "base": "main" }), json!({ "repoId": 999, "head": "x" })] {
+        assert_eq!(hub.client.refused(Method::POST, &path, Some(refused.clone())).await, StatusCode::BAD_REQUEST, "{refused}");
+    }
+
+    assert_eq!(hub.client.refused(Method::POST, &path, Some(json!({ "repoId": repo, "head": "nowhere" }))).await, StatusCode::BAD_GATEWAY);
+    assert_eq!(hub.status(&key).await, "To Do");
+
+    // Neither the title nor the branch names the issue, so the title gets its key.
+    let opened = hub.client.post(&path, json!({ "repoId": repo, "head": "feature/cards", "title": "Card form", "body": "Adds the form." })).await;
+    assert_eq!(
+        (&opened["number"], &opened["url"], &opened["title"]),
+        (&json!(9), &json!("https://github.com/acme/web/pull/9"), &json!("WEB-1 Card form"))
+    );
+    assert_eq!(opened["panel"]["prs"][0]["number"], 9, "{opened}");
+    assert_eq!(opened["panel"]["prs"][0]["baseRef"], "main", "the repository's default branch: {opened}");
+    assert_eq!(hub.status(&key).await, "In Review", "the project's rule for an opened pull request has run");
+
+    // The webhook that follows says the same and changes nothing.
+    hub.deliver("pull_request", pull(9, "WEB-1 Card form", "feature/cards", "opened", json!({}))).await;
+    assert_eq!(hub.client.get(&format!("/api/issues/{key}")).await["panels"]["github"]["prs"].as_array().map(Vec::len), Some(1));
+
+    let (mut viewer, viewer_id) = hub.client.member("Vera Viewer", "vera@example.com").await;
+    hub.client.put(&format!("/api/projects/WEB/members/{viewer_id}"), json!({ "role": "viewer" })).await;
+    assert_eq!(viewer.refused(Method::POST, &path, Some(json!({ "repoId": repo, "head": "feature/other" }))).await, StatusCode::FORBIDDEN);
 }

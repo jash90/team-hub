@@ -204,12 +204,11 @@ app takes the larger of "replace" and "add", see `Store::record_result`).
 - Packaging is configured (`tauri.conf.json` bundles the sidecar's sources and its
   `node_modules` as resources) but no installer was built or signed; Node has to be installed
   on the user's machine.
-- A pull request is opened with the `gh` command when it is installed; otherwise the app opens
-  GitHub's compare page and you paste the address back. The app has no GitHub token of its own.
-- Two runners of the same person (the app on two computers) can race for the run the app
-  creates for its own thread: the other one may claim it first and start a second thread. The
-  thread here then works unmirrored and says so. The server would need a way to create a run
-  already claimed by a runner.
+- A pull request is opened with the `gh` command when it is installed (it is then yours). Without
+  it, the server opens it with its own GitHub token when the repository is connected to the
+  issue's project there, so the pull request is authored by whoever that token belongs to.
+  Failing both, the app opens GitHub's compare page and you paste the address back. The app has
+  no GitHub token of its own.
 - One server and one account. No review remarks in line, no evidence or device tooling, no
   supervisor threads: those parts of agent-hub were left out on purpose.
 - Core messages (errors, status lines of threads) are English only; the interface is

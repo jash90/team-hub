@@ -31,6 +31,14 @@ pub struct GithubClient {
 
 /// The token is sent to this address, so it must be HTTPS (or this machine, for tests and
 /// a local GitHub Enterprise).
+pub struct NewPullRequest {
+    pub title: String,
+    pub body: String,
+    pub head: String,
+    pub base: String,
+    pub draft: bool,
+}
+
 pub fn clean_api_url(url: &str) -> ApiResult<String> {
     let url = url.trim().trim_end_matches('/');
     let local = ["http://127.0.0.1", "http://localhost"].iter().any(|prefix| url == *prefix || url.starts_with(&format!("{prefix}:")));
@@ -124,6 +132,16 @@ impl GithubClient {
         self.request("POST", &format!("/repos/{full_name}/git/refs"), Some(&json!({ "ref": format!("refs/heads/{branch}"), "sha": sha })))?;
 
         Ok(sha)
+    }
+
+    /// Opens a pull request for a branch that is already on GitHub and returns it as GitHub
+    /// describes it.
+    pub fn create_pull_request(&self, full_name: &str, new: &NewPullRequest) -> ApiResult<Value> {
+        self.request(
+            "POST",
+            &format!("/repos/{full_name}/pulls"),
+            Some(&json!({ "title": new.title, "body": new.body, "head": new.head, "base": new.base, "draft": new.draft })),
+        )
     }
 
     fn review_state(&self, full_name: &str, number: i64) -> ApiResult<&'static str> {

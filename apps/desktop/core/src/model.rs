@@ -405,8 +405,11 @@ shared!(
         pub body: String,
         /// Whether the branch on the server is at the thread's last commit.
         pub pushed: bool,
-        /// True when the `gh` command is there to create it; otherwise the browser opens.
+        /// True when it can be created from here, with the `gh` command or through the
+        /// server; otherwise the browser opens.
         pub can_create: bool,
+        /// The server's id of the repository, when the server can open the pull request.
+        pub server_repo: Option<i64>,
         pub compare_url: Option<String>,
         pub existing_url: Option<String>,
     }

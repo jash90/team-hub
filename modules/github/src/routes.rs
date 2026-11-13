@@ -14,12 +14,12 @@ use hub_app::{Actor, ApiError, ApiResult, App, AuthUser};
 use hub_core::keys::suggest_branch_name;
 use hub_core::{Id, IssueRow};
 use rusqlite::Connection;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::Sha256;
 
 use crate::actions::run_actions;
-use crate::client::{api_url, clean_api_url, sync_and_record, GithubClient, API_URL_SETTING, TOKEN_SECRET, WEBHOOK_SECRET};
+use crate::client::{api_url, clean_api_url, sync_and_record, GithubClient, NewPullRequest, API_URL_SETTING, TOKEN_SECRET, WEBHOOK_SECRET};
 use crate::drift::recompute_drift;
 use crate::ingest::{ingest, project_keys, upsert_branch, Action};
 use crate::model::{
@@ -40,6 +40,7 @@ pub fn routes() -> Router<App> {
         .route("/repos/{id}", delete(remove_repo))
         .route("/repos/{id}/sync", post(sync_repo))
         .route("/issues/{key}/branch", post(create_branch))
+        .route("/issues/{key}/pull-request", post(create_pull_request))
 }
 
 pub fn hooks() -> Router<App> {
@@ -424,6 +425,100 @@ async fn create_branch(
         }
 
         app.read(|connection| issue_panel(app, connection, &issue))
+    })
+    .await
+    .map(Json)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PullRequestInput {
+    repo_id: Id,
+    /// The branch with the work; it has to be on GitHub already.
+    head: String,
+    title: Option<String>,
+    #[serde(default)]
+    body: String,
+    /// The branch to merge into; the repository's default one when left out.
+    base: Option<String>,
+    #[serde(default)]
+    draft: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenedPullRequest {
+    number: i64,
+    url: String,
+    title: String,
+    panel: Option<GithubIssuePanel>,
+}
+
+/// Opens a pull request for the issue with the instance's GitHub token: for whoever has
+/// pushed a branch and has no GitHub client of their own at hand (the desktop app, an
+/// agent's runner). What GitHub answers is taken in like a delivery, so the pull request is
+/// on the issue, and the project's rules have run, before the webhook says the same.
+async fn create_pull_request(
+    State(app): State<App>,
+    user: AuthUser,
+    Path(key): Path<String>,
+    Json(input): Json<PullRequestInput>,
+) -> Reply<OpenedPullRequest> {
+    let reader = user.clone();
+    let (issue, repo, new) = app
+        .run(move |app| {
+            app.read(|connection| {
+                let (issue_id, access) = issue_access(connection, &reader, &key)?;
+                access.require_edit()?;
+                let issue = hub_app::services::issues::row_by_id(app, connection, issue_id)?;
+                let repo = repo_by_id(connection, input.repo_id)?
+                    .filter(|repo| repo.project_id == issue.project_id)
+                    .ok_or_else(|| ApiError::bad_request("That repository is not connected to this issue's project"))?;
+                let head = input.head.trim().to_string();
+                let base = input.base.as_deref().map(str::trim).filter(|base| !base.is_empty()).unwrap_or(&repo.default_branch).to_string();
+
+                if !valid_branch_name(&head) || !valid_branch_name(&base) {
+                    return Err(ApiError::bad_request("A branch name may contain letters, digits, dashes, dots, underscores and slashes"));
+                }
+
+                if head == base {
+                    return Err(ApiError::bad_request("A pull request needs a branch other than the one it merges into"));
+                }
+
+                let title = input.title.as_deref().map(str::trim).filter(|title| !title.is_empty()).unwrap_or(&issue.summary).to_string();
+
+                if title.chars().count() > 250 || input.body.len() > 60_000 {
+                    return Err(ApiError::bad_request("The title or the description is too long"));
+                }
+
+                // A pull request belongs to the issues its title or its branch names. One
+                // that names neither would not stay on this issue, so the title gets the key.
+                let names_issue = |text: &str| text.to_uppercase().contains(&issue.key.to_uppercase());
+                let title = if names_issue(&title) || names_issue(&head) { title } else { format!("{} {title}", issue.key) };
+
+                Ok((issue, repo, NewPullRequest { title, body: input.body.clone(), head, base, draft: input.draft }))
+            })
+        })
+        .await?;
+
+    let worker = app.clone();
+    let full_name = repo.full_name.clone();
+    let opened = tokio::task::spawn_blocking(move || GithubClient::from_app(&worker)?.create_pull_request(&full_name, &new))
+        .await
+        .map_err(|_| ApiError::internal("opening the pull request was interrupted"))??;
+    let number = opened["number"].as_i64().ok_or_else(|| ApiError::upstream("GitHub did not say which pull request it opened"))?;
+    let url = opened["html_url"].as_str().map(String::from).unwrap_or_else(|| format!("https://github.com/{}/pull/{number}", repo.full_name));
+    let title = opened["title"].as_str().unwrap_or_default().to_string();
+
+    app.run(move |app| {
+        let delivery = json!({ "action": "opened", "repository": { "full_name": repo.full_name }, "pull_request": opened });
+        let ingested = app.write(user.actor(), |tx| ingest(tx, "pull_request", &delivery))?;
+
+        run_actions(app, ingested.actions);
+
+        let panel = app.read(|connection| issue_panel(app, connection, &issue))?;
+
+        Ok(OpenedPullRequest { number, url, title, panel })
     })
     .await
     .map(Json)

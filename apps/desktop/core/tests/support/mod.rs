@@ -112,6 +112,8 @@ pub struct HubState {
     pub runs_api: bool,
     /// An older server: runners cannot record what the person said.
     pub refuses_runner_answers: bool,
+    /// The server's code module has no GitHub token to open pull requests with.
+    pub github_token_missing: bool,
     pub issues: BTreeMap<String, Issue>,
     pub project: Project,
     pub runs: Vec<Value>,
@@ -503,6 +505,19 @@ async fn add_worklog(State(state): Shared, headers: HeaderMap, UrlPath(key): Url
     Json(json!({ "id": 1, "issueId": issue.row.id, "userId": 1, "minutes": minutes, "startedAt": NOW, "note": body["note"] })).into_response()
 }
 
+/// The code module's route that opens a pull request with the server's own GitHub token.
+async fn open_pull_request(State(state): Shared, headers: HeaderMap, UrlPath(key): UrlPath<String>, Json(body): Json<Value>) -> Response {
+    let mut state = guard!(state, headers);
+
+    state.writes.push(("POST".into(), format!("/api/m/github/issues/{key}/pull-request"), body.clone()));
+
+    if state.github_token_missing {
+        return error(StatusCode::CONFLICT, "No GitHub token is configured (Settings → GitHub)");
+    }
+
+    Json(json!({ "number": 12, "url": "https://github.com/acme/web/pull/12", "title": body["title"], "panel": null })).into_response()
+}
+
 async fn search(State(state): Shared, headers: HeaderMap, Query(query): Query<BTreeMap<String, String>>) -> Response {
     let state = guard!(state, headers);
     let wanted = query.get("q").cloned().unwrap_or_default().to_lowercase();
@@ -811,6 +826,7 @@ impl FakeHub {
             token: TOKEN.to_string(),
             runs_api: true,
             refuses_runner_answers: false,
+            github_token_missing: false,
             issues: issues.into_iter().map(|issue| (issue.row.key.clone(), issue)).collect(),
             project: project(),
             runs: Vec::new(),
@@ -848,6 +864,7 @@ impl FakeHub {
             .route("/search", get(search))
             .route("/notifications", get(notifications))
             .route("/stream", get(stream))
+            .route("/m/github/issues/{key}/pull-request", post(open_pull_request))
             .nest("/m/agents", agents);
         let app = Router::new().nest("/api", api).with_state(Arc::clone(&state));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -952,6 +969,7 @@ pub fn open_in(data: TempDir) -> Bench {
     options.stop_grace = Duration::from_millis(400);
     options.poll_every = Duration::from_millis(100);
     options.sandbox = Some(SandboxState::Unavailable);
+    options.github_cli = Some(false);
 
     let desktop = Desktop::open(options).unwrap();
     let events = desktop.subscribe();

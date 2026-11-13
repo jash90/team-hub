@@ -6,6 +6,11 @@ export type PullRequestPreview = { threadId: number, repo: string | null, base: 
  */
 pushed: boolean, 
 /**
- * True when the `gh` command is there to create it; otherwise the browser opens.
+ * True when it can be created from here, with the `gh` command or through the
+ * server; otherwise the browser opens.
  */
-canCreate: boolean, compareUrl: string | null, existingUrl: string | null, };
+canCreate: boolean, 
+/**
+ * The server's id of the repository, when the server can open the pull request.
+ */
+serverRepo: number | null, compareUrl: string | null, existingUrl: string | null, };

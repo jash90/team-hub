@@ -50,6 +50,8 @@ pub struct OpenOptions {
     pub poll_every: Duration,
     /// None: ask the operating system.
     pub sandbox: Option<SandboxState>,
+    /// Whether GitHub's `gh` command is used to open pull requests. None: when it is installed.
+    pub github_cli: Option<bool>,
 }
 
 impl OpenOptions {
@@ -62,6 +64,7 @@ impl OpenOptions {
             stop_grace: Duration::from_secs(5),
             poll_every: Duration::from_secs(5),
             sandbox: None,
+            github_cli: None,
         }
     }
 }
@@ -98,6 +101,7 @@ pub struct Core {
     events: broadcast::Sender<AppEvent>,
     runtime: OnceLock<Runtime>,
     sandbox: SandboxState,
+    github_cli: bool,
     seen_notification: AtomicI64,
     wake: Arc<Notify>,
     closing: Arc<AtomicBool>,
@@ -1168,19 +1172,34 @@ impl Core {
         base.strip_prefix("origin/").unwrap_or(&base).to_string()
     }
 
-    fn gh_available() -> bool {
+    fn gh_installed() -> bool {
         std::process::Command::new("gh").arg("--version").output().is_ok_and(|output| output.status.success())
     }
 
-    /// The pull request of this thread's branch that the server already knows, if any.
-    fn known_pull_request(&self, thread: &Thread) -> Option<String> {
-        let branch = thread.branch.as_deref()?;
-        let issue = self.client().ok()?.issue(&thread.issue_key).ok()?;
-        let prs = issue.panels.get("github")?.get("prs")?.as_array()?.clone();
+    /// What the server's code module says about the thread's issue; none when the module is
+    /// off there or the server cannot be asked.
+    fn code_on_server(&self, thread: &Thread) -> Option<Value> {
+        self.client().ok()?.issue(&thread.issue_key).ok()?.panels.get("github").cloned()
+    }
 
-        prs.iter()
+    /// The pull request of this thread's branch that the server already knows, if any.
+    fn known_pull_request(code: Option<&Value>, thread: &Thread) -> Option<String> {
+        let branch = thread.branch.as_deref()?;
+
+        code?
+            .get("prs")?
+            .as_array()?
+            .iter()
             .find(|pr| pr["headRef"].as_str() == Some(branch) && pr["state"].as_str() == Some("open"))
             .and_then(|pr| pr["url"].as_str().map(String::from))
+    }
+
+    /// The server's id of the repository, when it is connected to the issue's project there:
+    /// the server can then open the pull request with its own GitHub token.
+    fn repo_on_server(code: Option<&Value>, repo: Option<&str>) -> Option<i64> {
+        let repo = repo?;
+
+        code?.get("repos")?.as_array()?.iter().find(|known| known["fullName"].as_str().is_some_and(|name| name.eq_ignore_ascii_case(repo)))?["id"].as_i64()
     }
 
     pub fn pull_request_preview(&self, thread_id: i64) -> CoreResult<PullRequestPreview> {
@@ -1209,7 +1228,9 @@ impl Core {
             .or(thread.summary.clone())
             .unwrap_or_default();
         let head = thread.worktree.as_deref().and_then(|worktree| git::head(repo_path, Path::new(worktree)).ok());
-        let existing_url = thread.pull_request_url.clone().or_else(|| self.known_pull_request(&thread));
+        let code = self.code_on_server(&thread);
+        let existing_url = thread.pull_request_url.clone().or_else(|| Self::known_pull_request(code.as_ref(), &thread));
+        let server_repo = Self::repo_on_server(code.as_ref(), repo.as_deref());
 
         if let (Some(url), None) = (&existing_url, &thread.pull_request_url) {
             self.store.set_pull_request(thread_id, url)?;
@@ -1224,13 +1245,16 @@ impl Core {
             head: branch,
             title,
             body,
-            can_create: Self::gh_available(),
+            can_create: self.github_cli || server_repo.is_some(),
+            server_repo,
             existing_url,
         })
     }
 
-    /// Opens the pull request after the person's click: with `gh` when it is installed and
-    /// signed in, otherwise by handing back the page where the person finishes it.
+    /// Opens the pull request after the person's click: with `gh` when it is installed (the
+    /// pull request is then the person's own), else through the server when it has the
+    /// repository connected (with the server's GitHub token), else by handing back the page
+    /// where the person finishes it. The page is also what is left when the server cannot.
     pub fn open_pull_request(&self, thread_id: i64, title: &str, body: &str) -> CoreResult<PullRequestResult> {
         let preview = self.pull_request_preview(thread_id)?;
         let thread = self.store.thread(thread_id)?;
@@ -1249,7 +1273,12 @@ impl Core {
             return Err(CoreError::not_possible("The pull request needs a title"));
         }
 
-        let result = if preview.can_create {
+        let browser = |compare_url: Option<String>| {
+            let query = format!("&title={}&body={}", url_encode(title.trim()), url_encode(body));
+
+            PullRequestResult { url: None, browser_url: compare_url.map(|url| format!("{url}{query}")) }
+        };
+        let result = if self.github_cli {
             let output = std::process::Command::new("gh")
                 .args(["pr", "create", "--repo", &repo, "--head", &preview.head, "--base", &preview.base, "--title", title.trim(), "--body", body])
                 .current_dir(&thread.repo_path)
@@ -1262,10 +1291,17 @@ impl Core {
             let url = String::from_utf8_lossy(&output.stdout).lines().rev().find(|line| line.starts_with("https://")).map(str::to_string);
 
             PullRequestResult { url, browser_url: None }
-        } else {
-            let query = format!("&title={}&body={}", url_encode(title.trim()), url_encode(body));
+        } else if let Some(repo_id) = preview.server_repo {
+            let new = json!({ "repoId": repo_id, "head": preview.head, "base": preview.base, "title": title.trim(), "body": body });
 
-            PullRequestResult { url: None, browser_url: preview.compare_url.map(|url| format!("{url}{query}")) }
+            match self.client().and_then(|client| self.seen(client.open_pull_request(&thread.issue_key, &new))) {
+                Ok(opened) => PullRequestResult { url: opened["url"].as_str().map(String::from), browser_url: None },
+                Err(error) if error.is_offline() => return Err(error),
+                // No token on the server, or GitHub said no: the person can still finish it by hand.
+                Err(_) => browser(preview.compare_url),
+            }
+        } else {
+            browser(preview.compare_url)
         };
 
         if let Some(url) = &result.url {
@@ -1734,6 +1770,7 @@ impl Desktop {
             events: events.clone(),
             runtime: OnceLock::new(),
             sandbox,
+            github_cli: options.github_cli.unwrap_or_else(Core::gh_installed),
             seen_notification: AtomicI64::new(-1),
             wake: Arc::new(Notify::new()),
             closing: Arc::new(AtomicBool::new(false)),
