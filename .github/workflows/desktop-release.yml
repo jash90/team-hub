@@ -1,0 +1,411 @@
+# Builds the desktop app (apps/desktop) for macOS, Windows and Linux and drafts a GitHub
+# Release with the installers.
+#
+#   git tag desktop-v0.1.0 && git push origin desktop-v0.1.0
+#       builds everything and creates (or updates) the DRAFT release "team-hub desktop v0.1.0";
+#       a person reviews and publishes it.
+#   Actions → Desktop release → Run workflow (version: 0.1.0)
+#       a dry run: the same builds, kept as workflow artifacts; no release is touched.
+#
+# How to cut a release, what the installers contain and how signing is switched on:
+# apps/desktop/README.md, "Releasing".
+#
+# The build jobs only read the repository. One job, at the end and only for a tag, may write
+# releases. Nothing here needs a secret: without the Apple secrets the macOS app is signed
+# ad hoc, and the Windows installer is not signed.
+#
+# An installer does not carry the Claude Agent SDK: the app fetches it with npm on the
+# person's computer when it first starts. The build legs try exactly that on what they built.
+name: Desktop release
+
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Dry run: the app version to build, e.g. 0.1.0. It must be the version in the files; nothing is published.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  version:
+    name: The tag is the app's version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      # Fails here, before an hour of builds, when the tag and the files disagree or the
+      # release notes are still those of another version.
+      - name: Check the version
+        id: check
+        env:
+          ASKED: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+        run: |
+          version=$(node apps/desktop/scripts/check-version.mjs "$ASKED" | tee /dev/stderr | tail -n 1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  app:
+    name: App · ${{ matrix.label }}
+    needs: version
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # One macOS build per architecture, as Tauri's own example does: two plain builds
+          # and two small downloads rather than one universal build of both.
+          - label: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - label: macos-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - label: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          # The oldest Ubuntu GitHub offers: the packages then run on that glibc and newer.
+          - label: linux-x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      LABEL: ${{ matrix.label }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            apps/desktop/package-lock.json
+            apps/desktop/ui/package-lock.json
+
+      - name: Rust (stable) for ${{ matrix.target }}
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustup target add "$TARGET"
+          rustc --version
+
+      - name: System libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
+            libxdo-dev libssl-dev patchelf build-essential curl wget file xdg-utils
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - name: The Tauri command line and the interface's dependencies
+        run: |
+          npm ci --prefix apps/desktop
+          npm ci --prefix apps/desktop/ui
+
+      # Nothing is installed for the helper (apps/desktop/sidecar): the installer carries its
+      # source, package.json, lock file and launcher, and no node_modules.
+
+      # Optional. With the secrets of a Developer ID certificate the app is signed with it,
+      # and notarized when the Apple ID ones are there too. A variable that is set but empty
+      # makes Tauri try to sign with nothing and fail, so they are only passed on when they
+      # have a value; without them tauri.conf.json's ad-hoc signature ("-") applies.
+      - name: Signing (macOS), when the repository has the secrets
+        if: runner.os == 'macOS'
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          NOTARY_ID: ${{ secrets.APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          pass_on() {
+            {
+              echo "$1<<__TEAM_HUB_VALUE__"
+              printf '%s\n' "$2"
+              echo "__TEAM_HUB_VALUE__"
+            } >> "$GITHUB_ENV"
+          }
+
+          if [ -n "$CERTIFICATE" ] && [ -n "$CERTIFICATE_PASSWORD" ] && [ -n "$SIGNING_IDENTITY" ]; then
+            pass_on APPLE_CERTIFICATE "$CERTIFICATE"
+            pass_on APPLE_CERTIFICATE_PASSWORD "$CERTIFICATE_PASSWORD"
+            pass_on APPLE_SIGNING_IDENTITY "$SIGNING_IDENTITY"
+
+            if [ -n "$NOTARY_ID" ] && [ -n "$NOTARY_PASSWORD" ] && [ -n "$NOTARY_TEAM_ID" ]; then
+              pass_on APPLE_ID "$NOTARY_ID"
+              pass_on APPLE_PASSWORD "$NOTARY_PASSWORD"
+              pass_on APPLE_TEAM_ID "$NOTARY_TEAM_ID"
+              echo "Signing with the Developer ID certificate and notarizing."
+            else
+              echo "::warning::Signing with the Developer ID certificate, but not notarizing: APPLE_ID, APPLE_PASSWORD and APPLE_TEAM_ID are not all set."
+            fi
+          else
+            echo "::notice::No Apple signing secrets: the app gets an ad-hoc signature, and macOS will ask the person to allow it."
+          fi
+
+      # Builds only: no tag or release is given to the action, so it uploads nothing and
+      # needs no token. `npm run tauri` is the script in apps/desktop/package.json; the action
+      # runs `npm run tauri build -- <args>` there, and what follows the second `--` is for cargo.
+      - name: Build the app and its installers
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        with:
+          projectPath: apps/desktop
+          tauriScript: npm run tauri
+          args: --target ${{ matrix.target }} -- --locked
+
+      - name: Collect the installers
+        run: |
+          bundle="apps/desktop/src-tauri/target/$TARGET/release/bundle"
+          mkdir -p dist
+
+          # take <folder> <pattern> <ending>: exactly one such installer, under the release's name.
+          take() {
+            count=$(find "$bundle/$1" -maxdepth 1 -type f -name "$2" | wc -l | tr -d ' ')
+
+            if [ "$count" != "1" ]; then
+              echo "::error::Expected one $2 in $bundle/$1, found $count."
+              ls -la "$bundle" "$bundle/$1" || true
+              exit 1
+            fi
+
+            cp "$(find "$bundle/$1" -maxdepth 1 -type f -name "$2")" "dist/team-hub-desktop-$VERSION-$LABEL$3"
+          }
+
+          case "$RUNNER_OS" in
+            macOS)
+              take dmg '*.dmg' .dmg
+              ;;
+            Windows)
+              take nsis '*-setup.exe' -setup.exe
+              ;;
+            Linux)
+              take deb '*.deb' .deb
+              take rpm '*.rpm' .rpm
+              take appimage '*.AppImage' .AppImage
+              ;;
+          esac
+
+          ls -l dist
+
+      # What a person's first start does, tried on what was just packaged (see
+      # scripts/check-packaged.mjs): the package carries the helper and no SDK; the installed
+      # program fetches the agent runtime with npm into a data folder (--fetch-agent-runtime);
+      # the agent's program answers; the launcher starts the helper from there. It uses the
+      # network and no account. It does not open the window or run an agent.
+      - name: The packaged app fetches its runtime and starts the helper (Linux, the .deb and the AppImage)
+        if: runner.os == 'Linux'
+        run: |
+          work="$RUNNER_TEMP/packaged"
+          mkdir -p "$work"
+
+          dpkg-deb -x "dist/team-hub-desktop-$VERSION-$LABEL.deb" "$work/deb"
+          node apps/desktop/scripts/check-packaged.mjs "$work/deb/usr/lib/team-hub" --app "$work/deb/usr/bin/team-hub-desktop"
+
+          cp "dist/team-hub-desktop-$VERSION-$LABEL.AppImage" "$work/app.AppImage"
+          chmod +x "$work/app.AppImage"
+          (cd "$work" && ./app.AppImage --appimage-extract > /dev/null)
+          # AppRun, so that npm runs in the environment an AppImage gives what it starts.
+          node apps/desktop/scripts/check-packaged.mjs "$work/squashfs-root/usr/lib/team-hub" --app "$work/squashfs-root/AppRun"
+
+      - name: The packaged app fetches its runtime and starts the helper (macOS, the .app)
+        if: runner.os == 'macOS'
+        run: |
+          bundle="apps/desktop/src-tauri/target/$TARGET/release/bundle/macos/team-hub.app/Contents"
+          set -- "$bundle/Resources"
+
+          # The app itself does the fetching where this machine can run it. The build for the
+          # other architecture is checked with the same npm command instead.
+          case "$(uname -m)-$TARGET" in
+            arm64-aarch64-apple-darwin | x86_64-x86_64-apple-darwin)
+              set -- "$@" --app "$bundle/MacOS/team-hub-desktop"
+              ;;
+          esac
+
+          node apps/desktop/scripts/check-packaged.mjs "$@"
+
+      # The only place the Windows installer is ever run before a person does. It reports and
+      # does not stop the release: an installer that will not install silently on a build
+      # machine may still be fine on a desk.
+      - name: The installer installs, the app fetches its runtime and starts the helper (Windows; reported, not required)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path "dist/team-hub-desktop-${env:VERSION}-${env:LABEL}-setup.exe").Path
+          $folder = Join-Path $env:RUNNER_TEMP 'team-hub-installed'
+          # NSIS: /S is silent, and /D= (last, unquoted) is the folder to install into.
+          $install = Start-Process -FilePath $installer -ArgumentList '/S', "/D=$folder" -Wait -PassThru
+
+          if ($install.ExitCode -ne 0) {
+            Write-Output "::error::The installer ended with $($install.ExitCode)."
+            exit 1
+          }
+
+          node apps/desktop/scripts/check-packaged.mjs $folder --app (Join-Path $folder 'team-hub-desktop.exe')
+          exit $LASTEXITCODE
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-app-${{ matrix.label }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+          # Installers are compressed already.
+          compression-level: 0
+
+  cli:
+    name: hub · ${{ matrix.label }}
+    needs: version
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - label: macos-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - label: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - label: linux-x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    env:
+      TARGET: ${{ matrix.target }}
+      ARCHIVE: hub-${{ needs.version.outputs.version }}-${{ matrix.label }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust (stable) for ${{ matrix.target }}
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustup target add "$TARGET"
+          rustc --version
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: hub-${{ matrix.target }}
+
+      - name: Build hub
+        run: cargo build --release --locked -p hub-desktop-core --bin hub --target "$TARGET"
+
+      - name: Pack (tar.gz)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          tar -czf "dist/$ARCHIVE.tar.gz" -C "target/$TARGET/release" hub
+
+      - name: Pack (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "target/$env:TARGET/release/hub.exe" -DestinationPath "dist/$env:ARCHIVE.zip"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-cli-${{ matrix.label }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  release:
+    name: Draft the release
+    # A tag only. A dry run stops at the artifacts above.
+    if: github.event_name == 'push'
+    needs: [version, app, cli]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # For the release notes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: apps/desktop/RELEASE_NOTES.md
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: dist
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum -- * > ../SHA256SUMS
+          mv ../SHA256SUMS SHA256SUMS
+          cat SHA256SUMS
+
+      # Running the workflow again for the same tag replaces the files of the draft. A release
+      # that a person has published is never changed from here.
+      - name: Create or update the draft
+        run: |
+          title="team-hub desktop v$VERSION"
+          notes=apps/desktop/RELEASE_NOTES.md
+
+          if state=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$state" != "true" ]; then
+              echo "::error::The release $TAG is published already. Delete it, or release a new version."
+              exit 1
+            fi
+
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --draft --title "$title" --notes-file "$notes"
+          else
+            gh release create "$TAG" dist/* --draft --verify-tag --title "$title" --notes-file "$notes"
+          fi
+
+          gh release view "$TAG" --json url,isDraft,assets --jq '"\(.url) (draft: \(.isDraft))", (.assets[] | "  \(.name)  \(.size) bytes")'

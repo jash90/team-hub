@@ -9,7 +9,9 @@
  * The process holds no token of team-hub and makes no request to it: the tracker's tools are
  * relayed to the core as `request` lines and answered with `reply` lines.
  */
+import { realpathSync } from 'node:fs';
 import { createInterface } from 'node:readline';
+import { pathToFileURL } from 'node:url';
 
 import { type Options, query } from '@anthropic-ai/claude-agent-sdk';
 
@@ -157,7 +159,8 @@ const end = (code: number) => {
   }, GRACE_MS).unref();
 };
 
-const main = async () => {
+/** The helper's whole life: `ready`, one turn, the end. `launch.mjs` calls it in an installed app. */
+export const main = async () => {
   let turn: Promise<void> | undefined;
 
   send({ type: 'ready', protocol: PROTOCOL });
@@ -188,6 +191,19 @@ const main = async () => {
   end(turn ? 1 : 0);
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+/**
+ * Whether this file is what Node was started with (`node src/main.ts`: development, the tests,
+ * `TEAM_HUB_SIDECAR`), and not imported. Compared as addresses: a path with a space in it, or
+ * a Windows one, is not its own address with `file://` put in front.
+ */
+const startedDirectly = () => {
+  try {
+    return process.argv[1] !== undefined && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
+  } catch {
+    return false;
+  }
+};
+
+if (startedDirectly()) {
   void main();
 }
