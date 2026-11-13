@@ -1,20 +1,29 @@
-# team-hub desktop 0.1.1
+# team-hub desktop 0.2.0
 
-The desktop app for [team-hub](https://github.com/jash90/team-hub). This is 0.1.0 again with
-one change: **the macOS app is now signed with an Apple Developer ID and notarized by Apple**,
-so it opens without the "Open Anyway" step. Nothing else in the app changed.
+The desktop app for [team-hub](https://github.com/jash90/team-hub). New in 0.2.0: **the
+window now shows the tracker**, your server's own web interface, beside the app's panel of
+agent threads. The app's own issue and search views are gone: an issue's key and the search
+field open the page in the tracker. The macOS app is signed with an Apple Developer ID and
+notarized by Apple, as in 0.1.1.
 
 **Read this first.** The app was written and run on Linux only. The Windows and Linux
 installers and the `hub` archives were built by GitHub's machines, the two macOS `.dmg` files
 on a Mac that holds the certificate; none of them was installed and tried by a person before
 this release, and the Windows build has never been run at all. The Windows installer is not
-signed. Treat 0.1.1 as a preview and
+signed. Treat 0.2.0 as a preview and
 [report](https://github.com/jash90/team-hub/issues) what does not work.
 
 ## What it is
 
-A developer's cockpit on top of a team-hub server.
+team-hub in a window of its own, with what a browser cannot do beside it.
 
+- The window shows the **tracker**: your server's web interface, loaded from the server, the
+  same board, backlog, issues and knowledge base a browser shows. You sign in to it once, as
+  in a browser. Beside it is the app's panel of threads and decisions. An issue's key in the
+  panel and the search field open the page in the tracker; **New**, while the tracker shows
+  an issue, starts a thread for it; where the tracker asks for a runner, this computer is
+  offered first. The tracker cannot call the app: pushes, pull requests, repository folders
+  and the sandbox are decided only in the files that came with the app.
 - The issues assigned to you become **agent threads**: an AI agent works on an issue in a
   local clone of the repository, in a git working tree and branch of its own.
 - **Nothing leaves your computer without a click.** A comment, a status change, subtasks, a
@@ -85,13 +94,13 @@ needs other versions:
 
 | System | File |
 |---|---|
-| macOS 13 or newer, Apple silicon | `team-hub-desktop-0.1.1-macos-arm64.dmg` |
-| macOS 13 or newer, Intel | `team-hub-desktop-0.1.1-macos-x64.dmg` |
-| Windows 10 and 11, 64-bit Intel/AMD | `team-hub-desktop-0.1.1-windows-x64-setup.exe` |
-| Debian 12 or newer, Ubuntu 22.04 or newer | `team-hub-desktop-0.1.1-linux-x64.deb` |
-| Fedora (other RPM systems are untried) | `team-hub-desktop-0.1.1-linux-x64.rpm` |
-| Other Linux (glibc 2.35 or newer) | `team-hub-desktop-0.1.1-linux-x64.AppImage` |
-| The `hub` command line alone | `hub-0.1.1-macos-arm64.tar.gz`, `hub-0.1.1-macos-x64.tar.gz`, `hub-0.1.1-linux-x64.tar.gz`, `hub-0.1.1-windows-x64.zip` |
+| macOS 13 or newer, Apple silicon | `team-hub-desktop-0.2.0-macos-arm64.dmg` |
+| macOS 13 or newer, Intel | `team-hub-desktop-0.2.0-macos-x64.dmg` |
+| Windows 10 and 11, 64-bit Intel/AMD | `team-hub-desktop-0.2.0-windows-x64-setup.exe` |
+| Debian 12 or newer, Ubuntu 22.04 or newer | `team-hub-desktop-0.2.0-linux-x64.deb` |
+| Fedora (other RPM systems are untried) | `team-hub-desktop-0.2.0-linux-x64.rpm` |
+| Other Linux (glibc 2.35 or newer) | `team-hub-desktop-0.2.0-linux-x64.AppImage` |
+| The `hub` command line alone | `hub-0.2.0-macos-arm64.tar.gz`, `hub-0.2.0-macos-x64.tar.gz`, `hub-0.2.0-linux-x64.tar.gz`, `hub-0.2.0-windows-x64.zip` |
 | Checksums of all of the above | `SHA256SUMS` |
 
 Check a download: `sha256sum --ignore-missing -c SHA256SUMS` (macOS:
@@ -116,9 +125,9 @@ needs the internet).
 ### Linux
 
 ```bash
-sudo apt install ./team-hub-desktop-0.1.1-linux-x64.deb      # Debian, Ubuntu
-sudo dnf install ./team-hub-desktop-0.1.1-linux-x64.rpm      # Fedora
-chmod +x team-hub-desktop-0.1.1-linux-x64.AppImage && ./team-hub-desktop-0.1.1-linux-x64.AppImage
+sudo apt install ./team-hub-desktop-0.2.0-linux-x64.deb      # Debian, Ubuntu
+sudo dnf install ./team-hub-desktop-0.2.0-linux-x64.rpm      # Fedora
+chmod +x team-hub-desktop-0.2.0-linux-x64.AppImage && ./team-hub-desktop-0.2.0-linux-x64.AppImage
 ```
 
 The packages need WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), which the `.deb` and `.rpm` ask
@@ -143,10 +152,12 @@ what the app downloads at its first start is described above.
 
 ## First steps
 
-1. Start the app, enter the server's address and your API token.
+1. Start the app, enter the server's address and your API token, and sign in to the tracker
+   with your password when it asks (once).
 2. **Repositories → Choose the folder…** next to a project's GitHub repository, and pick your
    local clone.
-3. Open an issue assigned to you and start a thread, or leave the app running (closing the
+3. Open an issue assigned to you in the tracker and choose **New** in the panel to start a
+   thread, or leave the app running (closing the
    window keeps it in the tray) and delegate work to an agent on the web.
 
 ## Known limits
@@ -156,6 +167,12 @@ what the app downloads at its first start is described above.
   without a shell unless you allow one in Settings); the tray icon, system notifications and
   the folder dialog; a long real implementation run. On Windows, console windows may appear
   while the app runs git or an agent.
+- **The window with the tracker in it has run on Linux only**, on a virtual screen. On macOS
+  and Windows the same code places the tracker with Tauri's own calls, which compile and
+  have not been run by anybody.
+- The app is connected twice: the core with an API token, and the tracker by signing in with
+  your password, once. The tracker needs the server: offline, the panel and the threads keep
+  working and the tracker shows the browser engine's own error page.
 - **The installers are untested**, as said above, and the Windows installer and the `hub`
   archives are unsigned. The AppImage is the least certain of the three Linux packages.
 - **Node.js and npm are not bundled.** The app looks for `node` and `npm` on the `PATH` of
