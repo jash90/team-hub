@@ -1,5 +1,683 @@
-/* Timeline. Class names start with the module's id. */
+/* Timeline. Class names start with the module's id. Colours are the application's
+   variables, so both themes follow; a bar's meaning never rests on its colour alone. */
+
+.timeline-view {
+  max-width: none;
+}
+
+.timeline-view .empty p {
+  max-width: 540px;
+  margin: 0 0 12px;
+}
+
+.timeline {
+  --timeline-side: 320px;
+  --timeline-bar: var(--purple);
+  --timeline-bar-soft: var(--purple-soft);
+  --timeline-hatch: repeating-linear-gradient(135deg, var(--timeline-bar-soft) 0 5px, transparent 5px 9px);
+  overflow: hidden;
+}
+
+/* ---------- controls ---------- */
+
+.timeline-tools {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.timeline-switch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--sunk);
+}
+
+.timeline-switch button {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.timeline-switch button:hover {
+  color: var(--ink);
+}
+
+.timeline-switch .timeline-switch-on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(16 24 40 / 14%);
+}
+
+.timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 16px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.timeline-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.timeline-key {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 24px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.timeline-key-planned {
+  border: 1px solid var(--timeline-bar);
+  background: linear-gradient(90deg, var(--timeline-bar) 0 45%, var(--timeline-bar-soft) 45%);
+}
+
+.timeline-key-estimated {
+  border: 1px dashed var(--timeline-bar);
+  background: var(--timeline-hatch);
+}
+
+.timeline-key-sprint {
+  border: 1px solid var(--line-strong);
+  background: var(--sunk);
+}
+
+.timeline-key-release {
+  width: 0;
+  height: 13px;
+  border-left: 2px dashed var(--amber);
+  border-radius: 0;
+}
+
+.timeline-key-today {
+  width: 2px;
+  height: 13px;
+  border-radius: 0;
+  background: var(--red);
+}
+
+/* ---------- the frame: a column of issues that stays put, and time that scrolls ---------- */
+
+.timeline-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.timeline-canvas {
+  width: max-content;
+  min-width: 100%;
+}
+
+.timeline-head {
+  display: flex;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.timeline-side {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  width: var(--timeline-side);
+  min-width: 0;
+  padding: 0 6px;
+  border-right: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.timeline-corner {
+  align-items: flex-end;
+  padding: 0 14px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ---------- the header of the axis ---------- */
+
+.timeline-axis {
+  position: relative;
+  flex: none;
+}
+
+.timeline-lane {
+  position: relative;
+  height: 26px;
+}
+
+.timeline-cell {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  border-left: 1px solid var(--line);
+  overflow: clip;
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* A caption stays in view for as long as its stretch of the axis does. */
+.timeline-cell span,
+.timeline-sprint-name span {
+  position: sticky;
+  left: calc(var(--timeline-side) + 1px);
+  padding: 0 8px;
+}
+
+.timeline-major .timeline-cell {
+  border-left-color: var(--line-strong);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.timeline-major .timeline-cell span::first-letter {
+  text-transform: uppercase;
+}
+
+.timeline-minor {
+  height: 22px;
+}
+
+.timeline-sprints {
+  border-top: 1px solid var(--line);
+}
+
+.timeline-sprint-name {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  border: 0 solid transparent;
+  border-width: 0 1px;
+  border-radius: 5px;
+  background: var(--sunk) padding-box;
+  overflow: clip;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.timeline-sprint-active {
+  background: var(--blue-soft) padding-box;
+  color: var(--blue);
+}
+
+.timeline-version {
+  position: absolute;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  margin-left: -1px;
+  padding: 0 8px 0 5px;
+  border-left: 2px solid var(--amber);
+  border-radius: 0 9px 9px 0;
+  background: var(--amber-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+.timeline-version-released {
+  border-left-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.timeline-today-mark {
+  position: absolute;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  margin-left: -5px;
+  border: 5px solid transparent;
+  border-top-color: var(--red);
+  border-bottom-width: 0;
+}
+
+/* ---------- behind the rows ---------- */
+
+.timeline-body {
+  position: relative;
+}
+
+.timeline-backdrop {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--timeline-side);
+  overflow: clip;
+  pointer-events: none;
+}
+
+.timeline-backdrop > * {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.timeline-band {
+  box-sizing: border-box;
+  border: 0 solid var(--surface);
+  border-width: 0 1px;
+  background: var(--muted);
+  opacity: 0.09;
+}
+
+.timeline-band-active {
+  background: var(--blue);
+  opacity: 0.11;
+}
+
+.timeline-gridline {
+  width: 1px;
+  background: var(--line);
+  opacity: 0.55;
+}
+
+.timeline-gridline-major {
+  background: var(--line-strong);
+  opacity: 0.9;
+}
+
+.timeline-release-line {
+  border-left: 1px dashed var(--amber);
+}
+
+.timeline-release-line-done {
+  border-left-color: var(--green);
+}
+
+.timeline-today {
+  width: 2px;
+  margin-left: -1px;
+  background: var(--red);
+}
+
+/* ---------- rows ---------- */
+
+.timeline-row {
+  position: relative;
+  display: flex;
+  min-height: 54px;
+  border-bottom: 1px solid var(--line);
+}
+
+.timeline-row:last-child {
+  border-bottom: 0;
+}
+
+.timeline-row:hover .timeline-side {
+  background: var(--sunk);
+}
+
+.timeline-no-toggle {
+  flex: none;
+  width: 26px;
+}
+
+.timeline-epic {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.timeline-title {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
 
 .timeline-summary {
-  padding: 24px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  overflow: hidden;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.timeline-summary:hover {
+  color: var(--accent);
+}
+
+.timeline-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.timeline-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-progress .progress {
+  width: 52px;
+  height: 5px;
+}
+
+.timeline-row-child {
+  min-height: 34px;
+}
+
+.timeline-row-child .timeline-side {
+  gap: 8px;
+  padding-left: 36px;
+  font-size: 12.5px;
+}
+
+.timeline-row-child .timeline-summary {
+  font-weight: 400;
+}
+
+.timeline-track {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.timeline-set {
+  position: sticky;
+  left: calc(var(--timeline-side) + 12px);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.timeline-set:hover {
+  border-color: var(--muted);
+  color: var(--ink);
+}
+
+.timeline-set-none {
+  border-color: transparent;
+  background: none;
+  cursor: default;
+}
+
+/* ---------- bars ---------- */
+
+.timeline-bar {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  box-sizing: border-box;
+  height: 22px;
+  min-width: 6px;
+  margin-top: -11px;
+  border: 1px solid var(--timeline-bar);
+  border-radius: 6px;
+  background: var(--timeline-bar-soft);
+  overflow: hidden;
+  user-select: none;
+}
+
+.timeline-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--timeline-bar);
+  pointer-events: none;
+}
+
+/* Estimated: hatched and dashed, and the caption beside the bar says so. */
+.timeline-bar-estimated {
+  border-style: dashed;
+  background: var(--timeline-hatch), var(--surface);
+}
+
+.timeline-bar-estimated .timeline-fill {
+  opacity: 0.4;
+}
+
+/* An end nobody knows: the bar fades out towards it. */
+.timeline-bar-open-due {
+  border-right-color: transparent;
+  mask-image: linear-gradient(90deg, #000 35%, transparent);
+}
+
+.timeline-bar-open-start {
+  border-left-color: transparent;
+  mask-image: linear-gradient(270deg, #000 35%, transparent);
+}
+
+.timeline-bar-draggable {
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.timeline-bar-dragging {
+  z-index: 3;
+  box-shadow: var(--shadow);
+  cursor: grabbing;
+}
+
+.timeline-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: ew-resize;
+}
+
+.timeline-grip-start {
+  left: 0;
+}
+
+.timeline-grip-due {
+  right: 0;
+}
+
+.timeline-grip::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 3px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--timeline-bar);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.timeline-bar-draggable:hover .timeline-grip::after,
+.timeline-bar-dragging .timeline-grip::after {
+  opacity: 1;
+}
+
+/* A bar too short to hold its grips has them just outside. */
+.timeline-bar-short {
+  overflow: visible;
+}
+
+.timeline-bar-short .timeline-fill {
+  border-radius: 5px;
+}
+
+.timeline-bar-short .timeline-grip-start {
+  left: -10px;
+}
+
+.timeline-bar-short .timeline-grip-due {
+  right: -10px;
+}
+
+.timeline-bar-thin {
+  height: 8px;
+  min-width: 4px;
+  margin-top: -4px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--line-strong);
+}
+
+.timeline-bar-thin.timeline-bar-in_progress {
+  background: var(--blue);
+}
+
+.timeline-bar-thin.timeline-bar-done {
+  background: var(--green);
+}
+
+.timeline-bar-note {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* The dates under the pointer while a bar is dragged. */
+.timeline-bar-dates {
+  position: absolute;
+  bottom: calc(50% + 15px);
+  z-index: 6;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--surface);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* ---------- the dialog and the panel on the issue page ---------- */
+
+.timeline-dialog-summary {
+  margin: 0;
+  font-weight: 600;
+}
+
+.timeline-more {
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.timeline-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 28px;
+}
+
+.timeline-panel-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.timeline-panel-field .input {
+  width: auto;
+}
+
+.timeline-panel-note {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+/* ---------- less room ---------- */
+
+@media (max-width: 1100px) {
+  .timeline {
+    --timeline-side: 264px;
+  }
+}
+
+@media (max-width: 760px) {
+  .timeline {
+    --timeline-side: 172px;
+  }
+
+  .timeline-legend {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  /* Key over summary, and the progress under them: the status stays on the issue itself. */
+  .timeline-title {
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .timeline-summary {
+    flex: none;
+    width: 100%;
+  }
+
+  .timeline-side .status {
+    display: none;
+  }
+
+  .timeline-row-child .timeline-side {
+    padding: 4px 6px 4px 14px;
+  }
 }

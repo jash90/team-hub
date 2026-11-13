@@ -586,7 +586,8 @@ export function RunCard({ run: listed, canDecide, settings, open = false, showIs
     (event) => event.kind === 'agent.run' && event.payload.runId === listed.id,
   );
   const run = detail.data?.run ?? listed;
-  const pending = detail.data?.proposals.filter((proposal) => proposal.state === 'pending') ?? [];
+  // What can be decided here; a push or a pull request waits in the desktop app.
+  const pending = detail.data?.proposals.filter((proposal) => proposal.state === 'pending' && !decidedByRunner(proposal.kind)) ?? [];
   const [busy, work] = useBusy();
 
   function changed(next: AgentRunDetail): void {

@@ -177,7 +177,7 @@ fn world() -> (Router, String) {
             Ok((user, token))
         })
         .expect("a user with a token");
-    let admin = AuthUser { id: user.id, name: user.name, email: user.email, role: Role::Admin, via_token: true };
+    let admin = AuthUser { id: user.id, name: user.name, email: user.email, role: Role::Admin, via_token: true, through: Vec::new() };
 
     app.write(Actor::user(admin.id), |tx| {
         let project = NewProject {

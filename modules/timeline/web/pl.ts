@@ -1,5 +1,66 @@
 /** Polish for the phrases of the "Timeline" module; the key is the English text. */
 export const polish: Record<string, string> = {
-  'Timeline': 'Timeline',
-  'This page comes from the “{name}” module. Replace it with what the module shows.': 'Ta strona pochodzi z modułu „{name}”. Zastąp ją tym, co moduł ma pokazywać.',
+  Timeline: 'Oś czasu',
+  'Open the timeline': 'Otwórz oś czasu',
+  'Epics from their start date to their due date. Drag a bar to move it, drag an end to change one date.': 'Epiki od daty rozpoczęcia do terminu. Przeciągnij pasek, żeby go przesunąć, albo jego koniec, żeby zmienić jedną datę.',
+  'Epics from their start date to their due date.': 'Epiki od daty rozpoczęcia do terminu.',
+
+  // the axis
+  Zoom: 'Skala',
+  Weeks: 'Tygodnie',
+  Months: 'Miesiące',
+  Quarters: 'Kwartały',
+  Today: 'Dziś',
+  'Q{quarter} {year}': '{quarter}. kwartał {year}',
+  running: 'trwa',
+  completed: 'zakończony',
+  planned: 'zaplanowany',
+  'released {date}': 'wydano {date}',
+  'release planned for {date}': 'wydanie planowane na {date}',
+  'dates set; the filled part is done': 'daty ustawione; wypełniona część to zrobione zadania',
+  'estimated from the epic’s issues': 'oszacowane na podstawie zadań epika',
+  sprint: 'sprint',
+  release: 'wydanie',
+  today: 'dziś',
+
+  // rows and bars
+  Epic: 'Epik',
+  'Show the issues of {key}': 'Pokaż zadania epika {key}',
+  'Hide the issues of {key}': 'Ukryj zadania epika {key}',
+  '{done} of {total} issues done': 'Zrobione zadania: {done} z {total}',
+  '{done} of {total} story points done': 'Zrobione punkty: {done} z {total}',
+  'no issues': 'brak zadań',
+  'Actions for {key}': 'Akcje dla {key}',
+  'Set dates…': 'Ustaw daty…',
+  'Set dates': 'Ustaw daty',
+  'Clear dates': 'Wyczyść daty',
+  'No dates': 'Brak dat',
+  estimated: 'szacowane',
+  'start estimated': 'początek szacowany',
+  'due date estimated': 'termin szacowany',
+  'no start date': 'brak daty rozpoczęcia',
+  'no due date': 'brak terminu',
+  'from {date}': 'od {date}',
+  'until {date}': 'do {date}',
+  'The dates of {key} were not saved: {reason}': 'Nie udało się zapisać dat zadania {key}: {reason}',
+
+  // the dialog and the panel on the issue page
+  'Dates of {key}': 'Daty zadania {key}',
+  'Start date': 'Data rozpoczęcia',
+  'Due date': 'Termin',
+  'Estimated from its issues: {date}': 'Oszacowane na podstawie zadań: {date}',
+  'Estimated from its issues: {dates}': 'Oszacowane na podstawie zadań: {dates}',
+  'starts {date}': 'początek {date}',
+  'due {date}': 'termin {date}',
+  'not set': 'nie ustawiono',
+  'The start date is after the due date': 'Data rozpoczęcia jest późniejsza niż termin',
+  Clear: 'Wyczyść',
+  Cancel: 'Anuluj',
+  Save: 'Zapisz',
+
+  // without epics
+  'No epics yet': 'Nie ma jeszcze epików',
+  'An epic is a larger piece of work that groups issues. On the timeline every epic is a bar from its start date to its due date, so you can see what is planned when and how far along it is.':
+    'Epik to większy kawałek pracy, który grupuje zadania. Na osi czasu każdy epik jest paskiem od daty rozpoczęcia do terminu, więc widać, co jest zaplanowane na kiedy i ile już zrobiono.',
+  'Create an epic': 'Utwórz epik',
 };

@@ -15,6 +15,9 @@ the knowledge base instead of bolted onto them.
 - **Knowledge** (modules `wiki`, `confluence`): a Markdown knowledge base with page trees,
   history and diff, pages and issues linked both ways, issues created from a page's task
   list, and import of Confluence spaces as a mirror.
+- **Timeline** (module `timeline`): a project's epics as bars on a time axis, from start
+  date to due date, with sprints and releases behind them; drag a bar to plan, and an epic
+  nobody has dated shows the span its issues suggest.
 - **Reports** (module `reports`): burndown, velocity, cumulative flow, cycle time, workload,
   all reconstructed from issue history.
 - **Tests** (module `e2e`): runs of the [e2e](https://github.com/e2e-inc/e2e) testing
@@ -138,9 +141,9 @@ enabled modules add. Plain words search the text; a bare key opens the issue.
 
 ## What it does not do yet
 
-Each of these is meant to arrive as a module: e-mail notifications, custom fields, a
-timeline of epics, automation rules beyond the code-driven ones, GitLab as a second code
-host (the drift rules and badges are host-neutral already), single sign-on.
+Each of these is meant to arrive as a module: e-mail notifications, custom fields,
+automation rules beyond the code-driven ones, GitLab as a second code host (the drift rules
+and badges are host-neutral already), single sign-on.
 
 Known gaps in what is there:
 

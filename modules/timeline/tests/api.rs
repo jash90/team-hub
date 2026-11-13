@@ -440,6 +440,12 @@ async fn the_demo_has_epics_planned_around_today() {
     let checkout = epic_of(&web, "WEB-1");
     assert_eq!(checkout["counts"], json!({ "total": 10, "todo": 2, "inProgress": 4, "done": 4 }));
     assert_eq!((&checkout["pointsDone"], &checkout["pointsTotal"]), (&json!(12.0), &json!(39.0)));
+    let card = checkout["children"].as_array().expect("children").iter().find(|child| child["key"] == "WEB-9").expect("WEB-9 is under WEB-1");
+    assert_eq!(
+        (card["start"].as_str(), card["due"].as_str()),
+        (Some(date(-5).as_str()), Some(date(3).as_str())),
+        "a few issues have a span of their own"
+    );
     assert_eq!(web["sprints"].as_array().map(Vec::len), Some(3));
     assert_eq!(
         (&web["sprints"][1]["state"], &web["sprints"][1]["start"], &web["sprints"][1]["end"]),
