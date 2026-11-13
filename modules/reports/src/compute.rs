@@ -19,7 +19,8 @@ const END_OF_TIME: &str = "9999";
 const UNASSIGNED: &str = "Unassigned";
 
 fn round2(value: f64) -> f64 {
-    (value * 100.0).round() / 100.0
+    // An empty sum is negative zero; adding zero makes it the plain one, which is what JSON should carry.
+    (value * 100.0).round() / 100.0 + 0.0
 }
 
 /// One issue's part of a sprint at one instant: nothing while it is not in the sprint.
@@ -47,11 +48,7 @@ fn counts(unit: ReportUnit, issue: &IssueHistory) -> bool {
 }
 
 fn members(history: &ProjectHistory, sprint_id: Id, unit: ReportUnit) -> Vec<&IssueHistory> {
-    history
-        .issues
-        .iter()
-        .filter(|issue| counts(unit, issue) && issue.was_ever_in(sprint_id))
-        .collect()
+    history.issues.iter().filter(|issue| counts(unit, issue) && issue.was_ever_in(sprint_id)).collect()
 }
 
 fn share(history: &ProjectHistory, issue: &IssueHistory, sprint_id: Id, unit: ReportUnit, instant: &str) -> Share {
@@ -64,10 +61,7 @@ fn share(history: &ProjectHistory, issue: &IssueHistory, sprint_id: Id, unit: Re
         ReportUnit::Issues => 1.0,
     };
 
-    Share {
-        amount,
-        done: history.is_done(issue.status_before(instant)),
-    }
+    Share { amount, done: history.is_done(issue.status_before(instant)) }
 }
 
 fn snapshot(history: &ProjectHistory, members: &[&IssueHistory], sprint_id: Id, unit: ReportUnit, instant: &str) -> Vec<Share> {
@@ -95,20 +89,14 @@ fn sprint_days(sprint: &Sprint, today: NaiveDate) -> Vec<(NaiveDate, String)> {
     let last = match sprint.state {
         SprintState::Future => return Vec::new(),
         SprintState::Active => today,
-        SprintState::Closed => completed_at
-            .and_then(day_of)
-            .or_else(|| sprint.end_date.as_deref().and_then(day_of))
-            .unwrap_or(today)
-            .max(first),
+        SprintState::Closed => completed_at.and_then(day_of).or_else(|| sprint.end_date.as_deref().and_then(day_of)).unwrap_or(today).max(first),
     };
 
     days_between(first, last)
         .into_iter()
         .map(|day| {
             let end = day_end(day);
-            let instant = completed_at
-                .filter(|completed_at| *completed_at < end.as_str())
-                .map_or(end.clone(), String::from);
+            let instant = completed_at.filter(|completed_at| *completed_at < end.as_str()).map_or(end.clone(), String::from);
 
             (day, instant)
         })
@@ -125,10 +113,7 @@ fn ideal(committed: f64, span: i64, elapsed: i64) -> f64 {
 
 fn burndown_series(history: &ProjectHistory, sprint: &Sprint, unit: ReportUnit, days: &[(NaiveDate, String)]) -> (f64, Vec<ReportBurndownDay>) {
     let members = members(history, sprint.id, unit);
-    let snapshots: Vec<Vec<Share>> = days
-        .par_iter()
-        .map(|(_, instant)| snapshot(history, &members, sprint.id, unit, instant))
-        .collect();
+    let snapshots: Vec<Vec<Share>> = days.par_iter().map(|(_, instant)| snapshot(history, &members, sprint.id, unit, instant)).collect();
     let committed = snapshots.first().map_or(0.0, |shares| scope(shares));
     let span = match (days.first(), sprint.end_date.as_deref().and_then(day_of)) {
         (Some((first, _)), Some(end)) => (end - *first).num_days(),
@@ -173,23 +158,16 @@ pub fn burndown(history: &ProjectHistory, sprint: &Sprint, unit: Option<ReportUn
         }
     };
 
-    ReportBurndown {
-        sprint: Some(sprint.clone()),
-        unit,
-        committed,
-        days,
-    }
+    ReportBurndown { sprint: Some(sprint.clone()), unit, committed, days }
 }
 
 /// The sprint a burndown shows when none is asked for: the running one, else the one
 /// completed last.
 pub fn default_sprint(sprints: &[Sprint]) -> Option<&Sprint> {
-    sprints.iter().find(|sprint| sprint.state == SprintState::Active).or_else(|| {
-        sprints
-            .iter()
-            .filter(|sprint| sprint.state == SprintState::Closed)
-            .max_by(|a, b| a.completed_at.cmp(&b.completed_at))
-    })
+    sprints
+        .iter()
+        .find(|sprint| sprint.state == SprintState::Active)
+        .or_else(|| sprints.iter().filter(|sprint| sprint.state == SprintState::Closed).max_by(|a, b| a.completed_at.cmp(&b.completed_at)))
 }
 
 /// The `count` sprints completed last, oldest first.
@@ -203,13 +181,8 @@ pub fn recent_closed(sprints: &[Sprint], count: usize) -> Vec<Sprint> {
 fn sprint_velocity(history: &ProjectHistory, sprint: &Sprint) -> ReportVelocitySprint {
     let completion = sprint.completed_at.clone().unwrap_or_else(|| END_OF_TIME.to_string());
     // What the team took on is what was in the sprint when its first day ended.
-    let commitment = sprint
-        .start_date
-        .as_deref()
-        .and_then(day_of)
-        .map(day_end)
-        .filter(|instant| *instant < completion)
-        .unwrap_or_else(|| completion.clone());
+    let commitment =
+        sprint.start_date.as_deref().and_then(day_of).map(day_end).filter(|instant| *instant < completion).unwrap_or_else(|| completion.clone());
     let shares = |unit, instant: &str| snapshot(history, &members(history, sprint.id, unit), sprint.id, unit, instant);
 
     ReportVelocitySprint {
@@ -229,10 +202,7 @@ pub fn velocity(history: &ProjectHistory, sprints: &[Sprint]) -> ReportVelocity 
         count => sprints.iter().map(|sprint| sprint.completed_points).sum::<f64>() / count as f64,
     };
 
-    ReportVelocity {
-        sprints,
-        average_completed_points: round2(average),
-    }
+    ReportVelocity { sprints, average_completed_points: round2(average) }
 }
 
 /// How many issues were in each status category at the end of each of the last `days` days.
@@ -242,12 +212,7 @@ pub fn cumulative_flow(history: &ProjectHistory, days: i64, today: NaiveDate) ->
         .par_iter()
         .map(|day| {
             let instant = day_end(*day);
-            let mut entry = ReportFlowDay {
-                date: iso_day(*day),
-                todo: 0,
-                in_progress: 0,
-                done: 0,
-            };
+            let mut entry = ReportFlowDay { date: iso_day(*day), todo: 0, in_progress: 0, done: 0 };
 
             for issue in work.iter().filter(|issue| issue.exists_before(&instant)) {
                 match history.category(issue.status_before(&instant)) {
@@ -268,20 +233,14 @@ pub fn cumulative_flow(history: &ProjectHistory, days: i64, today: NaiveDate) ->
 /// resolved once, on the day it entered the done statuses it is still in.
 pub fn created_vs_resolved(history: &ProjectHistory, days: i64, today: NaiveDate) -> ReportCreatedResolved {
     let work = history.work();
-    let marks: Vec<(Option<NaiveDate>, Option<NaiveDate>)> = work
-        .par_iter()
-        .map(|issue| (day_of(&issue.created_at), history.resolved_at(issue).and_then(day_of)))
-        .collect();
+    let marks: Vec<(Option<NaiveDate>, Option<NaiveDate>)> =
+        work.par_iter().map(|issue| (day_of(&issue.created_at), history.resolved_at(issue).and_then(day_of))).collect();
     let counted: Vec<(NaiveDate, i64, i64)> = last_days(today, days)
         .par_iter()
         .map(|day| {
             let on_day = |mark: &Option<NaiveDate>| i64::from(*mark == Some(*day));
 
-            (
-                *day,
-                marks.iter().map(|(created, _)| on_day(created)).sum(),
-                marks.iter().map(|(_, resolved)| on_day(resolved)).sum(),
-            )
+            (*day, marks.iter().map(|(created, _)| on_day(created)).sum(), marks.iter().map(|(_, resolved)| on_day(resolved)).sum())
         })
         .collect();
     let (mut created_total, mut resolved_total) = (0, 0);
@@ -291,21 +250,11 @@ pub fn created_vs_resolved(history: &ProjectHistory, days: i64, today: NaiveDate
             created_total += created;
             resolved_total += resolved;
 
-            ReportCreatedResolvedDay {
-                date: iso_day(day),
-                created,
-                resolved,
-                created_total,
-                resolved_total,
-            }
+            ReportCreatedResolvedDay { date: iso_day(day), created, resolved, created_total, resolved_total }
         })
         .collect();
 
-    ReportCreatedResolved {
-        days,
-        created: created_total,
-        resolved: resolved_total,
-    }
+    ReportCreatedResolved { days, created: created_total, resolved: resolved_total }
 }
 
 /// The smallest value with at least `percent` percent of the values at or below it.
@@ -318,11 +267,7 @@ fn percentile(sorted: &[f64], percent: usize) -> Option<f64> {
 fn percentiles(mut values: Vec<f64>) -> ReportPercentiles {
     values.sort_by(f64::total_cmp);
 
-    ReportPercentiles {
-        p50: percentile(&values, 50),
-        p85: percentile(&values, 85),
-        p95: percentile(&values, 95),
-    }
+    ReportPercentiles { p50: percentile(&values, 50), p85: percentile(&values, 85), p95: percentile(&values, 95) }
 }
 
 /// How long the issues resolved in the last `days` days took.
@@ -334,10 +279,7 @@ pub fn cycle_time(history: &ProjectHistory, days: i64, today: NaiveDate) -> Repo
         .par_iter()
         .filter_map(|issue| {
             let resolved_at = history.resolved_at(issue).filter(|at| *at >= from.as_str() && *at < until.as_str())?;
-            let cycle_days = history
-                .started_at(issue)
-                .and_then(|started_at| days_from(started_at, resolved_at))
-                .filter(|days| *days >= 0.0);
+            let cycle_days = history.started_at(issue).and_then(|started_at| days_from(started_at, resolved_at)).filter(|days| *days >= 0.0);
 
             Some(ReportCycleIssue {
                 key: issue.key.clone(),
@@ -448,11 +390,7 @@ mod tests {
     }
 
     fn project(issues: Vec<IssueHistory>) -> ProjectHistory {
-        let categories = HashMap::from([
-            (TODO, StatusCategory::Todo),
-            (DOING, StatusCategory::InProgress),
-            (DONE, StatusCategory::Done),
-        ]);
+        let categories = HashMap::from([(TODO, StatusCategory::Todo), (DOING, StatusCategory::InProgress), (DONE, StatusCategory::Done)]);
 
         ProjectHistory { issues, categories }
     }
@@ -481,11 +419,7 @@ mod tests {
 
     #[test]
     fn a_field_without_changes_has_always_had_its_current_value_and_one_with_changes_starts_at_the_first_old_value() {
-        let untouched = IssueHistory {
-            sprint_id: Some(SPRINT),
-            points: Some(5.0),
-            ..issue(1)
-        };
+        let untouched = IssueHistory { sprint_id: Some(SPRINT), points: Some(5.0), ..issue(1) };
         let changed = IssueHistory {
             sprint_id: None,
             sprint_steps: vec![step(4, 12, Some(SPRINT), None)],
@@ -505,28 +439,13 @@ mod tests {
 
     #[test]
     fn scope_added_mid_sprint_raises_remaining_and_is_reported_as_added_not_as_commitment() {
-        let planned = moved(
-            IssueHistory {
-                sprint_id: Some(SPRINT),
-                points: Some(5.0),
-                ..issue(1)
-            },
-            &[(3, 10, DOING), (4, 15, DONE)],
-        );
-        let late = IssueHistory {
-            sprint_id: Some(SPRINT),
-            points: Some(3.0),
-            sprint_steps: vec![step(3, 11, None, Some(SPRINT))],
-            ..issue(2)
-        };
+        let planned = moved(IssueHistory { sprint_id: Some(SPRINT), points: Some(5.0), ..issue(1) }, &[(3, 10, DOING), (4, 15, DONE)]);
+        let late = IssueHistory { sprint_id: Some(SPRINT), points: Some(3.0), sprint_steps: vec![step(3, 11, None, Some(SPRINT))], ..issue(2) };
         let report = burndown(&project(vec![planned, late]), &running(), None, day(5));
 
         assert_eq!(report.unit, ReportUnit::Points);
         assert_eq!(report.committed, 5.0);
-        assert_eq!(
-            report.days.iter().map(|day| day.date.as_str()).collect::<Vec<_>>(),
-            ["2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05"]
-        );
+        assert_eq!(report.days.iter().map(|day| day.date.as_str()).collect::<Vec<_>>(), ["2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05"]);
         assert_eq!(column(&report, |day| day.remaining), [5.0, 8.0, 3.0, 3.0]);
         assert_eq!(column(&report, |day| day.completed), [0.0, 0.0, 5.0, 5.0]);
         assert_eq!(column(&report, |day| day.added), [0.0, 3.0, 0.0, 0.0]);
@@ -536,14 +455,7 @@ mod tests {
 
     #[test]
     fn a_reopened_issue_goes_back_to_remaining() {
-        let reopened = moved(
-            IssueHistory {
-                sprint_id: Some(SPRINT),
-                points: Some(5.0),
-                ..issue(1)
-            },
-            &[(3, 10, DONE), (4, 10, DOING)],
-        );
+        let reopened = moved(IssueHistory { sprint_id: Some(SPRINT), points: Some(5.0), ..issue(1) }, &[(3, 10, DONE), (4, 10, DOING)]);
         let report = burndown(&project(vec![reopened]), &running(), Some(ReportUnit::Points), day(5));
 
         assert_eq!(column(&report, |day| day.completed), [0.0, 5.0, 0.0, 0.0]);
@@ -569,17 +481,8 @@ mod tests {
 
     #[test]
     fn an_issue_whose_first_sprint_change_leaves_the_sprint_was_in_it_from_creation_and_is_removed_that_day() {
-        let dropped = IssueHistory {
-            sprint_id: None,
-            points: Some(2.0),
-            sprint_steps: vec![step(4, 10, Some(SPRINT), None)],
-            ..issue(1)
-        };
-        let kept = IssueHistory {
-            sprint_id: Some(SPRINT),
-            points: Some(1.0),
-            ..issue(2)
-        };
+        let dropped = IssueHistory { sprint_id: None, points: Some(2.0), sprint_steps: vec![step(4, 10, Some(SPRINT), None)], ..issue(1) };
+        let kept = IssueHistory { sprint_id: Some(SPRINT), points: Some(1.0), ..issue(2) };
         let report = burndown(&project(vec![dropped, kept]), &running(), None, day(5));
 
         assert_eq!(report.committed, 3.0);
@@ -590,22 +493,11 @@ mod tests {
     #[test]
     fn a_completed_sprint_stops_at_completion_and_still_shows_the_work_it_handed_on() {
         let completed_at = at(5, 10);
-        let finished = moved(
-            IssueHistory {
-                sprint_id: Some(SPRINT),
-                points: Some(5.0),
-                ..issue(1)
-            },
-            &[(4, 10, DONE)],
-        );
+        let finished = moved(IssueHistory { sprint_id: Some(SPRINT), points: Some(5.0), ..issue(1) }, &[(4, 10, DONE)]);
         let carried_over = IssueHistory {
             sprint_id: Some(SPRINT + 1),
             points: Some(3.0),
-            sprint_steps: vec![Step {
-                at: completed_at.clone(),
-                old: Some(SPRINT),
-                new: Some(SPRINT + 1),
-            }],
+            sprint_steps: vec![Step { at: completed_at.clone(), old: Some(SPRINT), new: Some(SPRINT + 1) }],
             ..issue(2)
         };
         let closed = sprint(SprintState::Closed, 2, 6, Some(completed_at));
@@ -618,26 +510,9 @@ mod tests {
 
     #[test]
     fn points_come_from_stories_only_while_counting_issues_includes_subtasks_but_never_epics() {
-        let story = IssueHistory {
-            sprint_id: Some(SPRINT),
-            points: Some(5.0),
-            ..issue(1)
-        };
-        let subtask = moved(
-            IssueHistory {
-                level: TypeLevel::Subtask,
-                sprint_id: Some(SPRINT),
-                points: Some(2.0),
-                ..issue(2)
-            },
-            &[(3, 10, DONE)],
-        );
-        let epic = IssueHistory {
-            level: TypeLevel::Epic,
-            sprint_id: Some(SPRINT),
-            points: Some(40.0),
-            ..issue(3)
-        };
+        let story = IssueHistory { sprint_id: Some(SPRINT), points: Some(5.0), ..issue(1) };
+        let subtask = moved(IssueHistory { level: TypeLevel::Subtask, sprint_id: Some(SPRINT), points: Some(2.0), ..issue(2) }, &[(3, 10, DONE)]);
+        let epic = IssueHistory { level: TypeLevel::Epic, sprint_id: Some(SPRINT), points: Some(40.0), ..issue(3) };
         let history = project(vec![story, subtask, epic]);
         let points = burndown(&history, &running(), Some(ReportUnit::Points), day(3));
         let issues = burndown(&history, &running(), Some(ReportUnit::Issues), day(3));
@@ -649,17 +524,19 @@ mod tests {
     }
 
     #[test]
+    fn nothing_completed_is_a_plain_zero_and_never_a_negative_one() {
+        let history = project(vec![IssueHistory { sprint_id: Some(SPRINT), points: Some(5.0), ..issue(1) }]);
+        let report = burndown(&history, &running(), None, day(3));
+        let empty = velocity(&project(Vec::new()), std::slice::from_ref(&sprint(SprintState::Closed, 2, 6, Some(at(6, 16)))));
+
+        assert!(report.days.iter().all(|day| day.completed == 0.0 && day.completed.is_sign_positive() && day.removed.is_sign_positive()));
+        assert!(empty.sprints[0].committed_points.is_sign_positive() && empty.sprints[0].completed_points.is_sign_positive());
+        assert!(empty.average_completed_points.is_sign_positive());
+    }
+
+    #[test]
     fn a_sprint_without_any_points_is_drawn_in_issues_unless_points_are_asked_for() {
-        let history = project(vec![
-            IssueHistory {
-                sprint_id: Some(SPRINT),
-                ..issue(1)
-            },
-            IssueHistory {
-                sprint_id: Some(SPRINT),
-                ..issue(2)
-            },
-        ]);
+        let history = project(vec![IssueHistory { sprint_id: Some(SPRINT), ..issue(1) }, IssueHistory { sprint_id: Some(SPRINT), ..issue(2) }]);
 
         let fallback = burndown(&history, &running(), None, day(3));
         let asked = burndown(&history, &running(), Some(ReportUnit::Points), day(3));
@@ -670,11 +547,7 @@ mod tests {
 
     #[test]
     fn a_sprint_that_has_not_started_has_no_days_and_a_running_one_past_its_end_date_keeps_going_with_an_ideal_of_zero() {
-        let history = project(vec![IssueHistory {
-            sprint_id: Some(SPRINT),
-            points: Some(4.0),
-            ..issue(1)
-        }]);
+        let history = project(vec![IssueHistory { sprint_id: Some(SPRINT), points: Some(4.0), ..issue(1) }]);
         let planned = sprint(SprintState::Future, 2, 6, None);
         let overdue = burndown(&history, &running(), None, day(8));
 
@@ -686,56 +559,20 @@ mod tests {
     #[test]
     fn velocity_commits_what_was_in_the_sprint_on_its_first_day_and_completes_what_was_done_at_completion() {
         let completed_at = at(6, 16);
-        let planned_and_done = moved(
-            IssueHistory {
-                sprint_id: Some(SPRINT),
-                points: Some(5.0),
-                ..issue(1)
-            },
-            &[(3, 10, DONE)],
-        );
+        let planned_and_done = moved(IssueHistory { sprint_id: Some(SPRINT), points: Some(5.0), ..issue(1) }, &[(3, 10, DONE)]);
         let added_and_done = moved(
-            IssueHistory {
-                sprint_id: Some(SPRINT),
-                points: Some(2.0),
-                sprint_steps: vec![step(4, 9, None, Some(SPRINT))],
-                ..issue(2)
-            },
+            IssueHistory { sprint_id: Some(SPRINT), points: Some(2.0), sprint_steps: vec![step(4, 9, None, Some(SPRINT))], ..issue(2) },
             &[(5, 10, DONE)],
         );
         let planned_and_carried_over = IssueHistory {
             sprint_id: None,
             points: Some(8.0),
-            sprint_steps: vec![Step {
-                at: completed_at.clone(),
-                old: Some(SPRINT),
-                new: None,
-            }],
+            sprint_steps: vec![Step { at: completed_at.clone(), old: Some(SPRINT), new: None }],
             ..issue(3)
         };
-        let done_after_completion = moved(
-            IssueHistory {
-                sprint_id: Some(SPRINT),
-                points: Some(1.0),
-                ..issue(4)
-            },
-            &[(7, 10, DONE)],
-        );
-        let done_subtask = moved(
-            IssueHistory {
-                level: TypeLevel::Subtask,
-                sprint_id: Some(SPRINT),
-                ..issue(5)
-            },
-            &[(3, 10, DONE)],
-        );
-        let history = project(vec![
-            planned_and_done,
-            added_and_done,
-            planned_and_carried_over,
-            done_after_completion,
-            done_subtask,
-        ]);
+        let done_after_completion = moved(IssueHistory { sprint_id: Some(SPRINT), points: Some(1.0), ..issue(4) }, &[(7, 10, DONE)]);
+        let done_subtask = moved(IssueHistory { level: TypeLevel::Subtask, sprint_id: Some(SPRINT), ..issue(5) }, &[(3, 10, DONE)]);
+        let history = project(vec![planned_and_done, added_and_done, planned_and_carried_over, done_after_completion, done_subtask]);
         let closed = sprint(SprintState::Closed, 2, 6, Some(completed_at));
         let report = velocity(&history, std::slice::from_ref(&closed));
 
@@ -750,18 +587,8 @@ mod tests {
 
     #[test]
     fn the_default_sprint_is_the_running_one_else_the_one_completed_last() {
-        let closed = |id: Id, day: u32| Sprint {
-            id,
-            ..sprint(SprintState::Closed, 2, 6, Some(at(day, 10)))
-        };
-        let done = vec![
-            closed(1, 20),
-            closed(2, 10),
-            Sprint {
-                id: 3,
-                ..sprint(SprintState::Future, 2, 6, None)
-            },
-        ];
+        let closed = |id: Id, day: u32| Sprint { id, ..sprint(SprintState::Closed, 2, 6, Some(at(day, 10))) };
+        let done = vec![closed(1, 20), closed(2, 10), Sprint { id: 3, ..sprint(SprintState::Future, 2, 6, None) }];
         let mut with_active = done.clone();
         with_active.push(Sprint { id: 4, ..running() });
 
@@ -775,14 +602,8 @@ mod tests {
     #[test]
     fn cumulative_flow_follows_each_issue_through_the_categories_from_the_day_it_was_created() {
         let finished = moved(issue(1), &[(2, 10, DOING), (4, 10, DONE)]);
-        let late = IssueHistory {
-            created_at: at(3, 9),
-            ..issue(2)
-        };
-        let epic = IssueHistory {
-            level: TypeLevel::Epic,
-            ..issue(3)
-        };
+        let late = IssueHistory { created_at: at(3, 9), ..issue(2) };
+        let epic = IssueHistory { level: TypeLevel::Epic, ..issue(3) };
         let report = cumulative_flow(&project(vec![finished, late, epic]), 4, day(4));
         let counts: Vec<(i64, i64, i64)> = report.days.iter().map(|day| (day.todo, day.in_progress, day.done)).collect();
 
@@ -795,10 +616,7 @@ mod tests {
         let through_retired = moved(issue(1), &[(2, 10, RETIRED), (4, 10, DONE)]);
         let report = cumulative_flow(&project(vec![through_retired]), 4, day(4));
 
-        assert_eq!(
-            report.days.iter().map(|day| (day.todo, day.done)).collect::<Vec<_>>(),
-            [(1, 0), (1, 0), (1, 0), (0, 1)]
-        );
+        assert_eq!(report.days.iter().map(|day| (day.todo, day.done)).collect::<Vec<_>>(), [(1, 0), (1, 0), (1, 0), (0, 1)]);
     }
 
     #[test]
@@ -819,16 +637,10 @@ mod tests {
     #[test]
     fn an_issue_resolved_twice_counts_once_on_the_day_of_its_last_resolution() {
         let twice = moved(issue(1), &[(2, 10, DONE), (3, 10, DOING), (4, 10, DONE)]);
-        let open = IssueHistory {
-            created_at: at(3, 9),
-            ..issue(2)
-        };
+        let open = IssueHistory { created_at: at(3, 9), ..issue(2) };
         let report = created_vs_resolved(&project(vec![twice, open]), 4, day(4));
-        let rows: Vec<(i64, i64, i64, i64)> = report
-            .days
-            .iter()
-            .map(|day| (day.created, day.resolved, day.created_total, day.resolved_total))
-            .collect();
+        let rows: Vec<(i64, i64, i64, i64)> =
+            report.days.iter().map(|day| (day.created, day.resolved, day.created_total, day.resolved_total)).collect();
 
         assert_eq!(rows, [(1, 0, 1, 0), (0, 0, 1, 0), (1, 0, 2, 0), (0, 1, 2, 1)]);
         assert_eq!((report.created, report.resolved), (2, 1));
@@ -846,35 +658,12 @@ mod tests {
         };
         let report = cycle_time(&project(vec![worked, closed_unstarted, issue(4)]), 30, day(10));
 
-        assert_eq!(
-            report.issues.iter().map(|issue| issue.key.as_str()).collect::<Vec<_>>(),
-            ["WEB-2", "WEB-1"]
-        );
+        assert_eq!(report.issues.iter().map(|issue| issue.key.as_str()).collect::<Vec<_>>(), ["WEB-2", "WEB-1"]);
         assert_eq!((report.issues[0].lead_days, report.issues[0].cycle_days), (1.0, None));
         assert_eq!((report.issues[1].lead_days, report.issues[1].cycle_days), (6.5, Some(4.5)));
-        assert_eq!(
-            report.lead,
-            ReportPercentiles {
-                p50: Some(1.0),
-                p85: Some(6.5),
-                p95: Some(6.5)
-            }
-        );
-        assert_eq!(
-            report.cycle,
-            ReportPercentiles {
-                p50: Some(4.5),
-                p85: Some(4.5),
-                p95: Some(4.5)
-            }
-        );
-        assert_eq!(
-            (
-                between_done_statuses.issues[0].resolved_at.as_str(),
-                between_done_statuses.issues[0].lead_days
-            ),
-            (at(3, 9).as_str(), 2.0)
-        );
+        assert_eq!(report.lead, ReportPercentiles { p50: Some(1.0), p85: Some(6.5), p95: Some(6.5) });
+        assert_eq!(report.cycle, ReportPercentiles { p50: Some(4.5), p85: Some(4.5), p95: Some(4.5) });
+        assert_eq!((between_done_statuses.issues[0].resolved_at.as_str(), between_done_statuses.issues[0].lead_days), (at(3, 9).as_str(), 2.0));
     }
 
     #[test]
@@ -891,72 +680,22 @@ mod tests {
     fn percentiles_are_nearest_rank() {
         let values: Vec<f64> = (1..=20).map(f64::from).collect();
 
-        assert_eq!(
-            percentiles(values),
-            ReportPercentiles {
-                p50: Some(10.0),
-                p85: Some(17.0),
-                p95: Some(19.0)
-            }
-        );
-        assert_eq!(
-            percentiles(vec![4.0]),
-            ReportPercentiles {
-                p50: Some(4.0),
-                p85: Some(4.0),
-                p95: Some(4.0)
-            }
-        );
+        assert_eq!(percentiles(values), ReportPercentiles { p50: Some(10.0), p85: Some(17.0), p95: Some(19.0) });
+        assert_eq!(percentiles(vec![4.0]), ReportPercentiles { p50: Some(4.0), p85: Some(4.0), p95: Some(4.0) });
     }
 
     #[test]
     fn workload_counts_open_work_per_person_with_the_unassigned_row_last() {
-        let anna = |id: Id| IssueHistory {
-            assignee_id: Some(10),
-            ..issue(id)
-        };
+        let anna = |id: Id| IssueHistory { assignee_id: Some(10), ..issue(id) };
         let history = project(vec![
-            moved(
-                IssueHistory {
-                    points: Some(5.0),
-                    ..anna(1)
-                },
-                &[(2, 9, DOING)],
-            ),
-            IssueHistory {
-                level: TypeLevel::Subtask,
-                points: Some(1.0),
-                ..anna(2)
-            },
-            moved(
-                IssueHistory {
-                    points: Some(8.0),
-                    ..anna(3)
-                },
-                &[(2, 9, DONE)],
-            ),
-            IssueHistory {
-                points: Some(3.0),
-                ..issue(4)
-            },
-            IssueHistory {
-                points: Some(2.0),
-                ..issue(5)
-            },
-            IssueHistory {
-                points: Some(1.0),
-                ..issue(6)
-            },
-            IssueHistory {
-                level: TypeLevel::Epic,
-                assignee_id: Some(11),
-                ..issue(7)
-            },
-            IssueHistory {
-                assignee_id: Some(12),
-                points: Some(13.0),
-                ..issue(8)
-            },
+            moved(IssueHistory { points: Some(5.0), ..anna(1) }, &[(2, 9, DOING)]),
+            IssueHistory { level: TypeLevel::Subtask, points: Some(1.0), ..anna(2) },
+            moved(IssueHistory { points: Some(8.0), ..anna(3) }, &[(2, 9, DONE)]),
+            IssueHistory { points: Some(3.0), ..issue(4) },
+            IssueHistory { points: Some(2.0), ..issue(5) },
+            IssueHistory { points: Some(1.0), ..issue(6) },
+            IssueHistory { level: TypeLevel::Epic, assignee_id: Some(11), ..issue(7) },
+            IssueHistory { assignee_id: Some(12), points: Some(13.0), ..issue(8) },
         ]);
         let names = HashMap::from([(10, "Anna".to_string()), (12, "Piotr".to_string())]);
         let rows: Vec<(Option<Id>, String, i64, f64, i64)> = workload(&history, &names)
@@ -967,11 +706,7 @@ mod tests {
 
         assert_eq!(
             rows,
-            [
-                (Some(10), "Anna".to_string(), 2, 5.0, 1),
-                (Some(12), "Piotr".to_string(), 1, 13.0, 0),
-                (None, "Unassigned".to_string(), 3, 6.0, 0),
-            ]
+            [(Some(10), "Anna".to_string(), 2, 5.0, 1), (Some(12), "Piotr".to_string(), 1, 13.0, 0), (None, "Unassigned".to_string(), 3, 6.0, 0),]
         );
     }
 }

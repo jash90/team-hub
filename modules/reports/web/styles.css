@@ -283,10 +283,14 @@
   stroke-width: 2;
 }
 
-.reports-cross,
-.reports-reference {
+.reports-cross {
   stroke: var(--muted);
   stroke-width: 1;
+}
+
+.reports-reference {
+  stroke: var(--reports-context);
+  stroke-width: 1.5;
 }
 
 .reports-slot {

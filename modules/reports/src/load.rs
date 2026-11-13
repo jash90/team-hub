@@ -35,21 +35,12 @@ fn number(value: &Option<String>) -> Option<f64> {
 }
 
 fn apply(issue: &mut IssueHistory, change: ChangeRow) {
-    let ids = || {
-        Some((
-            referred(&change.old_value, &change.old_ref)?,
-            referred(&change.new_value, &change.new_ref)?,
-        ))
-    };
+    let ids = || Some((referred(&change.old_value, &change.old_ref)?, referred(&change.new_value, &change.new_ref)?));
 
     match change.field.as_str() {
         "status" => {
             if let Some((old, Some(new))) = ids() {
-                issue.status_steps.push(Step {
-                    at: change.at,
-                    old,
-                    new: Some(new),
-                });
+                issue.status_steps.push(Step { at: change.at, old, new: Some(new) });
             }
         }
         "sprint" => {
@@ -57,11 +48,7 @@ fn apply(issue: &mut IssueHistory, change: ChangeRow) {
                 issue.sprint_steps.push(Step { at: change.at, old, new });
             }
         }
-        "points" => issue.points_steps.push(Step {
-            at: change.at,
-            old: number(&change.old_value),
-            new: number(&change.new_value),
-        }),
+        "points" => issue.points_steps.push(Step { at: change.at, old: number(&change.old_value), new: number(&change.new_value) }),
         _ => {}
     }
 }
@@ -137,12 +124,10 @@ pub fn project_history(connection: &Connection, project_id: Id) -> ApiResult<Pro
 
 /// The names of the people who have issues in the project.
 pub fn assignee_names(connection: &Connection, project_id: Id) -> ApiResult<HashMap<Id, String>> {
-    let names = query_all(
-        connection,
-        "SELECT id, name FROM user WHERE id IN (SELECT assignee_id FROM issue WHERE project_id = ?1)",
-        [project_id],
-        |row| Ok((row.get::<_, Id>(0)?, row.get::<_, String>(1)?)),
-    )?;
+    let names =
+        query_all(connection, "SELECT id, name FROM user WHERE id IN (SELECT assignee_id FROM issue WHERE project_id = ?1)", [project_id], |row| {
+            Ok((row.get::<_, Id>(0)?, row.get::<_, String>(1)?))
+        })?;
 
     Ok(names.into_iter().collect())
 }

@@ -17,6 +17,8 @@
 
 .agents-steps .code-block {
   font-size: 12.5px;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .agents-group {

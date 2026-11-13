@@ -36,7 +36,7 @@ function argumentsOf(schema: JsonValue): Argument[] {
   const properties = asSchema(root?.properties);
   const required = Array.isArray(root?.required) ? root.required : [];
 
-  return Object.entries(properties ?? {}).map(([name, value]) => {
+  const fields = Object.entries(properties ?? {}).map(([name, value]) => {
     const property = asSchema(value) ?? {};
     const choices = Array.isArray(property.enum) ? property.enum.map(String) : [];
     const description = typeof property.description === 'string' ? property.description : '';
@@ -48,6 +48,9 @@ function argumentsOf(schema: JsonValue): Argument[] {
       description: [description, choices.length > 0 ? t('One of: {values}', { values: choices.join(', ') }) : ''].filter(Boolean).join('. '),
     };
   });
+
+  // A schema lists properties in no particular order; what must be given comes first.
+  return [...fields.filter((field) => field.required), ...fields.filter((field) => !field.required)];
 }
 
 function CopyRow({ text, label }: { text: string; label: string }) {

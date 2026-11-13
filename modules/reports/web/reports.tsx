@@ -458,8 +458,8 @@ export function CycleTime({ project }: { project: Project }) {
                       {issue.key} · {issue.summary}
                     </div>
                     <div className="muted">{t('resolved {when}', { when: formatDate(issue.resolvedAt) })}</div>
-                    <TipRow value={days(issue.leadDays)} label={t('from creation')} />
-                    {issue.cycleDays !== null && <TipRow value={days(issue.cycleDays)} label={t('from start of work')} />}
+                    <TipRow bare value={days(issue.leadDays)} label={t('from creation')} />
+                    {issue.cycleDays !== null && <TipRow bare value={days(issue.cycleDays)} label={t('from start of work')} />}
                   </>
                 );
               }}
@@ -479,7 +479,7 @@ export function CycleTime({ project }: { project: Project }) {
                   {[...data.issues].reverse().map((issue) => (
                     <tr key={issue.key}>
                       <td className="cell-key">
-                        <IssueKey issue={issue} done />
+                        <IssueKey issue={issue} />
                       </td>
                       <td>{issue.summary}</td>
                       <td className="cell-date muted">{formatDate(issue.resolvedAt)}</td>

@@ -59,23 +59,13 @@ async fn burndown(State(app): State<App>, user: AuthUser, Path(key): Path<String
     app.run(move |app| {
         let (history, sprints) = read_project(app, &user, &key, load_sprints)?;
         let sprint = match query.sprint {
-            Some(id) => Some(
-                sprints
-                    .iter()
-                    .find(|sprint| sprint.id == id)
-                    .ok_or_else(|| ApiError::not_found("Sprint"))?,
-            ),
+            Some(id) => Some(sprints.iter().find(|sprint| sprint.id == id).ok_or_else(|| ApiError::not_found("Sprint"))?),
             None => compute::default_sprint(&sprints),
         };
 
         Ok(match sprint {
             Some(sprint) => compute::burndown(&history, sprint, unit, today()),
-            None => ReportBurndown {
-                sprint: None,
-                unit: unit.unwrap_or(ReportUnit::Points),
-                committed: 0.0,
-                days: Vec::new(),
-            },
+            None => ReportBurndown { sprint: None, unit: unit.unwrap_or(ReportUnit::Points), committed: 0.0, days: Vec::new() },
         })
     })
     .await

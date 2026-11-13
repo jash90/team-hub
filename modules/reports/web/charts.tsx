@@ -10,7 +10,8 @@ const BAR_GAP = 2;
 const REACH = 32;
 
 export function formatNumber(value: number): string {
-  return new Intl.NumberFormat(currentLanguage() === 'pl' ? 'pl-PL' : 'en-GB', { maximumFractionDigits: 1 }).format(value);
+  // Adding zero turns a negative zero, which would print as "-0", into a plain one.
+  return new Intl.NumberFormat(currentLanguage() === 'pl' ? 'pl-PL' : 'en-GB', { maximumFractionDigits: 1 }).format(value + 0);
 }
 
 /** The element's width in pixels, kept current: charts are drawn at their real size so text stays legible. */
@@ -92,10 +93,10 @@ export function Swatch({ color, kind }: { color: string; kind: SwatchKind }) {
 }
 
 /** One line of a tooltip: the number leads, what it is follows. */
-export function TipRow({ color, kind = 'line', value, label }: { color?: string; kind?: SwatchKind; value: string; label: string }) {
+export function TipRow({ color, kind = 'line', value, label, bare }: { color?: string; kind?: SwatchKind; value: string; label: string; bare?: boolean }) {
   return (
     <div className="reports-tip-row">
-      {color ? <Swatch color={color} kind={kind} /> : <span className="reports-swatch" />}
+      {color ? <Swatch color={color} kind={kind} /> : !bare && <span className="reports-swatch" />}
       <strong>{value}</strong>
       <span>{label}</span>
     </div>
@@ -332,7 +333,7 @@ export function ColumnChart({ label, groups, series, reference, detail }: Column
       <Legend
         items={[
           ...series.map((entry) => ({ label: entry.label, color: entry.color, kind: 'box' as const })),
-          ...(reference ? [{ label: reference.label, color: 'var(--muted)', kind: 'line' as const, value: formatNumber(reference.value) }] : []),
+          ...(reference ? [{ label: reference.label, color: 'var(--reports-context)', kind: 'line' as const, value: formatNumber(reference.value) }] : []),
         ]}
       />
       <div ref={ref} className="reports-chart" role="group" aria-label={label}>
@@ -399,7 +400,7 @@ export function ScatterChart({ label, points, from, until, color, guides, detail
   const frame = frameFor(width, highest, false);
   const span = Math.max(until - from, 1);
   const x = (at: number) => MARGIN.left + (Math.min(Math.max(at - from, 0), span) / span) * frame.plotWidth;
-  const labels = Math.max(2, Math.floor(frame.plotWidth / LABEL_ROOM));
+  const labels = Math.max(2, Math.floor(frame.plotWidth / (LABEL_ROOM * 1.5)));
   const lines = guides
     .map((guide) => ({ ...guide, y: frame.y(guide.value) }))
     .sort((a, b) => b.y - a.y)
@@ -511,8 +512,10 @@ export function DataTable({ head, rows }: { head: string[]; rows: (string | numb
         <table className="table">
           <thead>
             <tr>
-              {head.map((cell) => (
-                <th key={cell}>{cell}</th>
+              {head.map((cell, position) => (
+                <th key={cell} className={position === 0 ? undefined : 'reports-number'}>
+                  {cell}
+                </th>
               ))}
             </tr>
           </thead>

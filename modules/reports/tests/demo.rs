@@ -27,13 +27,7 @@ struct Demo {
 }
 
 fn person(app: &App, name: &str, email: &str, role: Role) -> (AuthUser, String) {
-    let new = NewUser {
-        name: name.to_string(),
-        email: email.to_string(),
-        password: None,
-        role: Some(role),
-        github_login: None,
-    };
+    let new = NewUser { name: name.to_string(), email: email.to_string(), password: None, role: Some(role), github_login: None };
     let (user, token) = app
         .db
         .write(|tx| {
@@ -44,31 +38,16 @@ fn person(app: &App, name: &str, email: &str, role: Role) -> (AuthUser, String) 
         })
         .expect("a user with a token");
 
-    (
-        AuthUser {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role,
-            via_token: true,
-        },
-        token,
-    )
+    (AuthUser { id: user.id, name: user.name, email: user.email, role, via_token: true }, token)
 }
 
 fn demo() -> Demo {
-    let directory = std::env::temp_dir().join(format!(
-        "team-hub-reports-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
+    let directory = std::env::temp_dir().join(format!("team-hub-reports-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
     let _ = std::fs::remove_dir_all(&directory);
     let app = App::new(Config::for_tests(directory), vec![Arc::new(ReportsModule)]).expect("the test application starts");
     let (admin, token) = person(&app, "Bartek Admin", "admin@example.com", Role::Admin);
     seed_demo(&app, admin.id).expect("the demo data");
-    let router = Router::new()
-        .nest("/api/m/reports", ReportsModule.routes().expect("the module has routes"))
-        .with_state(app.clone());
+    let router = Router::new().nest("/api/m/reports", ReportsModule.routes().expect("the module has routes")).with_state(app.clone());
 
     Demo { app, router, admin, token }
 }
@@ -80,11 +59,7 @@ async fn send(router: &Router, token: Option<&str>, path: &str) -> (StatusCode, 
         request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
     }
 
-    let response = router
-        .clone()
-        .oneshot(request.body(Body::empty()).expect("a valid request"))
-        .await
-        .expect("the router answers");
+    let response = router.clone().oneshot(request.body(Body::empty()).expect("a valid request")).await.expect("the router answers");
     let status = response.status();
     let bytes = response.into_body().collect().await.expect("a readable body").to_bytes();
 
@@ -124,10 +99,7 @@ async fn the_running_sprint_committed_its_nine_stories_35_points_and_has_burned_
     assert_eq!(report["committed"], 35.0);
     assert_eq!(days(&report).len(), 6, "the sprint started five days ago and runs until today");
     assert_eq!(first["date"], report["sprint"]["startDate"]);
-    assert_eq!(
-        (&first["remaining"], &first["completed"], &first["ideal"], &first["added"]),
-        (&35.0.into(), &0.0.into(), &35.0.into(), &0.0.into())
-    );
+    assert_eq!((&first["remaining"], &first["completed"], &first["ideal"], &first["added"]), (&35.0.into(), &0.0.into(), &35.0.into(), &0.0.into()));
     assert_eq!((&last["remaining"], &last["completed"]), (&30.0.into(), &5.0.into()));
     assert_eq!(last["ideal"], 22.5, "five of the fourteen steps from 35 down to zero");
     assert_eq!((total(&report, "added"), total(&report, "removed")), (0.0, 0.0));
@@ -167,10 +139,7 @@ async fn sprint_1_committed_15_points_took_on_a_2_point_bug_three_days_in_and_co
     assert_eq!(last["date"].as_str(), report["sprint"]["completedAt"].as_str().map(|at| &at[..10]));
     assert_eq!((&last["remaining"], &last["completed"]), (&0.0.into(), &17.0.into()));
     assert_eq!((total(&report, "added"), total(&report, "removed")), (2.0, 0.0));
-    assert!(
-        ideals.windows(2).all(|pair| pair[0] > pair[1]),
-        "the ideal line only goes down: {ideals:?}"
-    );
+    assert!(ideals.windows(2).all(|pair| pair[0] > pair[1]), "the ideal line only goes down: {ideals:?}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -178,18 +147,12 @@ async fn of_the_26_web_issues_that_are_not_epics_8_are_done_6_in_progress_and_12
     let demo = demo();
     let flow = demo.get("/projects/WEB/cumulative-flow").await;
     let (first, last) = (&days(&flow)[0], &days(&flow)[29]);
-    let totals: Vec<i64> = days(&flow)
-        .iter()
-        .map(|day| ["todo", "inProgress", "done"].iter().filter_map(|field| day[field].as_i64()).sum())
-        .collect();
+    let totals: Vec<i64> =
+        days(&flow).iter().map(|day| ["todo", "inProgress", "done"].iter().filter_map(|field| day[field].as_i64()).sum()).collect();
 
     assert_eq!(days(&flow).len(), 30);
     assert_eq!((&last["todo"], &last["inProgress"], &last["done"]), (&12.into(), &6.into(), &8.into()));
-    assert_eq!(
-        (&first["todo"], &first["inProgress"], &first["done"]),
-        (&0.into(), &0.into(), &0.into()),
-        "the first story is 24 days old"
-    );
+    assert_eq!((&first["todo"], &first["inProgress"], &first["done"]), (&0.into(), &0.into(), &0.into()), "the first story is 24 days old");
     assert!(totals.windows(2).all(|pair| pair[0] <= pair[1]), "issues are only ever added: {totals:?}");
 
     let pace = demo.get("/projects/WEB/created-vs-resolved?days=30").await;
@@ -209,34 +172,17 @@ async fn the_eight_resolved_web_issues_took_3_to_16_days_from_creation_and_2_to_
     let keys: Vec<&str> = issues.iter().filter_map(|issue| issue["key"].as_str()).collect();
     let login = issues.iter().find(|issue| issue["key"] == "WEB-8").expect("WEB-8 was resolved");
 
-    assert_eq!(
-        keys,
-        ["WEB-7", "WEB-4", "WEB-5", "WEB-6", "WEB-8", "WEB-14", "WEB-27", "WEB-11"],
-        "in the order they were resolved"
-    );
-    assert!(
-        close(&login["leadDays"], 16.0) && close(&login["cycleDays"], 9.0),
-        "created 24 days ago, started 17 and done 8 days ago: {login}"
-    );
+    assert_eq!(keys, ["WEB-7", "WEB-4", "WEB-5", "WEB-6", "WEB-8", "WEB-14", "WEB-27", "WEB-11"], "in the order they were resolved");
+    assert!(close(&login["leadDays"], 16.0) && close(&login["cycleDays"], 9.0), "created 24 days ago, started 17 and done 8 days ago: {login}");
     assert_eq!(login["summary"], "Rejestracja i logowanie e-mailem");
     assert!(login["resolvedAt"].as_str().is_some_and(|at| at.ends_with('Z')));
 
     let lead = &report["lead"];
     let cycle = &report["cycle"];
 
-    assert!(
-        close(&lead["p50"], 7.0) && close(&lead["p85"], 12.0) && close(&lead["p95"], 16.0),
-        "leads are 3, 4, 6, 7, 9, 9, 12, 16 days: {lead}"
-    );
-    assert!(
-        close(&cycle["p50"], 3.0) && close(&cycle["p85"], 6.0) && close(&cycle["p95"], 9.0),
-        "cycles are 2, 2, 2, 3, 3, 4, 6, 9 days: {cycle}"
-    );
-    assert_eq!(
-        demo.get("/projects/WEB/cycle-time?days=1").await["issues"],
-        Value::Array(Vec::new()),
-        "nothing was resolved since yesterday"
-    );
+    assert!(close(&lead["p50"], 7.0) && close(&lead["p85"], 12.0) && close(&lead["p95"], 16.0), "leads are 3, 4, 6, 7, 9, 9, 12, 16 days: {lead}");
+    assert!(close(&cycle["p50"], 3.0) && close(&cycle["p85"], 6.0) && close(&cycle["p95"], 9.0), "cycles are 2, 2, 2, 3, 3, 4, 6, 9 days: {cycle}");
+    assert_eq!(demo.get("/projects/WEB/cycle-time?days=1").await["issues"], Value::Array(Vec::new()), "nothing was resolved since yesterday");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -289,10 +235,7 @@ async fn the_kanban_project_has_no_sprints_one_finished_story_and_two_issues_in_
     assert_eq!((&today["todo"], &today["inProgress"], &today["done"]), (&4.into(), &2.into(), &1.into()));
     assert_eq!(cycle["issues"].as_array().map(Vec::len), Some(1));
     assert_eq!(cycle["issues"][0]["key"], "API-2");
-    assert!(
-        close(&cycle["issues"][0]["leadDays"], 11.0) && close(&cycle["issues"][0]["cycleDays"], 5.0),
-        "created 18, started 12, done 7 days ago"
-    );
+    assert!(close(&cycle["issues"][0]["leadDays"], 11.0) && close(&cycle["issues"][0]["cycleDays"], 5.0), "created 18, started 12, done 7 days ago");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -307,34 +250,18 @@ async fn reports_need_a_sign_in_a_project_the_caller_may_see_and_sensible_parame
         is_private: true,
         lead_id: None,
     };
-    demo.app
-        .write(demo.admin.actor(), |tx| create_project(tx, &demo.admin, &private))
-        .expect("a private project");
+    demo.app.write(demo.admin.actor(), |tx| create_project(tx, &demo.admin, &private)).expect("a private project");
 
     assert_eq!(send(&demo.router, None, "/projects/WEB/velocity").await.0, StatusCode::UNAUTHORIZED);
     assert_eq!(send(&demo.router, Some(&outsider), "/projects/WEB/velocity").await.0, StatusCode::OK);
     assert_eq!(send(&demo.router, Some(&demo.token), "/projects/SEC/workload").await.0, StatusCode::OK);
 
     for report in ["burndown", "velocity", "cumulative-flow", "created-vs-resolved", "cycle-time", "workload"] {
-        assert_eq!(
-            send(&demo.router, Some(&outsider), &format!("/projects/SEC/{report}")).await.0,
-            StatusCode::NOT_FOUND,
-            "{report}"
-        );
-        assert_eq!(
-            send(&demo.router, Some(&demo.token), &format!("/projects/NOPE/{report}")).await.0,
-            StatusCode::NOT_FOUND,
-            "{report}"
-        );
+        assert_eq!(send(&demo.router, Some(&outsider), &format!("/projects/SEC/{report}")).await.0, StatusCode::NOT_FOUND, "{report}");
+        assert_eq!(send(&demo.router, Some(&demo.token), &format!("/projects/NOPE/{report}")).await.0, StatusCode::NOT_FOUND, "{report}");
     }
 
-    assert_eq!(
-        send(&demo.router, Some(&demo.token), "/projects/WEB/burndown?unit=hours").await.0,
-        StatusCode::BAD_REQUEST
-    );
-    assert_eq!(
-        send(&demo.router, Some(&demo.token), "/projects/WEB/burndown?sprint=9999").await.0,
-        StatusCode::NOT_FOUND
-    );
+    assert_eq!(send(&demo.router, Some(&demo.token), "/projects/WEB/burndown?unit=hours").await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(send(&demo.router, Some(&demo.token), "/projects/WEB/burndown?sprint=9999").await.0, StatusCode::NOT_FOUND);
     assert_eq!(days(&demo.get("/projects/WEB/cumulative-flow?days=100000").await).len(), 366);
 }
