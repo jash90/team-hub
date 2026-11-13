@@ -494,7 +494,9 @@ pub struct ApiToken {
 #[ts(export)]
 pub struct Bootstrap {
     pub setup_required: bool,
-    /// The first account needs the instance's setup token as well.
+    /// The first account needs the instance's setup token as well. Absent from the answer
+    /// of a server from before there was such a token.
+    #[serde(default)]
     pub setup_token_required: bool,
     pub user: Option<User>,
     pub csrf: Option<String>,

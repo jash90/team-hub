@@ -393,6 +393,7 @@ async fn bootstrap(State(state): Shared, headers: HeaderMap) -> Response {
 
     Json(Bootstrap {
         setup_required: false,
+        setup_token_required: false,
         user: signed_in.then(user),
         csrf: None,
         users: if signed_in { vec![user()] } else { Vec::new() },

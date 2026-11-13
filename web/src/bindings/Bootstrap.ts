@@ -5,6 +5,7 @@ import type { User } from "./User";
 
 export type Bootstrap = { setupRequired: boolean, 
 /**
- * The first account needs the instance's setup token as well.
+ * The first account needs the instance's setup token as well. Absent from the answer
+ * of a server from before there was such a token.
  */
 setupTokenRequired: boolean, user: User | null, csrf: string | null, users: Array<User>, projects: Array<ProjectSummary>, modules: Array<ModuleInfo>, version: string, unreadNotifications: number, };

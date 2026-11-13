@@ -103,9 +103,10 @@ docker run -p 8080:8080 -v team-hub-data:/data -e TEAM_HUB_SETUP_TOKEN=choose-on
 ```
 
 The image holds the server and the built interface, listens on all interfaces, and keeps
-everything in `/data`. On [Railway](https://railway.com) the repository deploys as it is
-(`railway.toml`): add a volume mounted at `/data`, a public domain, and the variables
-`TEAM_HUB_BASE_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}` and `TEAM_HUB_SETUP_TOKEN`.
+everything in `/data`. On [Railway](https://railway.com) the repository deploys as it is:
+connect it to a service, add a volume mounted at `/data`, a public domain, the variables
+`TEAM_HUB_BASE_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}` and `TEAM_HUB_SETUP_TOKEN`, and set
+the service's healthcheck path to `/api/bootstrap`.
 
 Back up the data directory. Without the instance key the stored integration tokens cannot be
 read and have to be entered again; everything else is in `team-hub.db`.
