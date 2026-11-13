@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from 'react';
 
 import { api } from '@/api.ts';
 import type { WikiSpace } from '@/bindings/WikiSpace.ts';
 import type { WikiTreeNode } from '@/bindings/WikiTreeNode.ts';
 import { Icon } from '@/components/icon.tsx';
-import { Button, Empty, ErrorNote, Menu, Spinner, Tag } from '@/components/ui.tsx';
+import { Button, Empty, ErrorNote, Menu, Spinner, Tag, attempt } from '@/components/ui.tsx';
 import { t } from '@/i18n/index.ts';
 import { Link, navigate } from '@/router.tsx';
 import { useRemote, useStored } from '@/session.tsx';
@@ -20,11 +20,68 @@ type TreeProps = {
   nodes: WikiTreeNode[];
   currentId: number | null;
   onAdd: (parent: WikiTreeNode | null) => void;
+  onMoved: () => void;
 };
 
-/** The pages of a space as a tree. Which branches are open is remembered per space. */
-function Tree({ space, nodes, currentId, onAdd }: TreeProps) {
+/** Where a dragged page would land relative to the page under the pointer. */
+type Drop = { targetId: number; place: 'before' | 'inside' | 'after' };
+
+/** The dragged page and everything under it, which it cannot be dropped into. */
+function branch(nodes: WikiTreeNode[], rootId: number): Set<number> {
+  const inside = new Set([rootId]);
+
+  // The list is in reading order, so a parent always comes before its children.
+  for (const node of nodes) {
+    if (node.parentId !== null && inside.has(node.parentId)) {
+      inside.add(node.id);
+    }
+  }
+
+  return inside;
+}
+
+/**
+ * The pages of a space as a tree. Which branches are open is remembered per space. A page
+ * can be dragged onto another (to go under it) or to its upper or lower edge (to go before
+ * or after it); "Move…" on the page does the same from the keyboard.
+ */
+function Tree({ space, nodes, currentId, onAdd, onMoved }: TreeProps) {
   const [open, setOpen] = useStored<Record<string, boolean>>(`wiki-open:${space.key}`, {});
+  const [dragged, setDragged] = useState<number | null>(null);
+  const [drop, setDrop] = useState<Drop | null>(null);
+  const carried = useMemo(() => (dragged === null ? new Set<number>() : branch(nodes, dragged)), [nodes, dragged]);
+
+  function dropAt(event: DragEvent<HTMLElement>, node: WikiTreeNode): Drop | null {
+    if (dragged === null || carried.has(node.id)) {
+      return null;
+    }
+
+    const box = event.currentTarget.getBoundingClientRect();
+    const part = (event.clientY - box.top) / box.height;
+
+    return { targetId: node.id, place: part < 0.3 ? 'before' : part > 0.7 ? 'after' : 'inside' };
+  }
+
+  function land(spot: Drop): void {
+    const target = nodes.find((node) => node.id === spot.targetId);
+    const moved = dragged;
+
+    if (!target || moved === null) {
+      return;
+    }
+
+    const parentId = spot.place === 'inside' ? target.id : target.parentId;
+    // The position counts the siblings without the page being moved.
+    const siblings = nodes.filter((node) => node.parentId === parentId && node.id !== moved);
+    const position = spot.place === 'inside' ? siblings.length : siblings.findIndex((node) => node.id === target.id) + (spot.place === 'after' ? 1 : 0);
+
+    if (spot.place === 'inside') {
+      setOpen({ ...open, [target.id]: true });
+    }
+
+    void attempt(() => api.post(`${BASE}/pages/${moved}/move`, { parentId, position }), t('Page moved')).then(onMoved);
+  }
+
   const byId = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const parents = useMemo(() => new Set(nodes.map((node) => node.parentId).filter((id): id is number => id !== null)), [nodes]);
 
@@ -72,7 +129,55 @@ function Tree({ space, nodes, currentId, onAdd }: TreeProps) {
         const folded = !(open[node.id] ?? level === 0);
 
         return (
-          <div key={node.id} className={node.id === currentId ? 'wiki-node wiki-node-current' : 'wiki-node'} style={{ paddingLeft: 6 + level * 16 }}>
+          <div
+            key={node.id}
+            className={[
+              'wiki-node',
+              node.id === currentId ? 'wiki-node-current' : '',
+              node.id === dragged ? 'wiki-node-dragged' : '',
+              drop?.targetId === node.id ? `wiki-node-drop-${drop.place}` : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            style={{ paddingLeft: 6 + level * 16 }}
+            draggable={space.canEdit && !node.locked}
+            onDragStart={(event) => {
+              setDragged(node.id);
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', node.title);
+            }}
+            onDragEnd={() => {
+              setDragged(null);
+              setDrop(null);
+            }}
+            onDragOver={(event) => {
+              const spot = dropAt(event, node);
+
+              if (spot) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+              }
+
+              if (spot?.targetId !== drop?.targetId || spot?.place !== drop?.place) {
+                setDrop(spot);
+              }
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null) && drop?.targetId === node.id) {
+                setDrop(null);
+              }
+            }}
+            onDrop={(event) => {
+              const spot = dropAt(event, node);
+
+              event.preventDefault();
+              setDrop(null);
+
+              if (spot) {
+                land(spot);
+              }
+            }}
+          >
             {parents.has(node.id) ? (
               <button type="button" className="wiki-node-fold" aria-expanded={!folded} aria-label={folded ? t('Unfold “{title}”', { title: node.title }) : t('Fold “{title}”', { title: node.title })} onClick={() => setOpen({ ...open, [node.id]: folded })}>
                 <Icon name={folded ? 'chevronRight' : 'chevronDown'} size={14} />
@@ -184,7 +289,7 @@ export function SpaceView({ spaceKey, pageId, mode }: { spaceKey: string; pageId
               {data.canEdit && <Button size="sm" variant="ghost" icon="plus" aria-label={t('New page')} title={t('New page')} onClick={() => setAdding({ parent: null })} />}
               {data.canEdit && <Menu label={t('Space actions')} items={[{ label: t('Space settings'), icon: 'settings', onSelect: () => setSettings(true) }]} />}
             </header>
-            {nodes.length === 0 ? <p className="muted panel-empty">{t('No pages yet.')}</p> : <Tree space={data} nodes={nodes} currentId={current} onAdd={(parent) => setAdding({ parent })} />}
+            {nodes.length === 0 ? <p className="muted panel-empty">{t('No pages yet.')}</p> : <Tree space={data} nodes={nodes} currentId={current} onAdd={(parent) => setAdding({ parent })} onMoved={() => void tree.reload()} />}
           </aside>
         )}
         <div className="wiki-main">

@@ -77,6 +77,29 @@
   background: var(--accent-soft);
 }
 
+.wiki-node[draggable='true'] {
+  cursor: grab;
+}
+
+.wiki-node-dragged {
+  opacity: 0.45;
+}
+
+/* Where a dragged page would land: a line above or below, or the whole row for "under it". */
+.wiki-node-drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.wiki-node-drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.wiki-node-drop-inside {
+  background: var(--accent-soft);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .wiki-node-current .wiki-node-link {
   color: var(--accent);
   font-weight: 600;
