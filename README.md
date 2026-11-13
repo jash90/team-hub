@@ -175,3 +175,7 @@ Known gaps in what is there:
 - The server writes English. The interface puts its errors, notifications and status lines
   into Polish as they arrive, from a dictionary the build checks against the server's
   sources. The descriptions of agent tools, which the agent itself reads, stay English.
+
+## Licence
+
+MIT; see [LICENSE](LICENSE).
