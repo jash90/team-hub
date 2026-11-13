@@ -1,0 +1,148 @@
+# Agent runs: the contract
+
+An **agent run** is a piece of work on an issue handed to an AI agent. The web interface
+starts runs and shows them; **runners** carry them out: the server itself for work that
+needs no repository, the desktop app (or any other client with an API token) for work in
+code. This file is the contract between the three; the `agents` module implements the server
+side under `/api/m/agents`.
+
+The rule that holds everywhere: **an agent proposes, a person decides.** A run can read
+whatever its requester can read, but changes to issues are *proposals* that take effect when
+a person approves them (or at once, for the kinds a project has chosen to trust).
+
+## Types
+
+```ts
+type RunKind =
+  | 'refine'      // improve the description, add acceptance criteria   → update_fields proposal
+  | 'breakdown'   // split into subtasks                                  → create_subtasks proposal
+  | 'summarize'   // summarise description, comments and code state       → a message, no proposal
+  | 'triage'      // suggest priority, labels, duplicates                 → update_fields + comment proposals
+  | 'implement'   // make the change in a repository: branch, commits, pull request
+  | 'review'      // review the issue's pull request
+  | 'custom';     // free instructions
+
+type RunState = 'queued' | 'claimed' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'cancelled';
+// waiting = the run needs a person: a question to answer or a proposal to decide.
+
+type AgentRun = {
+  id: number;
+  issueKey: string;
+  issueSummary: string;
+  projectKey: string;
+  kind: RunKind;
+  instructions: string;        // extra guidance from the requester; may be empty
+  state: RunState;
+  requestedBy: number;         // user id
+  shared: boolean;             // false: only the requester's runners may claim it
+  runnerId: string | null;     // who carries it out: "server", or a runner's id
+  runnerName: string | null;   // "Server", "Desktop · Bartek's MacBook"
+  model: string | null;
+  repo: string | null;         // "owner/name", for work in code
+  branch: string | null;
+  pullRequestUrl: string | null;
+  summary: string | null;      // the result in a few sentences (Markdown)
+  inputTokens: number | null;
+  outputTokens: number | null;
+  costUsd: number | null;
+  cancelRequested: boolean;
+  pendingProposals: number;
+  pendingQuestion: boolean;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+type RunEvent = {
+  id: number;
+  runId: number;
+  kind: 'message' | 'tool' | 'status' | 'question' | 'answer' | 'error';
+  text: string;                // Markdown for message/question/answer; one line for tool/status
+  data: unknown;               // optional details (a command, a file list)
+  actorId: number | null;      // the person, for answers
+  at: string;
+};
+
+type ProposalKind = 'comment' | 'transition' | 'update_fields' | 'create_subtasks' | 'create_issue' | 'log_work';
+
+type AgentProposal = {
+  id: number;
+  runId: number;
+  kind: ProposalKind;
+  payload: unknown;            // see below
+  state: 'pending' | 'approved' | 'rejected' | 'failed';
+  decidedBy: number | null;
+  decidedAt: string | null;
+  note: string | null;         // the person's reason, or why applying it failed
+  result: unknown;             // what applying it produced, e.g. { keys: ["WEB-31", "WEB-32"] }
+};
+
+type AgentRunDetail = { run: AgentRun; events: RunEvent[]; proposals: AgentProposal[] };
+
+type AgentRunner = {
+  id: string;                  // stable per installation
+  name: string;
+  userId: number;
+  kinds: RunKind[];
+  projects: string[] | null;   // project keys it has repositories for; null = any
+  version: string;
+  lastSeenAt: string;
+  online: boolean;             // seen in the last two minutes
+};
+```
+
+Proposal payloads:
+
+| Kind | Payload |
+|---|---|
+| `comment` | `{ body }` |
+| `transition` | `{ status }` (a status name of the issue's project) |
+| `update_fields` | any of `{ summary, description, priority, labels, points, assignee, dueDate }` (names, not ids) |
+| `create_subtasks` | `{ items: [{ summary, description? }] }` |
+| `create_issue` | `{ projectKey, summary, description?, type?, parentKey? }` |
+| `log_work` | `{ spent, note? }` (`spent` as "1h 30m") |
+
+An approved proposal is applied through the ordinary services, as the approving person, with
+the label "AI agent" in the history.
+
+## For people (the web interface)
+
+| Request | Answer |
+|---|---|
+| `POST /issues/{key}/runs` `{ kind, instructions?, model?, repo?, shared? }` | `AgentRun` (needs edit access to the project) |
+| `GET /issues/{key}/runs` | `AgentRun[]`, newest first |
+| `GET /runs?state=&mine=true&project=&limit=` | `AgentRun[]` the caller may see |
+| `GET /runs/{id}` | `AgentRunDetail` |
+| `POST /runs/{id}/cancel` | `AgentRun` (sets `cancelRequested`; a queued run is cancelled at once) |
+| `POST /runs/{id}/answer` `{ text }` | `AgentRunDetail` (adds an `answer` event; `waiting` → `running`) |
+| `POST /proposals/{id}/decide` `{ approve, note? }` | `AgentRunDetail` (applies the proposal when approved) |
+| `GET /runners` | `AgentRunner[]` the caller may see (their own, and shared ones) |
+| `GET /settings`, `PUT /settings` (admin) | model provider key (hint only), default model, which run kinds the server carries out |
+
+## For runners
+
+A runner authenticates with an API token and acts as that person.
+
+| Request | Answer |
+|---|---|
+| `POST /runners/heartbeat` `{ runnerId, name, kinds, projects?, version }` | `{ ok: true }`; call every 30–60 s |
+| `POST /runs/claim` `{ runnerId, kinds, projects? }` | `AgentRunDetail` of the oldest matching queued run, now `claimed` by this runner; `null` when there is none. A run is offered to the requester's own runners, or to anyone's when it is `shared`. |
+| `POST /runs/{id}/events` `{ kind, text, data? }` | `{ id }` — a `question` puts the run in `waiting` |
+| `POST /runs/{id}/proposals` `{ kind, payload }` | `AgentProposal` |
+| `PATCH /runs/{id}` `{ state?, summary?, branch?, pullRequestUrl?, model?, inputTokens?, outputTokens?, costUsd? }` | `AgentRun` — read `cancelRequested` from the answer and stop when it is set |
+| `GET /runs/{id}` | `AgentRunDetail` — where answers and decisions show up |
+
+Only the runner that claimed a run may write to it. A claimed run whose runner has not been
+heard from for ten minutes goes back to `queued`.
+
+## Live
+
+Every change to a run announces `agent.run` on the live stream (`GET /api/stream`) with
+`{ runId, state }`, the issue and the project, so open pages and runners need not poll.
+
+## What a runner is given
+
+`GET /runs/{id}` is enough to start: the issue key, the kind and the instructions. The issue
+itself (description, comments, links, code state, linked pages) is read through the ordinary
+API or through the MCP tools (`get_issue`, `get_issue_development`, `search_pages`, …), which
+a coding agent can use directly.
