@@ -1933,6 +1933,7 @@ impl Core {
         // A job's log lines are not news for whoever would run a job.
         if event.kind == "e2e.job" {
             self.jobs_wake.notify_one();
+            self.data_changed("jobs", None);
 
             return;
         }

@@ -18,7 +18,15 @@ import type { Thread } from './bindings/Thread.ts';
 import type { ThreadDetail } from './bindings/ThreadDetail.ts';
 import type { ThreadDiff } from './bindings/ThreadDiff.ts';
 import type { WorkspaceView } from './bindings/WorkspaceView.ts';
+import type { AgentRun } from '@web/bindings/AgentRun.ts';
+import type { AgentRunDetail } from '@web/bindings/AgentRunDetail.ts';
+import type { E2eJob } from '@web/bindings/E2eJob.ts';
+import type { E2eJobDetail } from '@web/bindings/E2eJobDetail.ts';
+import type { E2eSettings } from '@web/bindings/E2eSettings.ts';
 import type { GithubProjectCode } from '@web/bindings/GithubProjectCode.ts';
+import type { Runner } from '@web/bindings/Runner.ts';
+import type { Delegation } from './bindings/Delegation.ts';
+import type { NewTestJob } from './bindings/NewTestJob.ts';
 import { call } from './bridge.ts';
 
 export const core = {
@@ -56,4 +64,16 @@ export const core = {
   pullRequestPreview: (id: number) => call<PullRequestPreview>('pull_request_preview', { id }),
   openPullRequest: (id: number, title: string, body: string) => call<PullRequestResult>('open_pull_request', { id, title, body }),
   recordPullRequest: (id: number, url: string) => call<Thread>('record_pull_request', { id, url }),
+  // The same runners and work as the web shows (docs/runners.md).
+  runs: (mine: boolean) => call<AgentRun[]>('runs', { mine }),
+  runners: () => call<Runner[]>('runners'),
+  delegate: (work: Delegation) => call<AgentRun>('delegate', work),
+  runDetail: (id: number) => call<AgentRunDetail>('run_detail', { id }),
+  decideOnRun: (id: number, approve: boolean, note: string | null) => call<AgentRunDetail>('decide_on_run', { id, approve, note }),
+  cancelRun: (id: number) => call<AgentRun>('cancel_run', { id }),
+  testSettings: (key: string) => call<E2eSettings | null>('test_settings', { key }),
+  testJobs: (key: string) => call<E2eJob[]>('test_jobs', { key }),
+  startTestJob: (job: NewTestJob) => call<E2eJob>('start_test_job', job),
+  testJob: (id: number, after: number) => call<E2eJobDetail>('test_job', { id, after }),
+  cancelTestJob: (id: number) => call<E2eJob>('cancel_test_job', { id }),
 };

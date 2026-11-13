@@ -5,13 +5,15 @@ import { Button, ErrorNote, Field } from '@web/components/ui.tsx';
 import { t } from '@web/i18n/index.ts';
 import { core } from '../api.ts';
 import type { ThreadKind } from '../bindings/ThreadKind.ts';
+import { ANY, HERE, namableRunners, WhereSelect } from '../components/where.tsx';
 import { useRemote } from '../live.ts';
 import { useSession } from '../session.tsx';
 import { kindHint, kindIcon, kindLabel, THREAD_KINDS } from '../words.ts';
 
 /** Starts an agent thread for an issue: what kind of work, with which instructions, where. */
 export function NewThreadView({ issueKey }: { issueKey?: string }) {
-  const { go } = useSession();
+  const { go, status, workspace } = useSession();
+  const [where, setWhere] = useState(HERE);
   const [key, setKey] = useState(issueKey ?? '');
   const [kind, setKind] = useState<ThreadKind>('implement');
   const [instructions, setInstructions] = useState('');
@@ -26,6 +28,11 @@ export function NewThreadView({ issueKey }: { issueKey?: string }) {
   const dashboard = useRemote(() => core.dashboard(), []);
   const project = key.trim().toUpperCase().split('-')[0];
   const ofProject = (repos.data ?? []).filter((repo) => repo.mapping.projectKey === project);
+  const runners = useRemote(() => core.runners(), []);
+  const code = useRemote(() => (project ? core.projectCode(project) : Promise.resolve(null)), [project]);
+  // The runners that take this kind of work for this project, besides this computer.
+  const elsewhere = namableRunners(runners.data ?? [], status.runner.id, workspace?.bootstrap.user?.id, 'agents', kind === 'analyse' ? 'custom' : kind, project);
+  const here = where === HERE;
 
   useEffect(() => setKey(issueKey ?? ''), [issueKey]);
   useEffect(() => setRepoId(null), [project]);
@@ -36,6 +43,17 @@ export function NewThreadView({ issueKey }: { issueKey?: string }) {
     setError(undefined);
 
     try {
+      if (!here) {
+        // Carried out by another runner: nothing starts on this computer, the app follows the run.
+        const chosen = ofProject.find((repo) => repo.mapping.id === repoId) ?? ofProject[0];
+        const repo = chosen?.mapping.githubRepo ?? code.data?.repos[0]?.fullName ?? null;
+        const run = await core.delegate({ issueKey: key.trim(), kind, instructions, model: model || null, repo, onRunner: where === ANY ? null : where });
+
+        go({ name: 'run', id: run.id });
+
+        return;
+      }
+
       const thread = await core.startThread({ issueKey: key.trim(), kind, instructions, model: model || null, repoId: repoId ?? (ofProject.length === 1 ? ofProject[0].mapping.id : null), branch: branch.trim() || null });
 
       go({ name: 'thread', id: thread.id });
@@ -86,6 +104,12 @@ export function NewThreadView({ issueKey }: { issueKey?: string }) {
         <header className="panel-head">
           <h2>{t('Where and with what')}</h2>
         </header>
+        <Field
+          label={t('Where')}
+          hint={here ? t('On this computer: the agent works here, in a working tree of its own, with your own model sign-in.') : t('On another runner: nothing runs on this computer, and its pushes and pull requests are decided where that runner says.')}
+        >
+          <WhereSelect value={where} onChange={setWhere} runners={elsewhere} />
+        </Field>
         <div className="form-row">
           <Field label={t('Repository')}>
             <select className="input" value={repoId ?? ''} onChange={(event) => setRepoId(event.target.value ? Number(event.target.value) : null)} disabled={ofProject.length <= 1}>
@@ -113,7 +137,7 @@ export function NewThreadView({ issueKey }: { issueKey?: string }) {
         <Field label={t('Branch')} hint={t('Leave empty for the branch suggested for the issue (feature/KEY-summary). Name an existing branch to continue it.')}>
           <input className="input input-mono" value={branch} onChange={(event) => setBranch(event.target.value)} />
         </Field>
-        {project && ofProject.length === 0 && repos.data && (
+        {here && project && ofProject.length === 0 && repos.data && (
           <div className="note">
             {t('No local repository is mapped to project {project}.', { project })}{' '}
             <button type="button" className="link-button" onClick={() => go({ name: 'repos' })}>
@@ -126,7 +150,7 @@ export function NewThreadView({ issueKey }: { issueKey?: string }) {
       <div className="row-end">
         <Button onClick={() => window.history.back()}>{t('Cancel')}</Button>
         <Button variant="primary" type="submit" icon="play" disabled={busy || !key.trim()}>
-          {busy ? t('Starting…') : t('Start the thread')}
+          {busy ? t('Starting…') : here ? t('Start the thread') : t('Send the work')}
         </Button>
       </div>
     </form>

@@ -15,4 +15,13 @@ maxRunning: number, maxTurns: number, defaultModel: string, nodeCommand: string,
 /**
  * Where there is no OS sandbox a thread gets no shell at all, unless this is set.
  */
-allowUnsandboxedShell: boolean, };
+allowUnsandboxedShell: boolean, 
+/**
+ * Whether this computer runs test jobs at all (docs/runners.md).
+ */
+testJobs: boolean, 
+/**
+ * Also take the team's queued test jobs. Off: only the ones sent to this computer
+ * by name, because running a suite is running a repository's code here.
+ */
+testJobsFromQueue: boolean, };

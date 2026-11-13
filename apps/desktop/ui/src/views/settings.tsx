@@ -100,6 +100,17 @@ export function SettingsView({ onStatus }: { onStatus: (status: ConnectionStatus
           ))}
         </datalist>
         <label className="check">
+          <input type="checkbox" checked={draft.testJobs} onChange={(event) => change('testJobs', event.target.checked)} />
+          <span>{t('Run test suites on this computer')}</span>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={draft.testJobsFromQueue} disabled={!draft.testJobs} onChange={(event) => change('testJobsFromQueue', event.target.checked)} />
+          <span>{t('Also take the team’s queued test jobs')}</span>
+        </label>
+        <p className="muted">
+          {t('Running a suite is running a repository’s code on this computer, so by default it happens only for the jobs you send here by name. A job gets a folder of its own and only the variables its project’s test settings list; where the system has a sandbox it can write nowhere else and cannot read your keys.')}
+        </p>
+        <label className="check">
           <input type="checkbox" checked={draft.allowUnsandboxedShell} onChange={(event) => change('allowUnsandboxedShell', event.target.checked)} />
           <span>{t('Give threads a shell even where the system cannot confine it')}</span>
         </label>

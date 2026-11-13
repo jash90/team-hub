@@ -17,6 +17,9 @@ import { HomeView } from './views/home.tsx';
 import { IssueView } from './views/issue.tsx';
 import { NewThreadView } from './views/new-thread.tsx';
 import { ReposView } from './views/repos.tsx';
+import { RunView } from './views/run.tsx';
+import { RunnersView } from './views/runners.tsx';
+import { TestsView } from './views/tests.tsx';
 import { SearchView } from './views/search.tsx';
 import { SettingsView } from './views/settings.tsx';
 import { ThreadView } from './views/thread.tsx';
@@ -71,6 +74,12 @@ function TopBar() {
         {status.online ? t('online') : t('offline')}
       </Tag>
       {status.runner.enabled && status.runner.runsApi !== false && <Tag tone="blue" title={status.runner.name}>{t('runner')}</Tag>}
+      <Button variant={view.name === 'runners' ? 'default' : 'ghost'} icon="layers" onClick={() => go({ name: 'runners' })}>
+        {t('Runners')}
+      </Button>
+      <Button variant={view.name === 'tests' ? 'default' : 'ghost'} icon="check" onClick={() => go({ name: 'tests' })}>
+        {t('Tests')}
+      </Button>
       <Button variant={view.name === 'repos' ? 'default' : 'ghost'} icon="folder" onClick={() => go({ name: 'repos' })}>
         {t('Repositories')}
       </Button>
@@ -95,6 +104,12 @@ function Center({ view, onStatus }: { view: View; onStatus: (status: ConnectionS
       return <SearchView query={view.query} />;
     case 'repos':
       return <ReposView />;
+    case 'runners':
+      return <RunnersView />;
+    case 'tests':
+      return <TestsView project={view.project} />;
+    case 'run':
+      return <RunView runId={view.id} />;
     case 'settings':
       return <SettingsView onStatus={onStatus} />;
     default:

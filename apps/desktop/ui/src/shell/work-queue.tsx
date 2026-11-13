@@ -100,6 +100,10 @@ export function WorkQueue() {
   const { go } = useSession();
   const dashboard = useRemote(() => core.dashboard(), [], (event) => event.type === 'data_changed' || event.type === 'connection');
   const threads = useRemote(() => core.threads(), [], (event) => event.type === 'thread_changed');
+  const { status } = useSession();
+  // My runs wherever they are carried out: on this computer, on somebody's, on a service.
+  const runs = useRemote(() => core.runs(true), [], (event) => event.type === 'thread_changed' || (event.type === 'data_changed' && event.scope === 'runs'));
+  const live = (runs.data ?? []).filter((run) => !['succeeded', 'failed', 'cancelled'].includes(run.state));
   const [words, setWords] = useState('');
   const [filter, setFilter] = useStored<Filter>('queue-filter', 'all');
   const view = dashboard.data;
@@ -151,13 +155,37 @@ export function WorkQueue() {
           {agents && agents.waiting.length > 0 && (
             <Section id="q-runs" title={t('Agent runs waiting for me')} count={agents.waiting.length}>
               {agents.waiting.map((run) => (
-                <div key={run.id} className="issue-line desk-row" onClick={() => go({ name: 'issue', key: run.issueKey })}>
+                <div
+                  key={run.id}
+                  className="issue-line desk-row"
+                  onClick={() => go(run.runnerId && run.runnerId !== status.runner.id ? { name: 'run', id: run.id } : { name: 'issue', key: run.issueKey })}
+                >
                   <Icon name="bot" size={14} />
                   <IssueKeyLink issueKey={run.issueKey} />
                   <span className="issue-line-summary">{run.issueSummary}</span>
+                  {run.runnerId !== status.runner.id && run.runnerName && <Tag title={t('Carried out elsewhere; this app only follows it.')}>{run.runnerName}</Tag>}
                   <Tag tone="amber">{run.pendingQuestion ? t('asks a question') : t('{count} to decide', { count: run.pendingProposals })}</Tag>
                 </div>
               ))}
+            </Section>
+          )}
+          {live.length > 0 && (
+            <Section id="q-live-runs" title={t('Agent runs at work')} count={live.length}>
+              {live.map((run) => {
+                const thread = (threads.data ?? []).find((candidate) => candidate.runId === run.id);
+                const here = run.runnerId === status.runner.id || (!run.runnerId && run.onRunner === status.runner.id);
+
+                return (
+                  <div key={run.id} className="issue-line desk-row" onClick={() => go(thread ? { name: 'thread', id: thread.id } : { name: 'run', id: run.id })}>
+                    <Icon name="bot" size={14} />
+                    <IssueKeyLink issueKey={run.issueKey} />
+                    <span className="issue-line-summary">{run.issueSummary}</span>
+                    <Tag tone={here ? 'blue' : 'amber'} title={here ? t('Carried out on this computer') : t('Carried out elsewhere; this app only follows it.')}>
+                      {here ? t('This computer') : (run.runnerName ?? run.onRunnerName ?? t('waits for a runner'))}
+                    </Tag>
+                  </div>
+                );
+              })}
             </Section>
           )}
           <Section id="q-progress" title={t('In progress')} count={inProgress.length}>
