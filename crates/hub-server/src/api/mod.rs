@@ -11,6 +11,7 @@ mod keys;
 mod links;
 mod notifications;
 mod overview;
+mod pairing;
 mod project_config;
 mod projects;
 mod runners;
@@ -49,6 +50,7 @@ pub fn router() -> Router<App> {
         .merge(notifications::routes())
         .merge(runners::routes())
         .merge(keys::routes())
+        .merge(pairing::routes())
         .merge(tasks::routes())
         .merge(stream::routes())
         .merge(admin::routes())

@@ -407,6 +407,24 @@ export const pl: Record<string, string> = {
     'Moduł wyłączony tutaj zachowuje dane, ale jego nawigacja, panel w zadaniach i oznaczenia na kartach znikają z tego projektu. Inne projekty pozostają bez zmian.',
   'No modules are switched on for this instance.': 'W tej instancji nie włączono żadnych modułów.',
   Runners: 'Runnery',
+
+  // ---- connecting the desktop app ----
+  'Connect the desktop app': 'Połącz aplikację desktopową',
+  'Connect the desktop app “{name}” to your account, {user}? It will work as you: read and change what you can, and run agents in your name.':
+    'Połączyć aplikację desktopową „{name}” z Twoim kontem ({user})? Będzie działać jako Ty: czytać i zmieniać to, co Ty możesz, i uruchamiać agentów w Twoim imieniu.',
+  'The app shows this code. Go on only if you started this yourself, on your own computer, a moment ago, and the codes are the same.':
+    'Aplikacja pokazuje ten kod. Kontynuuj tylko wtedy, gdy przed chwilą zacząłeś to sam, na własnym komputerze, a kody są takie same.',
+  'The app chose its own name, so the name proves nothing; the code does. This request ends {when}.':
+    'Nazwę aplikacja wybrała sama, więc nazwa niczego nie dowodzi; dowodzi kod. Ta prośba wygasa {when}.',
+  Code: 'Kod',
+  Connect: 'Połącz',
+  'Do not connect': 'Nie łącz',
+  'The app is connected': 'Aplikacja jest połączona',
+  'The app was not connected': 'Aplikacja nie została połączona',
+  'It works as you from now on. You can take that back at any time: Settings → Profile and tokens lists it by its name.':
+    'Od teraz działa jako Ty. Możesz to cofnąć w każdej chwili: Ustawienia → Profil i tokeny pokazują ją pod jej nazwą.',
+  'Nothing was given to it. To connect it after all, start again in the app.': 'Niczego nie dostała. Żeby ją jednak połączyć, zacznij od nowa w aplikacji.',
+  'To the start page': 'Do strony startowej',
   'The runner’s id: what a scheduled task names to send its work to this runner.': 'Identyfikator runnera: podaje się go w czynności harmonogramu, żeby wysłać jej pracę na ten runner.',
   'My keys': 'Moje klucze',
   'A shared runner belongs to the team and has no keys of its own: it works on your agent runs and test jobs with yours, so your runs are billed to you and reach only what you can reach. The keys are stored encrypted, are never shown again, and leave the server only to a shared runner that has taken your work. The desktop app does not need them.':

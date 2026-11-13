@@ -337,4 +337,19 @@ CREATE TABLE schedule_slot_run (
     PRIMARY KEY (project_id, slot)
 ) WITHOUT ROWID;
 "#,
+    r#"
+-- A desktop app asking to act as a person (docs/desktop-pairing.md). The app holds the
+-- secret, the person sees the code; a row lives ten minutes at most and is gone once the
+-- app has its token. `user_id` is who said yes, and is empty until somebody has.
+CREATE TABLE desktop_pairing (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    secret_hash TEXT NOT NULL,
+    name TEXT NOT NULL,
+    runner_id TEXT NOT NULL DEFAULT '',
+    user_id INTEGER REFERENCES user (id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+"#,
 ];

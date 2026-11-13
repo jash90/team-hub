@@ -20,6 +20,7 @@ import {
   CreateIssueDialog,
   DashboardView,
   IssueView,
+  PairView,
   ProjectSettingsView,
   ProjectsView,
   ReleasesView,
@@ -163,6 +164,8 @@ const CORE: (Route & { view: { preload: () => Promise<void> } })[] = [
   { pattern: '/search', view: SearchView, render: () => <SearchView /> },
   { pattern: '/issue/:key', view: IssueView, render: (found) => <IssueView issueKey={found.key.toUpperCase()} mode="page" /> },
   { pattern: '/runners', view: RunnersView, render: () => <RunnersView /> },
+  // Where the desktop app sends its person to say yes to it: docs/desktop-pairing.md.
+  { pattern: '/desktop/pair', view: PairView, render: () => <PairView /> },
   { pattern: '/settings/:tab?', view: SettingsView, render: (found) => <SettingsView tab={found.tab} /> },
   { pattern: '/p/:key/board', view: BoardView, render: inProject(<BoardView />) },
   { pattern: '/p/:key/backlog', view: BacklogView, render: inProject(<BacklogView />) },
