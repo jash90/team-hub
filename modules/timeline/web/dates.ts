@@ -143,18 +143,18 @@ export function shapeOf(span: Pick<TimelineSpan, 'start' | 'due' | 'derived'>): 
   const due = span.due === null ? null : toDay(span.due);
   const estimated = span.derived.start && span.derived.due ? 'both' : span.derived.start ? 'start' : span.derived.due ? 'due' : null;
 
-  if (start === null && due === null) {
-    return null;
+  if (start !== null && due !== null) {
+    return { from: start, to: Math.max(start, due), open: null, estimated };
   }
 
-  if (start === null || due === null) {
-    return start === null ? { from: (due ?? 0) - OPEN_DAYS + 1, to: due ?? 0, open: 'start', estimated } : { from: start, to: start + OPEN_DAYS - 1, open: 'due', estimated };
+  if (start !== null) {
+    return { from: start, to: start + OPEN_DAYS - 1, open: 'due', estimated };
   }
 
-  return { from: start, to: Math.max(start, due), open: null, estimated };
+  return due === null ? null : { from: due - OPEN_DAYS + 1, to: due, open: 'start', estimated };
 }
 
-/** Every day the data mentions, for choosing what the axis covers. */
-export function mentioned(spans: { start: string | null; due?: string | null; end?: string | null; releaseDate?: string | null }[]): number[] {
-  return spans.flatMap((span) => [span.start, span.due, span.end, span.releaseDate]).flatMap((date) => (date ? [toDay(date)] : []));
+/** The days among `dates`, for choosing what the axis covers. */
+export function daysOf(dates: (string | null)[]): number[] {
+  return dates.flatMap((date) => (date ? [toDay(date)] : []));
 }
