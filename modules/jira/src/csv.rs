@@ -8,7 +8,10 @@ use chrono::{NaiveDate, NaiveDateTime, SecondsFormat};
 use sha2::{Digest, Sha256};
 
 use crate::mapping::{category_of, default_priority, fold, Structure};
-use crate::remote::{self, Body, RemoteAttachment, RemoteComment, RemoteIssue, RemoteLink, RemoteSprint, RemoteStatus, RemoteType, RemoteUser, RemoteVersion, RemoteWorklog};
+use crate::remote::{
+    self, Body, RemoteAttachment, RemoteComment, RemoteIssue, RemoteLink, RemoteSprint, RemoteStatus, RemoteType, RemoteUser, RemoteVersion,
+    RemoteWorklog,
+};
 use crate::types::JiraCsvColumn;
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -265,7 +268,12 @@ fn comment(cell: &str, fallback: &str, names: &HashMap<String, String>) -> Remot
 
     RemoteComment {
         id: digest(&[&created, author.unwrap_or(""), body]),
-        author: author.map(|author| RemoteUser { account: author.to_string(), name: names.get(author).cloned().unwrap_or_else(|| author.to_string()), email: None }),
+        author: author.map(|author| RemoteUser {
+            account: author.to_string(),
+            name: names.get(author).cloned().unwrap_or_else(|| author.to_string()),
+            // An author written as an e-mail address is matched by it.
+            email: author.contains('@').then(|| author.to_string()),
+        }),
         body: Body::Wiki(body.trim().to_string()),
         updated: created.clone(),
         created,
@@ -282,7 +290,12 @@ fn worklog(cell: &str, names: &HashMap<String, String>) -> Option<RemoteWorklog>
 
     Some(RemoteWorklog {
         id: digest(&[&started, author, &seconds.to_string(), note]),
-        author: (!author.is_empty()).then(|| RemoteUser { account: author.to_string(), name: names.get(author).cloned().unwrap_or_else(|| author.to_string()), email: None }),
+        author: (!author.is_empty()).then(|| RemoteUser {
+            account: author.to_string(),
+            name: names.get(author).cloned().unwrap_or_else(|| author.to_string()),
+            // An author written as an e-mail address is matched by it.
+            email: author.contains('@').then(|| author.to_string()),
+        }),
         seconds,
         started,
         comment: if note.is_empty() { Body::None } else { Body::Wiki(note.to_string()) },
@@ -295,12 +308,21 @@ fn attachment(cell: &str) -> RemoteAttachment {
 
     match parts.as_slice() {
         [_, _, filename, url] => RemoteAttachment { filename: filename.trim().to_string(), url: url.trim().to_string(), size: None },
-        _ => RemoteAttachment { filename: cell.rsplit('/').next().unwrap_or(cell).to_string(), url: if cell.contains("://") { cell.to_string() } else { String::new() }, size: None },
+        _ => RemoteAttachment {
+            filename: cell.rsplit('/').next().unwrap_or(cell).to_string(),
+            url: if cell.contains("://") { cell.to_string() } else { String::new() },
+            size: None,
+        },
     }
 }
 
 fn link_type(header: &str) -> String {
-    header.split_once('(').and_then(|(_, rest)| rest.rsplit_once(')')).map(|(name, _)| name.trim().to_string()).filter(|name| !name.is_empty()).unwrap_or_else(|| "Relates".to_string())
+    header
+        .split_once('(')
+        .and_then(|(_, rest)| rest.rsplit_once(')'))
+        .map(|(name, _)| name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "Relates".to_string())
 }
 
 fn category_key(text: &str) -> String {
@@ -398,7 +420,10 @@ pub fn read(table: &Table, columns: &[JiraCsvColumn], project_key: &str, project
         let created = row.first("created").and_then(csv_instant);
 
         if created.is_none() {
-            parsed.problems.push(format!("{key}: the creation date \"{}\" was not understood; the time of the import is used", row.first("created").unwrap_or("")));
+            parsed.problems.push(format!(
+                "{key}: the creation date \"{}\" was not understood; the time of the import is used",
+                row.first("created").unwrap_or("")
+            ));
         }
 
         let created = created.unwrap_or_else(|| now.to_string());
@@ -434,10 +459,17 @@ pub fn read(table: &Table, columns: &[JiraCsvColumn], project_key: &str, project
             labels: row.all("labels").flat_map(str::split_whitespace).map(String::from).collect(),
             components: row.all("components").map(String::from).collect(),
             fix_versions: row.all("fixVersion").map(String::from).collect(),
-            sprints: row.all("sprint").map(|sprint| RemoteSprint { id: format!("name:{}", fold(sprint)), name: sprint.to_string(), ..Default::default() }).collect(),
+            sprints: row
+                .all("sprint")
+                .map(|sprint| RemoteSprint { id: format!("name:{}", fold(sprint)), name: sprint.to_string(), ..Default::default() })
+                .collect(),
             points: row.first("points").and_then(|points| points.replace(',', ".").parse().ok()),
             due_date: row.first("due").and_then(csv_instant).and_then(|due| remote::day(&due)),
-            estimate_seconds: row.first("estimate").and_then(|seconds| seconds.parse::<f64>().ok()).map(|seconds| seconds as i64).filter(|seconds| *seconds > 0),
+            estimate_seconds: row
+                .first("estimate")
+                .and_then(|seconds| seconds.parse::<f64>().ok())
+                .map(|seconds| seconds as i64)
+                .filter(|seconds| *seconds > 0),
             parent_key,
             resolved: row.first("resolved").and_then(csv_instant),
             comments: row.all("comment").map(|cell| comment(cell, &updated, &names)).collect(),
@@ -446,7 +478,11 @@ pub fn read(table: &Table, columns: &[JiraCsvColumn], project_key: &str, project
                 .cells
                 .iter()
                 .filter(|(target, _, _)| matches!(*target, "linkInward" | "linkOutward"))
-                .map(|(target, header, cell)| RemoteLink { type_name: link_type(header), outward: *target == "linkOutward", other_key: cell.to_string() })
+                .map(|(target, header, cell)| RemoteLink {
+                    type_name: link_type(header),
+                    outward: *target == "linkOutward",
+                    other_key: cell.to_string(),
+                })
                 .collect(),
             attachments: row.all("attachment").map(attachment).collect(),
             type_name,
@@ -482,7 +518,10 @@ pub fn read(table: &Table, columns: &[JiraCsvColumn], project_key: &str, project
         people
     };
     let is_done = |issue: &RemoteIssue| {
-        statuses.iter().find(|status| fold(&status.name) == fold(&issue.status_name)).is_some_and(|status| category_of(&status.category, &status.name) == hub_core::StatusCategory::Done)
+        statuses
+            .iter()
+            .find(|status| fold(&status.name) == fold(&issue.status_name))
+            .is_some_and(|status| category_of(&status.category, &status.name) == hub_core::StatusCategory::Done)
     };
     // The file does not say which sprints are over. One whose issues are all done (or moved
     // on to a later sprint) is taken as completed; the others wait to be started.
@@ -523,7 +562,11 @@ pub fn read(table: &Table, columns: &[JiraCsvColumn], project_key: &str, project
         name: name.unwrap_or_else(|| project_key.to_string()),
         types: types
             .iter()
-            .map(|name| RemoteType { name: name.clone(), subtask: fold(name).contains("sub-task") || fold(name).contains("subtask"), epic: fold(name) == "epic" })
+            .map(|name| RemoteType {
+                name: name.clone(),
+                subtask: fold(name).contains("sub-task") || fold(name).contains("subtask"),
+                epic: fold(name) == "epic",
+            })
             .collect(),
         statuses,
         priorities,
@@ -577,8 +620,32 @@ Broken row,not a key,,,,,,,,,,,,,,,,,,,,,,,,\r\n";
         assert_eq!(
             targets,
             vec![
-                "summary", "key", "id", "type", "status", "projectKey", "projectName", "priority", "assignee", "reporter", "created", "updated", "resolved",
-                "description", "labels", "labels", "sprint", "sprint", "comment", "comment", "points", "parent", "linkOutward", "worklog", "attachment", "ignore",
+                "summary",
+                "key",
+                "id",
+                "type",
+                "status",
+                "projectKey",
+                "projectName",
+                "priority",
+                "assignee",
+                "reporter",
+                "created",
+                "updated",
+                "resolved",
+                "description",
+                "labels",
+                "labels",
+                "sprint",
+                "sprint",
+                "comment",
+                "comment",
+                "points",
+                "parent",
+                "linkOutward",
+                "worklog",
+                "attachment",
+                "ignore",
             ]
         );
         assert_eq!(defaults[1].sample, "SHOP-1");
@@ -601,7 +668,7 @@ Broken row,not a key,,,,,,,,,,,,,,,,,,,,,,,,\r\n";
         let keys: Vec<&str> = parsed.issues.iter().map(|issue| issue.key.as_str()).collect();
 
         assert_eq!(keys, vec!["SHOP-1", "SHOP-2", "SHOP-3"]);
-        assert_eq!(parsed.problems, vec!["Row 7: \"not a key\" is not an issue key".to_string()]);
+        assert_eq!(parsed.problems, vec!["Row 6: \"not a key\" is not an issue key".to_string()]);
 
         let epic = &parsed.issues[0];
         assert_eq!(epic.summary, "Checkout, the \"new\" one");
@@ -619,10 +686,16 @@ Broken row,not a key,,,,,,,,,,,,,,,,,,,,,,,,\r\n";
         assert_eq!(story.parent_key.as_deref(), Some("SHOP-1"));
         assert_eq!(story.points, Some(5.0));
         assert_eq!(story.resolved.as_deref(), Some("2024-03-09T16:00:00.000Z"));
-        assert_eq!(story.sprints.iter().map(|sprint| (sprint.name.as_str(), sprint.state.as_str())).collect::<Vec<_>>(), vec![("Sprint 1", "closed"), ("Sprint 2", "future")]);
+        assert_eq!(
+            story.sprints.iter().map(|sprint| (sprint.name.as_str(), sprint.state.as_str())).collect::<Vec<_>>(),
+            vec![("Sprint 1", "closed"), ("Sprint 2", "future")]
+        );
         assert_eq!(story.links, vec![RemoteLink { type_name: "Blocks".into(), outward: true, other_key: "SHOP-3".into() }]);
         assert_eq!((story.worklogs[0].seconds, story.worklogs[0].started.as_str()), (5400, "2024-03-08T13:00:00.000Z"));
-        assert_eq!(story.attachments[0], RemoteAttachment { filename: "spec.pdf".into(), url: "https://jira.example.com/secure/attachment/7/spec.pdf".into(), size: None });
+        assert_eq!(
+            story.attachments[0],
+            RemoteAttachment { filename: "spec.pdf".into(), url: "https://jira.example.com/secure/attachment/7/spec.pdf".into(), size: None }
+        );
         assert_eq!(parsed.issues[2].created, "2024-03-03T08:00:00.000Z");
 
         let structure = &parsed.structure;

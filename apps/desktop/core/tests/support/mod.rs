@@ -116,6 +116,8 @@ pub struct HubState {
     pub events: Vec<Value>,
     pub proposals: Vec<Value>,
     pub runners: Vec<Value>,
+    /// Proposal kinds the project trusts: applied on arrival.
+    pub trusted: Vec<String>,
     pub notifications: Vec<Notification>,
     /// Every request that changed something: method, path, body.
     pub writes: Vec<(String, String, Value)>,
@@ -155,6 +157,7 @@ fn project() -> Project {
             role: Some(hub_core::ProjectRole::Admin),
             issue_count: 2,
             open_count: 2,
+            disabled_modules: Vec::new(),
         },
         strict_workflow: false,
         statuses: vec![
@@ -283,6 +286,21 @@ impl HubState {
         issue.row.comment_count += 1;
 
         Some(comment)
+    }
+
+    fn cancel(&mut self, index: usize) {
+        let id = self.runs[index]["id"].clone();
+
+        self.runs[index]["cancelRequested"] = json!(true);
+
+        if self.runs[index]["state"] == "queued" {
+            self.runs[index]["state"] = json!("cancelled");
+        }
+
+        for proposal in self.proposals.iter_mut().filter(|proposal| proposal["runId"] == id && proposal["state"] == "pending") {
+            proposal["state"] = json!("rejected");
+            proposal["note"] = json!("The run was cancelled");
+        }
     }
 
     /// What an approved proposal does to the tracker.
@@ -615,9 +633,15 @@ async fn add_run_event(State(state): Shared, headers: HeaderMap, UrlPath(id): Ur
 
     let kind = body["kind"].as_str().unwrap_or_default().to_string();
 
+    if kind == "answer" {
+        return error(StatusCode::BAD_REQUEST, "Answers come from people, not from runners");
+    }
+
     if kind == "question" {
         state.runs[index]["state"] = json!("waiting");
         state.runs[index]["pendingQuestion"] = json!(true);
+    } else if state.runs[index]["state"] == "waiting" && state.runs[index]["pendingQuestion"] == false {
+        state.runs[index]["state"] = json!("running");
     }
 
     let event = state.add_event(id, &kind, body["text"].as_str().unwrap_or_default(), body["data"].clone(), None);
@@ -628,15 +652,34 @@ async fn add_run_event(State(state): Shared, headers: HeaderMap, UrlPath(id): Ur
 async fn add_proposal(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i64>, Json(body): Json<Value>) -> Response {
     let mut state = guard!(runs state, headers);
 
-    if state.run_index(id).is_none() {
-        return error(StatusCode::NOT_FOUND, "No such run");
+    let Some(index) = state.run_index(id) else { return error(StatusCode::NOT_FOUND, "No such run") };
+
+    if finished(&state.runs[index]) {
+        return error(StatusCode::CONFLICT, "The run is finished");
+    }
+
+    if body["kind"] == "transition" {
+        let wanted = body["payload"]["status"].as_str().unwrap_or_default();
+        let valid: Vec<&str> = state.project.statuses.iter().map(|status| status.name.as_str()).collect();
+
+        if !valid.contains(&wanted) {
+            return error(StatusCode::BAD_REQUEST, &format!("Unknown status \"{wanted}\" (valid: {})", valid.join(", ")));
+        }
     }
 
     let proposal_id = state.id();
-    let proposal = json!({
+    let mut proposal = json!({
         "id": proposal_id, "runId": id, "kind": body["kind"], "payload": body["payload"], "state": "pending",
-        "decidedBy": null, "decidedAt": null, "note": null, "result": null,
+        "decidedBy": null, "decidedAt": null, "note": null, "result": null, "preview": null,
     });
+    let key = state.runs[index]["issueKey"].as_str().unwrap().to_string();
+
+    if state.trusted.iter().any(|kind| body["kind"] == kind.as_str()) {
+        proposal["result"] = state.apply(&proposal, &key).unwrap();
+        proposal["state"] = json!("approved");
+    } else {
+        state.runs[index]["state"] = json!("waiting");
+    }
 
     state.proposals.push(proposal.clone());
 
@@ -647,11 +690,7 @@ async fn cancel_run(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPa
     let mut state = guard!(runs state, headers);
     let Some(index) = state.run_index(id) else { return error(StatusCode::NOT_FOUND, "No such run") };
 
-    state.runs[index]["cancelRequested"] = json!(true);
-
-    if state.runs[index]["state"] == "queued" {
-        state.runs[index]["state"] = json!("cancelled");
-    }
+    state.cancel(index);
 
     Json(state.runs[index].clone()).into_response()
 }
@@ -680,7 +719,13 @@ async fn decide(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i
 
     let proposal = state.proposals[index].clone();
     let run_id = proposal["runId"].as_i64().unwrap();
-    let key = state.runs[state.run_index(run_id).unwrap()]["issueKey"].as_str().unwrap().to_string();
+    let run = state.run_index(run_id).unwrap();
+    let key = state.runs[run]["issueKey"].as_str().unwrap().to_string();
+
+    if state.runs[run]["state"] == "cancelled" {
+        return error(StatusCode::CONFLICT, "The run was cancelled");
+    }
+
     let (outcome, result, note) = match body["approve"].as_bool() {
         Some(true) => match state.apply(&proposal, &key) {
             Ok(result) => ("approved", result, body["note"].clone()),
@@ -695,6 +740,12 @@ async fn decide(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i
     state.proposals[index]["decidedBy"] = json!(1);
     state.proposals[index]["decidedAt"] = json!(NOW);
     state.writes.push(("POST".into(), format!("/proposals/{id}/decide"), body));
+
+    let undecided = state.proposals.iter().any(|proposal| proposal["runId"] == run_id && proposal["state"] == "pending");
+
+    if !undecided && state.runs[run]["state"] == "waiting" && state.runs[run]["pendingQuestion"] == false {
+        state.runs[run]["state"] = json!("running");
+    }
 
     Json(state.detail(run_id)).into_response()
 }
@@ -715,6 +766,7 @@ impl FakeHub {
             events: Vec::new(),
             proposals: Vec::new(),
             runners: Vec::new(),
+            trusted: Vec::new(),
             notifications: Vec::new(),
             writes: Vec::new(),
             tool_calls: Vec::new(),
@@ -801,7 +853,7 @@ impl FakeHub {
         let mut state = self.state();
         let index = state.run_index(id).unwrap();
 
-        state.runs[index]["cancelRequested"] = json!(true);
+        state.cancel(index);
     }
 
     /// A person deciding a proposal on the web.
@@ -881,7 +933,10 @@ impl Bench {
             let thread = self.thread(id).await;
 
             if done(&thread) {
-                return thread;
+                // One more round, so the server has heard of the state the thread is in now.
+                self.desktop.tick(true).await.unwrap();
+
+                return self.thread(id).await;
             }
 
             tokio::time::sleep(Duration::from_millis(50)).await;

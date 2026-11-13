@@ -76,12 +76,14 @@ pub trait Module: Send + Sync + 'static {
         None
     }
 
-    /// Adds this module's entry to `ext` of each row (badges on cards and lists).
+    /// Adds this module's entry to `ext` of each row (badges on cards and lists). The host
+    /// drops the entry again for rows of a project where the module is switched off.
     fn decorate_issues(&self, _connection: &Connection, _rows: &mut [IssueRow]) -> ApiResult<()> {
         Ok(())
     }
 
-    /// Data for the module's panel on an issue's page.
+    /// Data for the module's panel on an issue's page. Not asked for issues of a project
+    /// where the module is switched off.
     fn issue_panel(&self, _app: &App, _connection: &Connection, _issue: &IssueRow, _viewer: &AuthUser) -> ApiResult<Option<serde_json::Value>> {
         Ok(None)
     }

@@ -1,0 +1,286 @@
+/* The Jira import: its settings tab and the line on imported issues. Colours come from the
+   application's variables, so both themes are covered. */
+
+.jira-origin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--sunk);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.jira-origin .icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.jira-origin-when {
+  margin-left: auto;
+}
+
+.jira-preview,
+.jira-mapping,
+.jira-report,
+.jira-target {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.jira-preview {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.jira-preview-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.jira-map h3 {
+  margin: 0 0 2px;
+  font-size: 13px;
+}
+
+.jira-map > p {
+  margin: 0 0 6px;
+  max-width: 72ch;
+}
+
+.jira-map-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+
+.jira-map-scroll {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.jira-map-wrap .table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+.jira-map-wrap .table td,
+.jira-map-wrap .table th {
+  padding-left: 10px;
+}
+
+.jira-map .table td {
+  min-width: 150px;
+}
+
+.jira-map .table .input,
+.jira-map .table .picker {
+  width: 100%;
+  min-width: 140px;
+}
+
+.jira-hint {
+  display: block;
+  font-size: 12px;
+}
+
+.jira-sample {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jira-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.jira-facts > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 92px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.jira-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.jira-facts dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.jira-info {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--blue-soft);
+  color: var(--ink);
+  max-width: 80ch;
+}
+
+.jira-check {
+  align-items: flex-start;
+  max-width: 80ch;
+}
+
+.jira-check input {
+  flex: none;
+  margin-top: 2px;
+}
+
+.jira-check-hint {
+  display: block;
+  font-size: 13px;
+}
+
+.jira-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 0;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.jira-result .icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.jira-result-ok {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.jira-result-bad {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.jira-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.jira-problems,
+.jira-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.jira-problems ul,
+.jira-notes ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+}
+
+.jira-problems {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.jira-note-key {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.jira-job:empty {
+  display: none;
+}
+
+.jira-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.jira-bar {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--sunk);
+}
+
+.jira-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--blue);
+  transition: width 0.3s ease;
+}
+
+.jira-bar-done {
+  background: var(--green);
+}
+
+.jira-bar-failed {
+  background: var(--red);
+}
+
+.jira-bar-cancelled {
+  background: var(--muted);
+}
+
+.jira-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.jira-report {
+  margin-top: 14px;
+}
+
+.jira-report > p {
+  margin: 0;
+}
+
+.jira-open {
+  display: flex;
+  gap: 16px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jira-bar-fill {
+    transition: none;
+  }
+}

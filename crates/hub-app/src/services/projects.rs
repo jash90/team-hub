@@ -17,6 +17,7 @@ use crate::services::{sprints, versions};
 
 fn map_summary(row: &rusqlite::Row) -> rusqlite::Result<ProjectSummary> {
     let mode: String = row.get(5)?;
+    let disabled: Option<String> = row.get(10)?;
 
     Ok(ProjectSummary {
         id: row.get(0)?,
@@ -30,12 +31,14 @@ fn map_summary(row: &rusqlite::Row) -> rusqlite::Result<ProjectSummary> {
         role: None,
         issue_count: row.get(8)?,
         open_count: row.get(9)?,
+        disabled_modules: disabled.map(|ids| ids.split(',').map(String::from).collect()).unwrap_or_default(),
     })
 }
 
 const SUMMARY_SELECT: &str = "SELECT p.id, p.key, p.name, p.description, p.lead_id, p.board_mode, p.is_private, p.archived,
         (SELECT count(*) FROM issue WHERE project_id = p.id),
-        (SELECT count(*) FROM issue i JOIN status s ON s.id = i.status_id WHERE i.project_id = p.id AND s.category != 'done')
+        (SELECT count(*) FROM issue i JOIN status s ON s.id = i.status_id WHERE i.project_id = p.id AND s.category != 'done'),
+        (SELECT group_concat(module_id) FROM (SELECT module_id FROM project_module_off WHERE project_id = p.id ORDER BY module_id))
     FROM project p";
 
 pub fn list_projects(connection: &Connection, user: &AuthUser) -> ApiResult<Vec<ProjectSummary>> {

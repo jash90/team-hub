@@ -179,7 +179,12 @@ impl Client {
         }
 
         // An e-mail means Jira Cloud; `detect` settles it by asking the server.
-        Ok(Self { agent: config.build().new_agent(), authorization: authorization(&settings.email, token), cloud: !settings.email.trim().is_empty(), base })
+        Ok(Self {
+            agent: config.build().new_agent(),
+            authorization: authorization(&settings.email, token),
+            cloud: !settings.email.trim().is_empty(),
+            base,
+        })
     }
 
     pub fn base(&self) -> &str {
@@ -286,7 +291,10 @@ impl Client {
             let total = answer["total"].as_u64().map(|total| total as usize);
             let last = answer["isLast"].as_bool().unwrap_or(false) || total.is_some_and(|total| start >= total);
 
-            if entries.is_empty() || last || (total.is_none() && answer["isLast"].is_null() && entries.len() < PAGE_SIZE) {
+            // A bare array says nothing about what follows: only an empty page ends it.
+            let short = !answer.is_array() && total.is_none() && answer["isLast"].is_null() && entries.len() < PAGE_SIZE;
+
+            if entries.is_empty() || last || short {
                 return Ok(());
             }
         }
@@ -453,8 +461,7 @@ impl Client {
 
         cursor.start += issues.len();
         cursor.token = answer["nextPageToken"].as_str().map(String::from);
-        cursor.done = issues.is_empty()
-            || if self.cloud { cursor.token.is_none() } else { total.is_none_or(|total| cursor.start as i64 >= total) };
+        cursor.done = issues.is_empty() || if self.cloud { cursor.token.is_none() } else { total.is_none_or(|total| cursor.start as i64 >= total) };
 
         Ok(SearchPage { issues, total })
     }

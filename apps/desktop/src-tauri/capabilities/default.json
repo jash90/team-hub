@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The main window may call the core, listen to its events, pick a folder for a repository, and open links in the browser.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "window-state:default",
+    "dialog:allow-open",
+    "notification:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://*" }, { "url": "http://*" }]
+    }
+  ]
+}

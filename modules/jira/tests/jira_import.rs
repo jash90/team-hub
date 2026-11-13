@@ -54,12 +54,31 @@ fn state(app: &App, key: &str) -> (String, String, String, Option<String>, Optio
     .unwrap()
 }
 
-fn issue_state(summary: &str, status: &str, kind: &str, parent: Option<&str>, sprint: Option<&str>, resolved: Option<&str>) -> (String, String, String, Option<String>, Option<String>, Option<String>) {
-    (summary.to_string(), status.to_string(), kind.to_string(), parent.map(String::from), sprint.map(String::from), resolved.map(|at| format!("2024-{at}:00.000Z")))
+fn issue_state(
+    summary: &str,
+    status: &str,
+    kind: &str,
+    parent: Option<&str>,
+    sprint: Option<&str>,
+    resolved: Option<&str>,
+) -> (String, String, String, Option<String>, Option<String>, Option<String>) {
+    (
+        summary.to_string(),
+        status.to_string(),
+        kind.to_string(),
+        parent.map(String::from),
+        sprint.map(String::from),
+        resolved.map(|at| format!("2024-{at}:00.000Z")),
+    )
 }
 
 fn notes(job: &Value, list: &str) -> Vec<(String, String)> {
-    job["report"][list].as_array().unwrap().iter().map(|note| (note["key"].as_str().unwrap().to_string(), note["reason"].as_str().unwrap().to_string())).collect()
+    job["report"][list]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|note| (note["key"].as_str().unwrap().to_string(), note["reason"].as_str().unwrap().to_string()))
+        .collect()
 }
 
 /// The import of the small project, checked from every side. The same for both flavours:
@@ -94,10 +113,14 @@ async fn brings_the_project_over(cloud: bool) {
 
     // Jira was asked the way its flavour wants: v3 with a page token, or v2 with an offset.
     let requests = fake.take_requests();
-    let searches: Vec<&String> = requests.iter().filter(|request| request.contains("/search")).collect();
+    let searches: Vec<&String> =
+        requests.iter().filter(|request| request.contains(&format!("/rest/api/{}/search", if cloud { 3 } else { 2 }))).collect();
 
     if cloud {
-        assert!(requests.iter().all(|request| !request.contains("/rest/api/2/") || request.ends_with("/serverInfo") || request.ends_with("/field")), "{requests:?}");
+        assert!(
+            requests.iter().all(|request| !request.contains("/rest/api/2/") || request.ends_with("/serverInfo") || request.ends_with("/field")),
+            "{requests:?}"
+        );
         assert_eq!(searches.len(), 4, "{searches:?}");
         assert!(searches[0].starts_with("POST /rest/api/3/search/approximate-count"));
         assert!(searches[1].starts_with("GET /rest/api/3/search/jql?") && !searches[1].contains("nextPageToken"));
@@ -110,7 +133,7 @@ async fn brings_the_project_over(cloud: bool) {
         assert!(searches[2].contains("startAt=3") && searches[3].contains("startAt=6"));
     }
 
-    assert!(searches.iter().skip(1).all(|search| search.contains("expand=changelog") && search.contains("ORDER+BY+key")), "{searches:?}");
+    assert!(searches.iter().skip(1).all(|search| search.contains("expand=changelog") && search.contains("ORDER%20BY%20key")), "{searches:?}");
 
     // The project: same key, Jira's statuses in workflow order (Jira lists them otherwise),
     // its types, components, versions and sprints.
@@ -140,7 +163,11 @@ async fn brings_the_project_over(cloud: bool) {
     assert_eq!(released.released_at.as_deref(), Some("2024-03-15T12:00:00.000Z"));
     assert_eq!((planned.released, planned.release_date.as_deref(), planned.released_at.as_deref()), (false, Some("2024-04-30"), None));
     assert_eq!(
-        project.sprints.iter().map(|sprint| (sprint.name.as_str(), sprint.state, sprint.start_date.as_deref(), sprint.end_date.as_deref())).collect::<Vec<_>>(),
+        project
+            .sprints
+            .iter()
+            .map(|sprint| (sprint.name.as_str(), sprint.state, sprint.start_date.as_deref(), sprint.end_date.as_deref()))
+            .collect::<Vec<_>>(),
         vec![
             ("Sprint 1", SprintState::Closed, Some("2024-03-01"), Some("2024-03-15")),
             ("Sprint 2", SprintState::Active, Some("2024-03-18"), Some("2024-04-01")),
@@ -181,7 +208,10 @@ async fn brings_the_project_over(cloud: bool) {
     let cart = issue_detail(&app, &admin.user, "WEB-2").unwrap();
 
     assert_eq!((cart.row.assignee_id, cart.row.reporter_id), (Some(member.user.id), Some(admin.user.id)));
-    assert_eq!((cart.row.priority, cart.row.points, cart.row.due_date.as_deref(), cart.estimate_minutes), (3, Some(5.0), Some("2024-03-10"), Some(480)));
+    assert_eq!(
+        (cart.row.priority, cart.row.points, cart.row.due_date.as_deref(), cart.estimate_minutes),
+        (3, Some(5.0), Some("2024-03-10"), Some(480))
+    );
     assert_eq!(cart.row.labels, vec!["checkout", "mvp"]);
     assert_eq!(cart.row.component_ids.len(), 1);
     assert_eq!(cart.row.version_id, Some(released.id));
@@ -219,12 +249,14 @@ async fn brings_the_project_over(cloud: bool) {
         })
         .unwrap();
 
-    assert_eq!(refs.iter().map(|(_, old, new)| (old.as_deref(), new.as_deref())).collect::<Vec<_>>(), vec![
-        (Some("Open"), Some("In Progress")),
-        (Some("In Progress"), Some("In Review")),
-        (Some("In Review"), Some("Done"))
-    ]);
-    assert_eq!(count(&app, "SELECT count(*) FROM change WHERE field = 'sprint' AND new_value IS NOT NULL AND new_ref NOT IN (SELECT id FROM sprint)"), 0);
+    assert_eq!(
+        refs.iter().map(|(_, old, new)| (old.as_deref(), new.as_deref())).collect::<Vec<_>>(),
+        vec![(Some("Open"), Some("In Progress")), (Some("In Progress"), Some("In Review")), (Some("In Review"), Some("Done"))]
+    );
+    assert_eq!(
+        count(&app, "SELECT count(*) FROM change WHERE field = 'sprint' AND new_value IS NOT NULL AND new_ref NOT IN (SELECT id FROM sprint)"),
+        0
+    );
     assert_eq!(count(&app, "SELECT count(*) FROM change WHERE field = 'assignee' AND new_ref IN (SELECT id FROM user)"), 1);
 
     // Comments keep their authors and times; work logs too.
@@ -235,7 +267,10 @@ async fn brings_the_project_over(cloud: bool) {
         vec![(Some(zofia), "Looks good on staging.", "2024-03-05T14:30:00.000Z"), (Some(admin.user.id), "Merged.", "2024-03-07T07:00:00.000Z")]
     );
     assert_eq!(
-        cart.worklogs.iter().map(|worklog| (worklog.user_id, worklog.minutes, worklog.started_at.as_str(), worklog.note.as_str())).collect::<Vec<_>>(),
+        cart.worklogs
+            .iter()
+            .map(|worklog| (worklog.user_id, worklog.minutes, worklog.started_at.as_str(), worklog.note.as_str()))
+            .collect::<Vec<_>>(),
         vec![(Some(member.user.id), 90, "2024-03-05T08:00:00.000Z", "Cart endpoints")]
     );
     assert_eq!(cart.spent_minutes, 90);
@@ -288,7 +323,10 @@ async fn brings_the_project_over(cloud: bool) {
         })
         .unwrap();
 
-    assert_eq!(links, vec![("WEB-5".to_string(), "blocks".to_string(), "WEB-7".to_string()), ("WEB-7".to_string(), "relates".to_string(), "WEB-2".to_string())]);
+    assert_eq!(
+        links,
+        vec![("WEB-5".to_string(), "blocks".to_string(), "WEB-7".to_string()), ("WEB-7".to_string(), "relates".to_string(), "WEB-2".to_string())]
+    );
 
     // An import is not something that happens to people: nobody is notified, nobody is
     // made a watcher, and the journal has the import's own entries, not one per issue.
@@ -301,7 +339,8 @@ async fn brings_the_project_over(cloud: bool) {
     assert_eq!(count(&app, "SELECT count(*) FROM issue_fts WHERE issue_fts MATCH 'staging'"), 1);
 
     // New work continues after Jira's numbers.
-    let new = NewIssue { project_key: "WEB".to_string(), fields: IssuePatch { summary: Some("First issue made here".to_string()), ..Default::default() } };
+    let new =
+        NewIssue { project_key: "WEB".to_string(), fields: IssuePatch { summary: Some("First issue made here".to_string()), ..Default::default() } };
     let id = app.write(admin.user.actor(), |tx| create_issue(tx, &new)).unwrap();
 
     assert_eq!(text(&app, &format!("SELECT key FROM issue WHERE id = {id}")).as_deref(), Some("WEB-10"));
@@ -329,7 +368,13 @@ fn counts(job: &Value) -> (i64, i64, i64, usize, usize) {
     let report = &job["report"];
     let number = |name: &str| report[name].as_i64().unwrap_or(-1);
 
-    (number("created"), number("updated"), number("unchanged"), report["skipped"].as_array().map_or(99, Vec::len), report["failed"].as_array().map_or(99, Vec::len))
+    (
+        number("created"),
+        number("updated"),
+        number("unchanged"),
+        report["skipped"].as_array().map_or(99, Vec::len),
+        report["failed"].as_array().map_or(99, Vec::len),
+    )
 }
 
 async fn imports_again_without_duplicates(cloud: bool) {
@@ -349,7 +394,10 @@ async fn imports_again_without_duplicates(cloud: bool) {
 
     assert_eq!(counts(&again), (0, 0, 1, 0, 0));
     assert_eq!(again["report"]["projectCreated"], false);
-    assert!(requests.iter().any(|request| request.contains("/search") && request.contains("updated+%3E%3D+%222024-03-20+12%3A00%22")), "{requests:?}");
+    assert!(
+        requests.iter().any(|request| request.contains("/search") && request.contains("updated%20%3E%3D%20%222024-03-20%2012%3A00%22")),
+        "{requests:?}"
+    );
     assert_eq!(totals(&app), before);
 
     // A full run reads everything again and still changes nothing.
@@ -370,7 +418,13 @@ async fn imports_again_without_duplicates(cloud: bool) {
             created: local("03-25T10:00"),
             items: vec![
                 ("summary".to_string(), None, Some("Refunds".to_string()), None, Some("Refunds and returns".to_string())),
-                ("status".to_string(), Some("10002".to_string()), Some("Open".to_string()), Some("10001".to_string()), Some("In Progress".to_string())),
+                (
+                    "status".to_string(),
+                    Some("10002".to_string()),
+                    Some("Open".to_string()),
+                    Some("10001".to_string()),
+                    Some("In Progress".to_string()),
+                ),
             ],
         });
         refunds.comments.push(fake::FakeComment {
@@ -460,8 +514,12 @@ async fn issues_edited_here_are_not_overwritten_unless_asked() {
 
     let job = admin.import(json!({ "projectKey": "WEB" })).await;
 
-    assert_eq!(counts(&job), (0, 1, 0, 1, 0), "{job}");
-    assert_eq!(notes(&job, "skipped"), vec![("WEB-5".to_string(), "Edited here after it was imported; the newer version in Jira was not applied".to_string())]);
+    // Asked for what changed since the last import: these two, and the issue that marked it.
+    assert_eq!(counts(&job), (0, 1, 1, 1, 0), "{job}");
+    assert_eq!(
+        notes(&job, "skipped"),
+        vec![("WEB-5".to_string(), "Edited here after it was imported; the newer version in Jira was not applied".to_string())]
+    );
     assert_eq!((state(&app, "WEB-5").0.as_str(), count(&app, "SELECT priority FROM issue WHERE key = 'WEB-5'")), ("Rounding (triaged)", 2));
     // A comment made here is not an edit of the issue, and it stays.
     assert_eq!(state(&app, "WEB-2").0, "Cart, reworked");
@@ -482,10 +540,20 @@ async fn an_existing_project_is_only_written_into_when_asked() {
     let Setup { app, admin, .. } = connected(small(false)).await;
 
     // A project with Jira's key is already here, with an issue of its own under WEB-1.
-    let new = NewProject { key: "WEB".to_string(), name: "Our web".to_string(), description: String::new(), board_mode: None, is_private: false, lead_id: None };
+    let new = NewProject {
+        key: "WEB".to_string(),
+        name: "Our web".to_string(),
+        description: String::new(),
+        board_mode: None,
+        is_private: false,
+        lead_id: None,
+    };
     let project = app.write(admin.user.actor(), |tx| create_project(tx, &admin.user, &new)).unwrap();
     let epic = project.types.iter().find(|kind| kind.name == "Epic").unwrap().id;
-    let own = NewIssue { project_key: "WEB".to_string(), fields: IssuePatch { summary: Some("Our own epic".to_string()), type_id: Some(epic), ..Default::default() } };
+    let own = NewIssue {
+        project_key: "WEB".to_string(),
+        fields: IssuePatch { summary: Some("Our own epic".to_string()), type_id: Some(epic), ..Default::default() },
+    };
 
     app.write(admin.user.actor(), |tx| create_issue(tx, &own)).unwrap();
 
@@ -498,7 +566,10 @@ async fn an_existing_project_is_only_written_into_when_asked() {
     let job = admin.import(json!({ "projectKey": "WEB", "intoExisting": true })).await;
 
     assert_eq!(counts(&job), (6, 0, 0, 1, 0), "{job}");
-    assert_eq!(notes(&job, "skipped"), vec![("WEB-1".to_string(), "An issue with this key already exists here and did not come from Jira".to_string())]);
+    assert_eq!(
+        notes(&job, "skipped"),
+        vec![("WEB-1".to_string(), "An issue with this key already exists here and did not come from Jira".to_string())]
+    );
     assert_eq!(job["report"]["projectCreated"], false);
     assert_eq!(state(&app, "WEB-1").0, "Our own epic");
     assert_eq!(state(&app, "WEB-2").3.as_deref(), Some("WEB-1"));
@@ -507,7 +578,10 @@ async fn an_existing_project_is_only_written_into_when_asked() {
     let project = app.read(|connection| get_project(connection, &admin.user, "WEB")).unwrap();
 
     assert_eq!(project.summary.name, "Our web");
-    assert_eq!(project.statuses.iter().map(|status| status.name.as_str()).collect::<Vec<_>>(), vec!["To Do", "In Progress", "In Review", "Done", "Open"]);
+    assert_eq!(
+        project.statuses.iter().map(|status| status.name.as_str()).collect::<Vec<_>>(),
+        vec!["To Do", "In Progress", "In Review", "Done", "Open"]
+    );
     assert!(project.types.iter().any(|kind| kind.name == "Task"));
 
     // Once imported, importing again needs no permission, and Jira's WEB-1 still does not
@@ -553,12 +627,16 @@ async fn the_mapping_decides_what_things_become() {
     assert_eq!(count(&app, "SELECT count(*) FROM user"), 2);
     assert_eq!(count(&app, "SELECT assignee_id FROM issue WHERE key = 'WEB-3'"), member.user.id);
     assert_eq!(count(&app, "SELECT count(*) FROM issue WHERE key = 'WEB-5' AND assignee_id IS NULL"), 1);
-    assert_eq!(text(&app, "SELECT c.author_label FROM comment c JOIN issue i ON i.id = c.issue_id WHERE i.key = 'WEB-5'").as_deref(), Some("Jira · Olaf Odszedł"));
+    assert_eq!(
+        text(&app, "SELECT c.author_label FROM comment c JOIN issue i ON i.id = c.issue_id WHERE i.key = 'WEB-5'").as_deref(),
+        Some("Jira · Olaf Odszedł")
+    );
     assert_eq!(history(&app, "WEB-5")[1].4.as_deref(), Some("Jira · Olaf Odszedł"));
 
     // The mapping is remembered: the next preview proposes it again.
     let preview = admin.get("/jira/projects/WEB/preview").await;
-    let status_of = |name: &str| preview["mapping"]["statuses"].as_array().unwrap().iter().find(|entry| entry["jiraName"] == name).unwrap()["name"].clone();
+    let status_of =
+        |name: &str| preview["mapping"]["statuses"].as_array().unwrap().iter().find(|entry| entry["jiraName"] == name).unwrap()["name"].clone();
 
     assert_eq!((status_of("Open"), status_of("In Review"), status_of("Done")), (json!("To Do"), json!("In Progress"), json!("Done")));
     assert_eq!(preview["mapping"]["createUsers"], false);
@@ -581,7 +659,9 @@ async fn without_the_agile_api_sprints_come_from_the_issues() {
 
     // The planned sprint has no issue yet, so only the two that issues name exist.
     let sprints: Vec<(String, String, Option<String>)> = app
-        .read(|connection| query_all(connection, "SELECT name, state, completed_at FROM sprint ORDER BY id", [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))))
+        .read(|connection| {
+            query_all(connection, "SELECT name, state, completed_at FROM sprint ORDER BY id", [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        })
         .unwrap();
 
     assert_eq!(
@@ -596,7 +676,8 @@ async fn without_the_agile_api_sprints_come_from_the_issues() {
     assert_eq!(history(&app, "WEB-5").len(), 4);
 
     // Without a board to read the columns from, the statuses are still in workflow order.
-    let statuses: Vec<String> = app.read(|connection| query_all(connection, "SELECT name FROM status ORDER BY position", [], |row| row.get(0))).unwrap();
+    let statuses: Vec<String> =
+        app.read(|connection| query_all(connection, "SELECT name FROM status ORDER BY position", [], |row| row.get(0))).unwrap();
 
     assert_eq!(statuses, vec!["Open", "In Progress", "In Review", "Done"]);
 }
@@ -686,7 +767,10 @@ async fn an_import_can_be_cancelled_and_picked_up_again() {
     assert_eq!(done["report"]["created"].as_i64(), Some(60 - imported), "{done}");
     assert_eq!(done["report"]["failed"], json!([]));
     assert_eq!(count(&app, "SELECT count(*) FROM issue"), 60);
-    assert_eq!(count(&app, "SELECT count(*) FROM issue WHERE parent_id IS NULL AND type_id NOT IN (SELECT id FROM issue_type WHERE level = 'epic')"), 0);
+    assert_eq!(
+        count(&app, "SELECT count(*) FROM issue WHERE parent_id IS NULL AND type_id NOT IN (SELECT id FROM issue_type WHERE level = 'epic')"),
+        0
+    );
 }
 
 async fn a_project_of_sixty_issues(cloud: bool) {
@@ -700,7 +784,8 @@ async fn a_project_of_sixty_issues(cloud: bool) {
     assert_eq!(count(&app, "SELECT count(*) FROM issue WHERE key IN ('WEB-25', 'WEB-26', 'WEB-27')"), 0);
 
     // 4 epics, 42 stories, bugs and tasks under them, 14 subtasks under those.
-    let by_level = |level: &str| count(&app, &format!("SELECT count(*) FROM issue i JOIN issue_type t ON t.id = i.type_id WHERE t.level = '{level}'"));
+    let by_level =
+        |level: &str| count(&app, &format!("SELECT count(*) FROM issue i JOIN issue_type t ON t.id = i.type_id WHERE t.level = '{level}'"));
 
     assert_eq!((by_level("epic"), by_level("standard"), by_level("subtask")), (4, 42, 14));
     assert_eq!(count(&app, "SELECT count(*) FROM issue i JOIN issue_type t ON t.id = i.type_id WHERE t.level != 'epic' AND i.parent_id IS NULL"), 0);
@@ -711,7 +796,7 @@ async fn a_project_of_sixty_issues(cloud: bool) {
         count(
             &app,
             "SELECT count(*) FROM issue i WHERE EXISTS (SELECT 1 FROM change c WHERE c.issue_id = i.id AND c.field = 'status')
-             AND i.status_id != (SELECT c.new_ref FROM change c WHERE c.issue_id = i.id AND c.field = 'status' ORDER BY c.created_at DESC, c.id DESC LIMIT 1)"
+             AND i.status_id != (SELECT CAST(c.new_ref AS INTEGER) FROM change c WHERE c.issue_id = i.id AND c.field = 'status' ORDER BY c.created_at DESC, c.id DESC LIMIT 1)"
         ),
         0
     );
@@ -726,10 +811,21 @@ async fn a_project_of_sixty_issues(cloud: bool) {
     assert_eq!(
         count(
             &app,
-            "SELECT count(*) FROM issue i WHERE coalesce(i.sprint_id, 0) != coalesce((SELECT c.new_ref FROM change c WHERE c.issue_id = i.id AND c.field = 'sprint'
+            "SELECT count(*) FROM issue i WHERE coalesce(i.sprint_id, 0) != coalesce((SELECT CAST(c.new_ref AS INTEGER) FROM change c WHERE c.issue_id = i.id AND c.field = 'sprint'
              ORDER BY c.created_at DESC, c.id DESC LIMIT 1), i.sprint_id, 0)"
         ),
         0
+    );
+
+    // The backlog status is in no column of Jira's board: it comes before the first column
+    // in the workflow, and stays off the board here too.
+    let statuses: Vec<(String, bool)> = app
+        .read(|connection| query_all(connection, "SELECT name, on_board FROM status ORDER BY position", [], |row| Ok((row.get(0)?, row.get(1)?))))
+        .unwrap();
+
+    assert_eq!(
+        statuses.iter().map(|(name, on_board)| (name.as_str(), *on_board)).collect::<Vec<_>>(),
+        vec![("Backlog", false), ("To Do", true), ("In Progress", true), ("In Review", true), ("Done", true)]
     );
 
     // Three sprints are over with all their work done in them, one runs, one is planned.
@@ -756,8 +852,8 @@ async fn a_project_of_sixty_issues(cloud: bool) {
             ("WEB Sprint 5", "future", 4, 0)
         ]
     );
-    // The two issues carried over left the second sprint when it ended and joined the third.
-    assert_eq!(count(&app, "SELECT count(*) FROM change WHERE field = 'sprint' AND old_value = 'WEB Sprint 2' AND new_value IS NULL AND actor_label = 'Jira'"), 2);
+    // The two issues that were not finished in the second sprint moved on to the third.
+    assert_eq!(count(&app, "SELECT count(*) FROM change WHERE field = 'sprint' AND old_value = 'WEB Sprint 2' AND new_value = 'WEB Sprint 3'"), 2);
 
     // The ranks an import appends stay short enough to sort and to read.
     assert!(count(&app, "SELECT max(length(rank)) FROM issue") <= 16);

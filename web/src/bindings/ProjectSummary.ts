@@ -6,4 +6,8 @@ export type ProjectSummary = { id: number, key: string, name: string, descriptio
 /**
  * The caller's role in this project; none when they can only see it.
  */
-role: ProjectRole | null, issueCount: number, openCount: number, };
+role: ProjectRole | null, issueCount: number, openCount: number, 
+/**
+ * Ids of the modules switched off in this project.
+ */
+disabledModules: Array<string>, };

@@ -131,11 +131,21 @@ impl Module for JiraModule {
 
     /// "Imported from Jira", with the way back to the original.
     fn issue_panel(&self, _app: &App, connection: &Connection, issue: &IssueRow, _viewer: &AuthUser) -> ApiResult<Option<serde_json::Value>> {
-        let panel = query_one(connection, "SELECT remote_key, browse_url, imported_at, remote_updated FROM jira_issue WHERE issue_id = ?1", [issue.id], |row| {
-            let url: String = row.get(1)?;
+        let panel = query_one(
+            connection,
+            "SELECT remote_key, browse_url, imported_at, remote_updated FROM jira_issue WHERE issue_id = ?1",
+            [issue.id],
+            |row| {
+                let url: String = row.get(1)?;
 
-            Ok(JiraIssuePanel { key: row.get(0)?, url: Some(url).filter(|url| !url.is_empty()), imported_at: row.get(2)?, remote_updated: row.get(3)? })
-        })?;
+                Ok(JiraIssuePanel {
+                    key: row.get(0)?,
+                    url: Some(url).filter(|url| !url.is_empty()),
+                    imported_at: row.get(2)?,
+                    remote_updated: row.get(3)?,
+                })
+            },
+        )?;
 
         Ok(panel.map(serde_json::to_value).transpose()?)
     }

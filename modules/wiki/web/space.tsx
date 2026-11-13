@@ -8,6 +8,7 @@ import { Button, Empty, ErrorNote, Menu, Spinner, Tag } from '@/components/ui.ts
 import { t } from '@/i18n/index.ts';
 import { Link, navigate } from '@/router.tsx';
 import { useRemote, useStored } from '@/session.tsx';
+import { useShellProject } from '@/shell.ts';
 
 import { NewPageDialog, SpaceSettingsDialog } from './dialogs.tsx';
 import { BASE, isPageEvent, pagePath, titleIndex, useSpaces } from './lib.ts';
@@ -126,6 +127,9 @@ export function SpaceView({ spaceKey, pageId, mode }: { spaceKey: string; pageId
   const nodes = tree.data ?? [];
   const titles = useMemo(() => titleIndex(tree.data ?? []), [tree.data]);
   const spaceKeys = useMemo(() => new Set((spaces.data ?? []).map((candidate) => candidate.key)), [spaces.data]);
+
+  // A space bound to a project is part of it: the shell shows that project's navigation.
+  useShellProject(space.data?.projectKey);
 
   if ((space.error && !space.data) || (tree.error && !tree.data)) {
     return (

@@ -203,7 +203,11 @@ fn render(lines: &[Line], depth: usize) -> String {
             // A closing tag with nothing open is dropped.
             if trimmed != "{panel}" || end < lines.len() {
                 let inner = if depth < MAX_NESTING { render(&lines[index + 1..end], depth + 1) } else { String::new() };
-                let label = if closing == "{quote}" { String::new() } else { format!("**{}**", md::escape(&tag_title(trimmed).unwrap_or_else(|| "Note".to_string()))) };
+                let label = if closing == "{quote}" {
+                    String::new()
+                } else {
+                    format!("**{}**", md::escape(&tag_title(trimmed).unwrap_or_else(|| "Note".to_string())))
+                };
 
                 blocks.push(md::quote(&md::join_blocks(vec![label, inner])));
                 index = end;
@@ -225,8 +229,12 @@ fn render(lines: &[Line], depth: usize) -> String {
             blocks.push("---".to_string());
             index += 1;
         } else if trimmed.starts_with('|') {
-            let end = lines[index..].iter().position(|line| !matches!(line, Line::Text(text) if text.trim().starts_with('|'))).map_or(lines.len(), |offset| index + offset);
-            let rows: Vec<(Vec<String>, bool)> = lines[index..end].iter().filter_map(|line| if let Line::Text(text) = line { Some(row(text.trim())) } else { None }).collect();
+            let end = lines[index..]
+                .iter()
+                .position(|line| !matches!(line, Line::Text(text) if text.trim().starts_with('|')))
+                .map_or(lines.len(), |offset| index + offset);
+            let rows: Vec<(Vec<String>, bool)> =
+                lines[index..end].iter().filter_map(|line| if let Line::Text(text) = line { Some(row(text.trim())) } else { None }).collect();
             let has_header = rows.first().is_some_and(|(_, header)| *header);
 
             blocks.push(md::table(&rows.into_iter().map(|(cells, _)| cells).collect::<Vec<_>>(), has_header));
@@ -373,7 +381,9 @@ fn delimited(characters: &[char], index: usize, marker: char) -> Option<(String,
     let mut end = index + 2;
 
     while end < limit && characters[end] != '\n' {
-        let closes = characters[end] == marker && !characters[end - 1].is_whitespace() && characters.get(end + 1).is_none_or(|after| !after.is_alphanumeric() && *after != marker);
+        let closes = characters[end] == marker
+            && !characters[end - 1].is_whitespace()
+            && characters.get(end + 1).is_none_or(|after| !after.is_alphanumeric() && *after != marker);
 
         if closes {
             return Some((characters[index + 1..end].iter().collect(), end + 1));
@@ -466,7 +476,9 @@ fn inline(text: &str, nesting: usize) -> String {
                 if let Some(end) = find(&characters, index + 1, "!") {
                     let inside: String = characters[index + 1..end].iter().collect();
                     let name = inside.split('|').next().unwrap_or("").trim();
-                    let is_file = name.rsplit_once('.').is_some_and(|(stem, extension)| !stem.is_empty() && (2..=5).contains(&extension.len()) && extension.chars().all(char::is_alphanumeric));
+                    let is_file = name.rsplit_once('.').is_some_and(|(stem, extension)| {
+                        !stem.is_empty() && (2..=5).contains(&extension.len()) && extension.chars().all(char::is_alphanumeric)
+                    });
 
                     if !name.is_empty() && !name.contains(char::is_whitespace) && is_file {
                         if is_linkable(name) && !name.starts_with('/') {
@@ -506,7 +518,7 @@ fn inline(text: &str, nesting: usize) -> String {
                     let end = index + code.chars().count();
 
                     if characters.get(end).is_none_or(|after| !after.is_alphanumeric()) {
-                        emit!(emoji.to_string(), end);
+                        emit!(*emoji, end);
                     }
                 }
             }
@@ -543,20 +555,35 @@ mod tests {
 
     #[test]
     fn markers_inside_words_are_not_markup() {
-        assert_eq!(wiki_to_markdown("2 * 3 * 4, snake_case_name, a - b - c, 2024-01-02, well-known"), "2 \\* 3 \\* 4, snake_case_name, a - b - c, 2024-01-02, well-known");
+        assert_eq!(
+            wiki_to_markdown("2 * 3 * 4, snake_case_name, a - b - c, 2024-01-02, well-known"),
+            "2 \\* 3 \\* 4, snake_case_name, a - b - c, 2024-01-02, well-known"
+        );
         assert_eq!(wiki_to_markdown("\\*not bold\\* and <b>"), "\\*not bold\\* and \\<b>");
         assert_eq!(wiki_to_markdown("wow! great! and 1 + 2 + 3"), "wow! great! and 1 + 2 + 3");
     }
 
     #[test]
     fn links_mentions_and_images() {
-        assert_eq!(wiki_to_markdown("[the docs|https://example.com/a_b] and [https://example.com]"), "[the docs](https://example.com/a_b) and [https://example.com](https://example.com)");
+        assert_eq!(
+            wiki_to_markdown("[the docs|https://example.com/a_b] and [https://example.com]"),
+            "[the docs](https://example.com/a_b) and [https://example.com](https://example.com)"
+        );
         assert_eq!(wiki_to_markdown("[*bold* link|https://example.com|a tip]"), "[**bold** link](https://example.com)");
         assert_eq!(wiki_to_markdown("cc [~jkowalski] and [~accountid:5b10ac8d]"), "cc @jkowalski and @5b10ac8d");
-        assert_eq!(wiki_to_markdown("see [^spec.pdf], [WEB-12] and [not a link]"), "see \\[attachment: spec.pdf\\], \\[WEB-12\\] and \\[not a link\\]");
-        assert_eq!(wiki_to_markdown("!screenshot.png! !shot 2.png|thumbnail! !https://example.com/a.png|width=200!"), "\\[attachment: screenshot.png\\] !shot 2.png|thumbnail! ![](https://example.com/a.png)");
+        assert_eq!(
+            wiki_to_markdown("see [^spec.pdf], [WEB-12] and [not a link]"),
+            "see \\[attachment: spec.pdf\\], \\[WEB-12\\] and \\[not a link\\]"
+        );
+        assert_eq!(
+            wiki_to_markdown("!screenshot.png! !shot 2.png|thumbnail! !https://example.com/a.png|width=200!"),
+            "\\[attachment: screenshot.png\\] !shot 2.png|thumbnail! ![](https://example.com/a.png)"
+        );
         assert_eq!(wiki_to_markdown("bare https://example.com/a_b*c, done"), "bare https://example.com/a_b*c, done");
-        assert_eq!(wiki_to_markdown("[mail|mailto:a@example.com] [x|javascript:alert(1)]"), "[mail](mailto:a@example.com) \\[x|javascript:alert(1)\\]");
+        assert_eq!(
+            wiki_to_markdown("[mail|mailto:a@example.com] [x|javascript:alert(1)]"),
+            "[mail](mailto:a@example.com) \\[x|javascript:alert(1)\\]"
+        );
     }
 
     #[test]
@@ -603,7 +630,10 @@ mod tests {
     fn rules_emoticons_and_text_that_looks_like_markdown() {
         assert_eq!(wiki_to_markdown("above\n----\nbelow\n--\n(/) done (x) failed :) ok"), "above\n\n---\n\nbelow\\\n\\--\\\n✅ done ❌ failed 🙂 ok");
         assert_eq!(wiki_to_markdown("# not a heading in Markdown terms"), "1. not a heading in Markdown terms");
-        assert_eq!(wiki_to_markdown("> quoted in Markdown, not in Jira\n1. neither a list"), "\\> quoted in Markdown, not in Jira\\\n1\\. neither a list");
+        assert_eq!(
+            wiki_to_markdown("> quoted in Markdown, not in Jira\n1. neither a list"),
+            "\\> quoted in Markdown, not in Jira\\\n1\\. neither a list"
+        );
         assert_eq!(wiki_to_markdown(""), "");
         assert_eq!(wiki_to_markdown("   \n\n  "), "");
     }
@@ -621,9 +651,50 @@ mod tests {
     }
 
     const PIECES: [&str; 44] = [
-        "*", "_", "-", "+", "^", "~", "??", "{{", "}}", "{code}", "{code:java}", "{noformat}", "{quote}", "{panel:title=x}", "{panel}", "{color:red}",
-        "{color}", "[", "]", "|", "||", "!", "\\", "\\\\", "h1. ", "bq. ", "# ", "* ", "** ", "----", "\n", "\n\n", " ", "a", "żółć", "👍", "http://x.io/a_b",
-        "[~", "[^", "(/)", "{", "}", "\r\n", "x.png",
+        "*",
+        "_",
+        "-",
+        "+",
+        "^",
+        "~",
+        "??",
+        "{{",
+        "}}",
+        "{code}",
+        "{code:java}",
+        "{noformat}",
+        "{quote}",
+        "{panel:title=x}",
+        "{panel}",
+        "{color:red}",
+        "{color}",
+        "[",
+        "]",
+        "|",
+        "||",
+        "!",
+        "\\",
+        "\\\\",
+        "h1. ",
+        "bq. ",
+        "# ",
+        "* ",
+        "** ",
+        "----",
+        "\n",
+        "\n\n",
+        " ",
+        "a",
+        "żółć",
+        "👍",
+        "http://x.io/a_b",
+        "[~",
+        "[^",
+        "(/)",
+        "{",
+        "}",
+        "\r\n",
+        "x.png",
     ];
 
     #[test]

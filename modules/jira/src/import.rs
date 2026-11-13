@@ -13,7 +13,8 @@ use hub_app::db::{now_iso, query_all, query_one};
 use hub_app::services::history::FieldChange;
 use hub_app::services::issues::{import_change, import_comment, import_issue, import_worklog, reindex_issue, update_comment, ImportedIssue};
 use hub_app::services::projects::{
-    add_component, add_status, add_type, create_project, delete_status, delete_type, update_status, ComponentInput, NewProject, StatusInput, TypeInput,
+    add_component, add_status, add_type, create_project, delete_status, delete_type, update_status, ComponentInput, NewProject, StatusInput,
+    TypeInput,
 };
 use hub_app::services::sprints::{create_sprint, SprintInput};
 use hub_app::services::users::{create_user, update_user, NewUser, UserPatch};
@@ -293,7 +294,14 @@ impl Step {
         Self { history: entry.id, at: entry.created.clone(), author: entry.author.clone(), field, old, new, old_ref: None, new_ref: None }
     }
 
-    fn reference(history: i64, at: &str, author: Option<RemoteUser>, field: &'static str, old: Option<(Id, String)>, new: Option<(Id, String)>) -> Self {
+    fn reference(
+        history: i64,
+        at: &str,
+        author: Option<RemoteUser>,
+        field: &'static str,
+        old: Option<(Id, String)>,
+        new: Option<(Id, String)>,
+    ) -> Self {
         Self {
             history,
             at: at.to_string(),
@@ -306,6 +314,10 @@ impl Step {
         }
     }
 }
+
+/// A move between sprints, by Jira's sprint ids: the changelog id (zero when the import worked
+/// it out), when, who, from where and to where.
+type SprintMove = (i64, String, Option<RemoteUser>, Option<String>, Option<String>);
 
 /// An issue's past and what follows from it for its present.
 struct Timeline {
@@ -365,12 +377,14 @@ fn link_kind(type_name: &str) -> (LinkType, bool) {
 fn pick(sprints: &[RemoteSprint]) -> Option<&RemoteSprint> {
     let last = |state: &str| sprints.iter().rev().find(|sprint| sprint.state == state);
 
-    last("active").or_else(|| last("future")).or_else(|| sprints.iter().filter(|sprint| sprint.state == "closed").max_by(|left, right| left.completed.cmp(&right.completed)))
+    last("active")
+        .or_else(|| last("future"))
+        .or_else(|| sprints.iter().filter(|sprint| sprint.state == "closed").max_by(|left, right| left.completed.cmp(&right.completed)))
 }
 
 /// The last id of a changelog's `from`/`to` for sprints, which lists every sprint so far.
 fn last_id(ids: &Option<String>) -> Option<String> {
-    ids.as_deref().and_then(|ids| ids.split(',').map(str::trim).filter(|id| !id.is_empty()).next_back()).map(String::from)
+    ids.as_deref().and_then(|ids| ids.split(',').map(str::trim).rfind(|id| !id.is_empty())).map(String::from)
 }
 
 fn fits(level: TypeLevel, parent: TypeLevel) -> bool {
@@ -460,7 +474,8 @@ impl Importer {
             )));
         }
 
-        let local_users: Vec<(Id, String)> = app.read(|connection| query_all(connection, "SELECT id, email FROM user", [], |row| Ok((row.get(0)?, row.get(1)?))))?;
+        let local_users: Vec<(Id, String)> =
+            app.read(|connection| query_all(connection, "SELECT id, email FROM user", [], |row| Ok((row.get(0)?, row.get(1)?))))?;
         let mapping = mapping::resolve(structure, &local_users, stored, request.mapping.as_ref());
         let mut importer = Self {
             job_id: request.job_id,
@@ -566,7 +581,8 @@ impl Importer {
         }
 
         for (position, (name, category, on_board)) in targets.iter().enumerate() {
-            let existing: Option<Id> = query_one(tx, "SELECT id FROM status WHERE project_id = ?1 AND name = ?2", (self.project_id, name), |row| row.get(0))?;
+            let existing: Option<Id> =
+                query_one(tx, "SELECT id FROM status WHERE project_id = ?1 AND name = ?2", (self.project_id, name), |row| row.get(0))?;
             let position = created.then_some(position as i64);
             let input = StatusInput { name: Some(name.clone()), category: Some(*category), on_board: Some(*on_board), wip_limit: None, position };
 
@@ -581,7 +597,8 @@ impl Importer {
         }
 
         if created && !targets.is_empty() {
-            let defaults: Vec<(Id, String)> = query_all(tx, "SELECT id, name FROM status WHERE project_id = ?1", [self.project_id], |row| Ok((row.get(0)?, row.get(1)?)))?;
+            let defaults: Vec<(Id, String)> =
+                query_all(tx, "SELECT id, name FROM status WHERE project_id = ?1", [self.project_id], |row| Ok((row.get(0)?, row.get(1)?)))?;
 
             for (id, name) in defaults {
                 if !targets.iter().any(|(target, _, _)| fold(target) == fold(&name)) {
@@ -600,7 +617,9 @@ impl Importer {
 
         if created && mapping.types.iter().any(|entry| entry.level == TypeLevel::Standard) {
             let defaults: Vec<(Id, String)> =
-                query_all(tx, "SELECT id, name FROM issue_type WHERE project_id = ?1 AND level = 'standard'", [self.project_id], |row| Ok((row.get(0)?, row.get(1)?)))?;
+                query_all(tx, "SELECT id, name FROM issue_type WHERE project_id = ?1 AND level = 'standard'", [self.project_id], |row| {
+                    Ok((row.get(0)?, row.get(1)?))
+                })?;
 
             for (id, name) in defaults {
                 if !mapping.types.iter().any(|entry| fold(&entry.name) == fold(&name)) {
@@ -620,7 +639,8 @@ impl Importer {
         }
 
         let mut sprints: Vec<&RemoteSprint> = structure.sprints.iter().collect();
-        sprints.sort_by_key(|sprint| (sprint.start.is_none() && sprint.state != "closed", sprint.start.clone(), sprint.id.parse::<i64>().unwrap_or(0)));
+        sprints
+            .sort_by_key(|sprint| (sprint.start.is_none() && sprint.state != "closed", sprint.start.clone(), sprint.id.parse::<i64>().unwrap_or(0)));
 
         for sprint in sprints {
             let local = self.ensure_sprint(tx, sprint)?;
@@ -689,7 +709,8 @@ impl Importer {
         let new = |email: String| NewUser { name: name.clone(), email, password: None, role: Some(Role::Member), github_login: None };
         let slug = slugify(&person.account, 48);
         // Jira Cloud rarely tells e-mail addresses; an address that cannot exist stands in.
-        let placeholder = format!("jira-{}@imported.invalid", if slug.is_empty() { hex::encode(&Sha256::digest(person.account.as_bytes())[..8]) } else { slug });
+        let placeholder =
+            format!("jira-{}@imported.invalid", if slug.is_empty() { hex::encode(&Sha256::digest(person.account.as_bytes())[..8]) } else { slug });
         let user = match person.email.as_deref() {
             Some(email) => create_user(tx, &new(email.to_string())).or_else(|_| create_user(tx, &new(placeholder)))?,
             None => create_user(tx, &new(placeholder))?,
@@ -732,7 +753,9 @@ impl Importer {
         };
         let name = if clean_name(&name).is_empty() { "Task".to_string() } else { clean_name(&name) };
         let existing: Option<(Id, String)> =
-            query_one(tx, "SELECT id, level FROM issue_type WHERE project_id = ?1 AND name = ?2", (self.project_id, &name), |row| Ok((row.get(0)?, row.get(1)?)))?;
+            query_one(tx, "SELECT id, level FROM issue_type WHERE project_id = ?1 AND name = ?2", (self.project_id, &name), |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })?;
         let found = match existing {
             Some((id, actual)) => {
                 let actual = TypeLevel::parse(&actual).unwrap_or(TypeLevel::Standard);
@@ -766,22 +789,28 @@ impl Importer {
         let mapped = self.status_names.get(&folded).cloned();
         let (name, category) = mapped.clone().unwrap_or_else(|| (clean_name(jira_name), guess_category(jira_name)));
         let name = if name.is_empty() { "To Do".to_string() } else { name };
-        let existing: Option<(Id, String, String)> = query_one(
-            tx,
-            "SELECT id, name, category FROM status WHERE project_id = ?1 AND name = ?2",
-            (self.project_id, &name),
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )?;
+        let existing: Option<(Id, String, String)> =
+            query_one(tx, "SELECT id, name, category FROM status WHERE project_id = ?1 AND name = ?2", (self.project_id, &name), |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?;
         let found = match existing {
             Some((id, name, category)) => LocalStatus { id, name, category: StatusCategory::parse(&category).unwrap_or(StatusCategory::InProgress) },
             None => {
                 // A status that only the history knows (Jira's workflow has dropped it since)
                 // is kept, off the board, so the history still says where the issue was.
-                let input = StatusInput { name: Some(name.clone()), category: Some(category), on_board: Some(mapped.is_some()), wip_limit: None, position: None };
+                let input = StatusInput {
+                    name: Some(name.clone()),
+                    category: Some(category),
+                    on_board: Some(mapped.is_some()),
+                    wip_limit: None,
+                    position: None,
+                };
                 let id = add_status(tx, &self.access(), &input)?;
 
                 if mapped.is_none() {
-                    self.note(format!("The status “{jira_name}” is not in the project's workflow any more; it was kept for the history, off the board"));
+                    self.note(format!(
+                        "The status “{jira_name}” is not in the project's workflow any more; it was kept for the history, off the board"
+                    ));
                 }
 
                 LocalStatus { id, name, category }
@@ -805,7 +834,8 @@ impl Importer {
             return Ok(Some(*found));
         }
 
-        let existing: Option<Id> = query_one(tx, "SELECT id FROM component WHERE project_id = ?1 AND name = ?2", (self.project_id, &name), |row| row.get(0))?;
+        let existing: Option<Id> =
+            query_one(tx, "SELECT id FROM component WHERE project_id = ?1 AND name = ?2", (self.project_id, &name), |row| row.get(0))?;
         let id = match existing {
             Some(id) => id,
             None => {
@@ -832,7 +862,8 @@ impl Importer {
             return Ok(Some(*found));
         }
 
-        let existing: Option<Id> = query_one(tx, "SELECT id FROM version WHERE project_id = ?1 AND name = ?2", (self.project_id, &name), |row| row.get(0))?;
+        let existing: Option<Id> =
+            query_one(tx, "SELECT id FROM version WHERE project_id = ?1 AND name = ?2", (self.project_id, &name), |row| row.get(0))?;
         let id = match existing {
             Some(id) => {
                 // Released in Jira since the last import.
@@ -881,7 +912,9 @@ impl Importer {
         let name = sprint.name.split_whitespace().collect::<Vec<_>>().join(" ");
         let name = if name.is_empty() { format!("Sprint {}", sprint.id) } else { name };
         let mapped: Option<Id> =
-            query_one(tx, "SELECT sprint_id FROM jira_sprint WHERE project_id = ?1 AND remote_id = ?2", (self.project_id, &sprint.id), |row| row.get(0))?;
+            query_one(tx, "SELECT sprint_id FROM jira_sprint WHERE project_id = ?1 AND remote_id = ?2", (self.project_id, &sprint.id), |row| {
+                row.get(0)
+            })?;
         let id = match mapped {
             Some(id) => id,
             None => {
@@ -907,7 +940,9 @@ impl Importer {
             }
         };
         let running: Option<String> =
-            query_one(tx, "SELECT name FROM sprint WHERE project_id = ?1 AND state = 'active' AND id != ?2 LIMIT 1", (self.project_id, id), |row| row.get(0))?;
+            query_one(tx, "SELECT name FROM sprint WHERE project_id = ?1 AND state = 'active' AND id != ?2 LIMIT 1", (self.project_id, id), |row| {
+                row.get(0)
+            })?;
         let state = match (sprint.state.as_str(), running) {
             ("active", Some(running)) => {
                 self.note(format!("Jira runs “{running}” and “{name}” at the same time; a project here runs one sprint at a time, so “{name}” is planned, not running"));
@@ -1055,7 +1090,14 @@ impl Importer {
                     moves.push((entry.created.clone(), new.category == StatusCategory::Done));
 
                     if old.id != new.id {
-                        steps.push(Step::reference(entry.id, &entry.created, entry.author.clone(), "status", Some((old.id, old.name)), Some((new.id, new.name))));
+                        steps.push(Step::reference(
+                            entry.id,
+                            &entry.created,
+                            entry.author.clone(),
+                            "status",
+                            Some((old.id, old.name)),
+                            Some((new.id, new.name)),
+                        ));
                     }
                 } else if field == "sprint" {
                     sprint_changes.push((entry, last_id(&item.from), last_id(&item.to)));
@@ -1114,12 +1156,17 @@ impl Importer {
             // was (the first status for a new issue) keeps the reports from showing work as
             // finished on the day it was created.
             let from: Option<(Id, String, String)> = match local {
-                Some(id) => query_one(tx, "SELECT s.id, s.name, i.status_since FROM issue i JOIN status s ON s.id = i.status_id WHERE i.id = ?1", [id], |row| {
-                    Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-                })?,
-                None => query_one(tx, "SELECT id, name, '' FROM status WHERE project_id = ?1 ORDER BY position, id LIMIT 1", [self.project_id], |row| {
-                    Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-                })?,
+                Some(id) => query_one(
+                    tx,
+                    "SELECT s.id, s.name, i.status_since FROM issue i JOIN status s ON s.id = i.status_id WHERE i.id = ?1",
+                    [id],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )?,
+                None => {
+                    query_one(tx, "SELECT id, name, '' FROM status WHERE project_id = ?1 ORDER BY position, id LIMIT 1", [self.project_id], |row| {
+                        Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                    })?
+                }
             };
 
             match from {
@@ -1145,9 +1192,12 @@ impl Importer {
             Some((_, from, _)) => from.clone(),
             None => field.clone(),
         };
-        let mut moved: Vec<(i64, String, Option<RemoteUser>, Option<String>, Option<String>)> = Vec::new();
+        let mut moved: Vec<SprintMove> = Vec::new();
         let left_behind = |importer: &Self, sprint: &Option<String>, before: Option<&str>| {
-            sprint.as_deref().and_then(|id| importer.closed_at(id)).filter(|closed| before.is_none_or(|before| closed.as_str() < before) && !done_at(closed))
+            sprint
+                .as_deref()
+                .and_then(|id| importer.closed_at(id))
+                .filter(|closed| before.is_none_or(|before| closed.as_str() < before) && !done_at(closed))
         };
 
         for (entry, _, to) in &sprint_changes {
@@ -1200,16 +1250,21 @@ impl Importer {
     }
 
     fn store_issue(&mut self, tx: &Tx, issue: &RemoteIssue, converted: &Converted) -> ApiResult<Outcome> {
-        let local: Option<Id> = query_one(tx, "SELECT id FROM issue WHERE project_id = ?1 AND number = ?2", (self.project_id, issue.number), |row| row.get(0))?;
+        let local: Option<Id> =
+            query_one(tx, "SELECT id FROM issue WHERE project_id = ?1 AND number = ?2", (self.project_id, issue.number), |row| row.get(0))?;
         let known: Option<Known> = match local {
-            Some(id) => query_one(tx, "SELECT remote_updated, fingerprint, last_history, history_through FROM jira_issue WHERE issue_id = ?1", [id], |row| {
-                Ok(Known { remote_updated: row.get(0)?, fingerprint: row.get(1)?, last_history: row.get(2)?, history_through: row.get(3)? })
-            })?,
+            Some(id) => {
+                query_one(tx, "SELECT remote_updated, fingerprint, last_history, history_through FROM jira_issue WHERE issue_id = ?1", [id], |row| {
+                    Ok(Known { remote_updated: row.get(0)?, fingerprint: row.get(1)?, last_history: row.get(2)?, history_through: row.get(3)? })
+                })?
+            }
             None => None,
         };
 
         match (local, &known) {
-            (Some(_), None) if !self.overwrite_local => return Ok(Outcome::Skipped("An issue with this key already exists here and did not come from Jira")),
+            (Some(_), None) if !self.overwrite_local => {
+                return Ok(Outcome::Skipped("An issue with this key already exists here and did not come from Jira"))
+            }
             (Some(id), Some(known)) => {
                 let edited = fingerprint(tx, id)? != known.fingerprint;
                 let changed = known.remote_updated.as_deref() != Some(issue.updated.as_str());
@@ -1246,8 +1301,13 @@ impl Importer {
                     )?;
 
                     match parent {
-                        Some((id, parent_level)) if fits(level, TypeLevel::parse(&parent_level).unwrap_or(TypeLevel::Standard)) => parent_id = Some(id),
-                        Some(_) => self.note(format!("{}: {parent_key} cannot be its parent here (epics hold stories, tasks and bugs; those hold subtasks)", issue.key)),
+                        Some((id, parent_level)) if fits(level, TypeLevel::parse(&parent_level).unwrap_or(TypeLevel::Standard)) => {
+                            parent_id = Some(id)
+                        }
+                        Some(_) => self.note(format!(
+                            "{}: {parent_key} cannot be its parent here (epics hold stories, tasks and bugs; those hold subtasks)",
+                            issue.key
+                        )),
                         None => waits_for_parent = true,
                     }
                 }
@@ -1348,7 +1408,13 @@ impl Importer {
             }
 
             let actor = self.actor(tx, step.author.as_ref())?;
-            let change = FieldChange { field: step.field, old: step.old.clone(), new: step.new.clone(), old_ref: step.old_ref.clone(), new_ref: step.new_ref.clone() };
+            let change = FieldChange {
+                field: step.field,
+                old: step.old.clone(),
+                new: step.new.clone(),
+                old_ref: step.old_ref.clone(),
+                new_ref: step.new_ref.clone(),
+            };
 
             import_change(tx, id, &actor, &change, &step.at)?;
             self.report.changes += 1;
@@ -1403,8 +1469,12 @@ impl Importer {
         }
 
         for (worklog, note) in issue.worklogs.iter().zip(&converted.worklogs) {
-            let before: Option<Id> =
-                query_one(tx, "SELECT local_id FROM jira_item WHERE issue_id = ?1 AND kind = 'worklog' AND remote_id = ?2", (id, &worklog.id), |row| row.get(0))?;
+            let before: Option<Id> = query_one(
+                tx,
+                "SELECT local_id FROM jira_item WHERE issue_id = ?1 AND kind = 'worklog' AND remote_id = ?2",
+                (id, &worklog.id),
+                |row| row.get(0),
+            )?;
 
             if before.is_none() {
                 let user_id = match &worklog.author {
@@ -1413,7 +1483,10 @@ impl Importer {
                 };
                 let local_id = import_worklog(tx, id, user_id, ((worklog.seconds + 30) / 60).max(1), &worklog.started, note)?;
 
-                tx.execute("INSERT INTO jira_item (issue_id, kind, remote_id, local_id) VALUES (?1, 'worklog', ?2, ?3)", (id, &worklog.id, local_id))?;
+                tx.execute(
+                    "INSERT INTO jira_item (issue_id, kind, remote_id, local_id) VALUES (?1, 'worklog', ?2, ?3)",
+                    (id, &worklog.id, local_id),
+                )?;
                 self.report.worklogs += 1;
             }
         }
@@ -1424,7 +1497,8 @@ impl Importer {
 
         for link in &issue.links {
             let (kind, known_type) = link_kind(&link.type_name);
-            let (source, target) = if link.outward { (issue.key.clone(), link.other_key.clone()) } else { (link.other_key.clone(), issue.key.clone()) };
+            let (source, target) =
+                if link.outward { (issue.key.clone(), link.other_key.clone()) } else { (link.other_key.clone(), issue.key.clone()) };
 
             if !known_type {
                 self.note(format!("Links of the type “{}” were imported as “relates to”", link.type_name));
@@ -1486,7 +1560,10 @@ impl Importer {
                     deferred.issue.parent_id = Some(parent_id);
                     import_issue(tx, &deferred.issue)?;
                 }
-                Some(_) => self.note(format!("{}: {} cannot be its parent here (epics hold stories, tasks and bugs; those hold subtasks)", deferred.key, deferred.parent_key)),
+                Some(_) => self.note(format!(
+                    "{}: {} cannot be its parent here (epics hold stories, tasks and bugs; those hold subtasks)",
+                    deferred.key, deferred.parent_key
+                )),
                 None => self.note(format!("{}: its parent {} was not imported", deferred.key, deferred.parent_key)),
             }
 

@@ -288,8 +288,20 @@ pub fn issue_type(value: &Value) -> Option<RemoteType> {
 /// Jira Server writes a sprint as the `toString` of a Java object:
 /// `com.atlassian.greenhopper.service.sprint.Sprint@1f[id=7,rapidViewId=2,state=CLOSED,name=Sprint 3,…]`.
 fn sprint_from_text(text: &str) -> Option<RemoteSprint> {
-    const KEYS: [&str; 12] =
-        ["id", "rapidViewId", "state", "name", "goal", "startDate", "endDate", "completeDate", "activatedDate", "sequence", "autoStartStop", "synced"];
+    const KEYS: [&str; 12] = [
+        "id",
+        "rapidViewId",
+        "state",
+        "name",
+        "goal",
+        "startDate",
+        "endDate",
+        "completeDate",
+        "activatedDate",
+        "sequence",
+        "autoStartStop",
+        "synced",
+    ];
     let inside = &text[text.find('[')? + 1..text.rfind(']')?];
     let value = |key: &str| -> Option<String> {
         let marker = format!("{key}=");
@@ -400,7 +412,11 @@ pub fn issue(value: &Value, fields: &Fields) -> Option<RemoteIssue> {
     let attachments = items(&data["attachment"])
         .iter()
         .filter_map(|file| {
-            Some(RemoteAttachment { filename: text_of(&file["filename"])?, url: text_of(&file["content"]).unwrap_or_default(), size: file["size"].as_i64() })
+            Some(RemoteAttachment {
+                filename: text_of(&file["filename"])?,
+                url: text_of(&file["content"]).unwrap_or_default(),
+                size: file["size"].as_i64(),
+            })
         })
         .collect();
     let comments: Vec<RemoteComment> = items(&data["comment"]["comments"]).iter().filter_map(comment).collect();

@@ -29,8 +29,11 @@ pub struct Text {
 impl Text {
     /// Plain paragraphs, one per line.
     pub fn plain(text: &str) -> Self {
-        let paragraphs: Vec<Value> =
-            text.split('\n').filter(|line| !line.is_empty()).map(|line| json!({ "type": "paragraph", "content": [{ "type": "text", "text": line }] })).collect();
+        let paragraphs: Vec<Value> = text
+            .split('\n')
+            .filter(|line| !line.is_empty())
+            .map(|line| json!({ "type": "paragraph", "content": [{ "type": "text", "text": line }] }))
+            .collect();
 
         Self { adf: json!({ "type": "doc", "version": 1, "content": paragraphs }), wiki: text.replace('\n', "\n\n") }
     }
@@ -237,7 +240,12 @@ impl Upstream {
     }
 
     fn status(&self, name: &str) -> Value {
-        let category = self.projects.iter().flat_map(|project| &project.statuses).find(|(known, _)| known == name).map_or("indeterminate", |(_, key)| key.as_str());
+        let category = self
+            .projects
+            .iter()
+            .flat_map(|project| &project.statuses)
+            .find(|(known, _)| known == name)
+            .map_or("indeterminate", |(_, key)| key.as_str());
         let category_name = match category {
             "new" => "To Do",
             "done" => "Done",
@@ -328,7 +336,11 @@ impl Upstream {
         let project = self.project_of(&issue.key);
         let kind = project.and_then(|project| project.types.iter().find(|(name, _, _)| *name == issue.kind));
         let named = |names: &[String]| names.iter().map(|name| json!({ "name": name })).collect::<Vec<_>>();
-        let parent_is_epic = issue.parent.as_ref().and_then(|parent| self.issues.iter().find(|other| other.key == *parent)).is_some_and(|parent| parent.kind == "Epic");
+        let parent_is_epic = issue
+            .parent
+            .as_ref()
+            .and_then(|parent| self.issues.iter().find(|other| other.key == *parent))
+            .is_some_and(|parent| parent.kind == "Epic");
         let mut histories: Vec<Value> = issue.history.iter().map(|entry| self.history(entry)).collect();
 
         if self.cloud {
@@ -457,7 +469,9 @@ fn query_of(uri: &Uri) -> HashMap<String, String> {
         let mut index = 0;
 
         while index < bytes.len() {
-            let escaped = (bytes[index] == b'%').then(|| std::str::from_utf8(bytes.get(index + 1..index + 3)?).ok().and_then(|digits| u8::from_str_radix(digits, 16).ok())).flatten();
+            let escaped = (bytes[index] == b'%')
+                .then(|| std::str::from_utf8(bytes.get(index + 1..index + 3)?).ok().and_then(|digits| u8::from_str_radix(digits, 16).ok()))
+                .flatten();
 
             decoded.push(escaped.unwrap_or(bytes[index]));
             index += if escaped.is_some() { 3 } else { 1 };
@@ -693,11 +707,6 @@ async fn handle(State(state): State<Arc<Mutex<Upstream>>>, method: Method, uri: 
 
 // ---------- a realistic project ----------
 
-/// Jira's way of writing an instant, `days` days and `hours` hours from now.
-pub fn at(days: i64, hours: i64) -> String {
-    (chrono::Utc::now() + chrono::Duration::days(days) + chrono::Duration::hours(hours)).format("%Y-%m-%dT%H:%M:%S%.3f+0000").to_string()
-}
-
 fn change(field: &str, from: Option<&str>, from_text: Option<&str>, to: Option<&str>, to_text: Option<&str>) -> FakeChange {
     (field.to_string(), from.map(String::from), from_text.map(String::from), to.map(String::from), to_text.map(String::from))
 }
@@ -707,6 +716,11 @@ fn change(field: &str, from: Option<&str>, from_text: Option<&str>, to: Option<&
 /// logs, links, attachments and a status history for every issue that has moved.
 pub fn demo(cloud: bool, accepts: &str) -> Upstream {
     let mut upstream = Upstream::new(cloud, accepts);
+    // Jira's way of writing an instant, `days` days and `hours` hours from the start of this hour.
+    let now = chrono::Utc::now().timestamp() / 3600 * 3600;
+    let at = |days: i64, hours: i64| {
+        chrono::DateTime::from_timestamp(now + days * 86_400 + hours * 3600, 0).unwrap_or_default().format("%Y-%m-%dT%H:%M:%S%.3f+0000").to_string()
+    };
     let people = [
         ("anna", "Anna Nowak", Some("anna.nowak@example.com")),
         ("jan", "Jan Kowalski", Some("jan.kowalski@example.com")),
@@ -776,9 +790,27 @@ pub fn demo(cloud: bool, accepts: &str) -> Upstream {
         ],
         components: ["Koszyk", "Płatności", "Frontend", "Backend"].map(String::from).to_vec(),
         versions: vec![
-            FakeVersion { name: "1.0".to_string(), released: true, archived: false, start: Some(at(-49, 0)[..10].to_string()), release: Some(at(-21, 0)[..10].to_string()) },
-            FakeVersion { name: "1.1".to_string(), released: true, archived: false, start: Some(at(-21, 0)[..10].to_string()), release: Some(at(-7, 0)[..10].to_string()) },
-            FakeVersion { name: "1.2".to_string(), released: false, archived: false, start: Some(at(-7, 0)[..10].to_string()), release: Some(at(14, 0)[..10].to_string()) },
+            FakeVersion {
+                name: "1.0".to_string(),
+                released: true,
+                archived: false,
+                start: Some(at(-49, 0)[..10].to_string()),
+                release: Some(at(-21, 0)[..10].to_string()),
+            },
+            FakeVersion {
+                name: "1.1".to_string(),
+                released: true,
+                archived: false,
+                start: Some(at(-21, 0)[..10].to_string()),
+                release: Some(at(-7, 0)[..10].to_string()),
+            },
+            FakeVersion {
+                name: "1.2".to_string(),
+                released: false,
+                archived: false,
+                start: Some(at(-7, 0)[..10].to_string()),
+                release: Some(at(14, 0)[..10].to_string()),
+            },
         ],
         boards: vec![FakeBoard {
             id: 7,
@@ -837,7 +869,7 @@ pub fn demo(cloud: bool, accepts: &str) -> Upstream {
     let mut number = 0;
     let mut history_id = 5000;
     let mut comment_id = 9000;
-    let mut next = |counter: &mut i64| {
+    let next = |counter: &mut i64| {
         *counter += 1;
         *counter
     };
@@ -929,8 +961,15 @@ pub fn demo(cloud: bool, accepts: &str) -> Upstream {
             history.push(FakeHistory {
                 id: next(&mut history_id),
                 author: account(0),
-                created: at(sprint_days[2].0, 1),
-                items: vec![change("Sprint", Some(&from.id.to_string()), Some(&from.name), Some(&format!("{}, {}", from.id, to.id)), Some(&format!("{}, {}", from.name, to.name)))],
+                // Moved on when the second sprint was completed, as Jira offers to.
+                created: at(sprint_days[1].1, 2),
+                items: vec![change(
+                    "Sprint",
+                    Some(&from.id.to_string()),
+                    Some(&from.name),
+                    Some(&format!("{}, {}", from.id, to.id)),
+                    Some(&format!("{}, {}", from.name, to.name)),
+                )],
             });
         }
 
@@ -939,7 +978,13 @@ pub fn demo(cloud: bool, accepts: &str) -> Upstream {
                 id: next(&mut history_id),
                 author: assignee.clone(),
                 created: moved_at(step),
-                items: vec![change("status", Some(&status_id(moves[step])), Some(moves[step]), Some(&status_id(moves[step + 1])), Some(moves[step + 1]))],
+                items: vec![change(
+                    "status",
+                    Some(&status_id(moves[step])),
+                    Some(moves[step]),
+                    Some(&status_id(moves[step + 1])),
+                    Some(moves[step + 1]),
+                )],
             });
         }
 
@@ -967,7 +1012,13 @@ pub fn demo(cloud: bool, accepts: &str) -> Upstream {
                     "Poprawione, komunikaty są już po polsku.",
                 ][turn];
 
-                FakeComment { id: next(&mut comment_id), author: account(index + turn + 1), body: Text::plain(text), created: when.clone(), updated: when }
+                FakeComment {
+                    id: next(&mut comment_id),
+                    author: account(index + turn + 1),
+                    body: Text::plain(text),
+                    created: when.clone(),
+                    updated: when,
+                }
             })
             .collect();
         let description = if index % 6 == 2 {
@@ -1022,7 +1073,13 @@ pub fn demo(cloud: bool, accepts: &str) -> Upstream {
             resolved,
             comments,
             worklogs: if done && index % 3 == 0 {
-                vec![FakeWorklog { id: 7000 + index as i64, author: assignee.clone(), seconds: 5400 + 1800 * (index as i64 % 3), started: moved_at(1), comment: Some(Text::plain("Implementacja i testy")) }]
+                vec![FakeWorklog {
+                    id: 7000 + index as i64,
+                    author: assignee.clone(),
+                    seconds: 5400 + 1800 * (index as i64 % 3),
+                    started: moved_at(1),
+                    comment: Some(Text::plain("Implementacja i testy")),
+                }]
             } else {
                 Vec::new()
             },
@@ -1033,14 +1090,32 @@ pub fn demo(cloud: bool, accepts: &str) -> Upstream {
     }
 
     // Links, each listed on both of its issues as Jira does.
-    for (kind, source, target) in [("Blocks", "WEB-10", "WEB-11"), ("Blocks", "WEB-10", "WEB-13"), ("Duplicate", "WEB-45", "WEB-7"), ("Relates", "WEB-20", "WEB-21")] {
+    for (kind, source, target) in
+        [("Blocks", "WEB-10", "WEB-11"), ("Blocks", "WEB-10", "WEB-13"), ("Duplicate", "WEB-45", "WEB-7"), ("Relates", "WEB-20", "WEB-21")]
+    {
         upstream.issue(source).links.push((kind.to_string(), true, target.to_string()));
         upstream.issue(target).links.push((kind.to_string(), false, source.to_string()));
     }
 
     // Subtasks under stories of the running sprint.
-    let parents = ["WEB-32", "WEB-32", "WEB-32", "WEB-33", "WEB-33", "WEB-35", "WEB-35", "WEB-36", "WEB-37", "WEB-37", "WEB-38", "WEB-39", "WEB-39", "WEB-40"];
-    let parts = ["Formularz (frontend)", "Endpoint API", "Testy jednostkowe", "Migracja bazy", "Przegląd bezpieczeństwa", "Makieta", "Implementacja", "Tłumaczenia", "Obsługa błędów", "Dokumentacja", "Konfiguracja", "Monitoring", "Testy ręczne", "Wdrożenie na staging"];
+    let parents =
+        ["WEB-32", "WEB-32", "WEB-32", "WEB-33", "WEB-33", "WEB-35", "WEB-35", "WEB-36", "WEB-37", "WEB-37", "WEB-38", "WEB-39", "WEB-39", "WEB-40"];
+    let parts = [
+        "Formularz (frontend)",
+        "Endpoint API",
+        "Testy jednostkowe",
+        "Migracja bazy",
+        "Przegląd bezpieczeństwa",
+        "Makieta",
+        "Implementacja",
+        "Tłumaczenia",
+        "Obsługa błędów",
+        "Dokumentacja",
+        "Konfiguracja",
+        "Monitoring",
+        "Testy ręczne",
+        "Wdrożenie na staging",
+    ];
 
     for (index, (parent, part)) in parents.iter().zip(parts).enumerate() {
         number += 1;
@@ -1054,7 +1129,13 @@ pub fn demo(cloud: bool, accepts: &str) -> Upstream {
                 id: next(&mut history_id),
                 author: assignee.clone(),
                 created: moved_at(step),
-                items: vec![change("status", Some(&status_id(moves[step])), Some(moves[step]), Some(&status_id(moves[step + 1])), Some(moves[step + 1]))],
+                items: vec![change(
+                    "status",
+                    Some(&status_id(moves[step])),
+                    Some(moves[step]),
+                    Some(&status_id(moves[step + 1])),
+                    Some(moves[step + 1]),
+                )],
             })
             .collect();
 

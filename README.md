@@ -24,8 +24,8 @@ the knowledge base instead of bolted onto them.
   can read its issue, comment, move it and look things up in the knowledge base, with the
   permissions of the person whose token it uses.
 
-Everything beyond the tracker is a module that can be switched off, and new ones plug in
-the same way: see [docs/modules.md](docs/modules.md).
+Everything beyond the tracker is a module that can be switched off, for the whole instance
+or for one project, and new ones plug in the same way: see [docs/modules.md](docs/modules.md).
 
 ## Running it
 

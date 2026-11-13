@@ -1313,6 +1313,7 @@ dependencies = [
  "hub-mod-confluence",
  "hub-mod-e2e",
  "hub-mod-github",
+ "hub-mod-jira",
  "hub-mod-reports",
  "hub-mod-wiki",
  "rayon",

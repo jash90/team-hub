@@ -72,14 +72,26 @@ pub fn fetch(client: &Client, key: &str) -> ApiResult<Structure> {
         }
     }
 
-    let columns = boards.iter().find(|board| board.scrum).or(boards.first()).and_then(|board| client.columns(&board.id).ok()).filter(|columns| !columns.is_empty());
+    let columns = boards
+        .iter()
+        .find(|board| board.scrum)
+        .or(boards.first())
+        .and_then(|board| client.columns(&board.id).ok())
+        .filter(|columns| !columns.is_empty());
     let column_of = |status: &RemoteStatus| columns.as_ref().and_then(|columns| columns.iter().position(|ids| ids.contains(&status.id)));
-    let mut ordered: Vec<(usize, usize, usize, RemoteStatus)> =
-        statuses.drain(..).enumerate().map(|(index, status)| (category_rank(&status.category), column_of(&status).unwrap_or(usize::MAX), index, status)).collect();
+    // Within a category the board's columns give the order. What is in no column comes
+    // before the first column while it is still to do (a backlog), and after the last otherwise.
+    let place = |status: &RemoteStatus| match (column_of(status), status.category.as_str()) {
+        (Some(column), _) => column as i64,
+        (None, "new") => -1,
+        (None, _) => i64::MAX,
+    };
+    let off_board =
+        columns.is_some().then(|| statuses.iter().filter(|status| column_of(status).is_none()).map(|status| fold(&status.name)).collect());
+    let mut ordered: Vec<(usize, i64, usize, RemoteStatus)> =
+        statuses.drain(..).enumerate().map(|(index, status)| (category_rank(&status.category), place(&status), index, status)).collect();
 
-    ordered.sort_by_key(|(category, column, index, _)| (*category, *column, *index));
-
-    let off_board = columns.is_some().then(|| ordered.iter().filter(|(_, column, _, _)| *column == usize::MAX).map(|(_, _, _, status)| fold(&status.name)).collect());
+    ordered.sort_by_key(|(category, place, index, _)| (*category, *place, *index));
 
     Ok(Structure {
         key: project.key,
@@ -197,7 +209,12 @@ pub fn resolve(structure: &Structure, local_users: &[(Id, String)], stored: Opti
 
             pick(&|mapping| mapping.statuses.iter().any(|entry| same(&entry)))
                 .and_then(|mapping| mapping.statuses.iter().find(same).cloned())
-                .map(|entry| JiraStatusMapping { name: clean_name(&entry.name), jira_name: status.name.clone(), jira_category: status.category.clone(), ..entry })
+                .map(|entry| JiraStatusMapping {
+                    name: clean_name(&entry.name),
+                    jira_name: status.name.clone(),
+                    jira_category: status.category.clone(),
+                    ..entry
+                })
                 .unwrap_or_else(|| default_status(status))
         })
         .collect();
@@ -222,9 +239,17 @@ pub fn resolve(structure: &Structure, local_users: &[(Id, String)], stored: Opti
             let by_choice = pick(&|mapping| mapping.users.iter().any(|entry| same(&entry) && entry.user_id.is_some()))
                 .and_then(|mapping| mapping.users.iter().find(same).and_then(|entry| entry.user_id))
                 .filter(|id| local_users.iter().any(|(known, _)| known == id));
-            let by_email = person.email.as_deref().and_then(|email| local_users.iter().find(|(_, known)| known.eq_ignore_ascii_case(email.trim())).map(|(id, _)| *id));
+            let by_email = person
+                .email
+                .as_deref()
+                .and_then(|email| local_users.iter().find(|(_, known)| known.eq_ignore_ascii_case(email.trim())).map(|(id, _)| *id));
 
-            JiraUserMapping { account: person.account.clone(), name: person.name.clone(), email: person.email.clone(), user_id: by_choice.or(by_email) }
+            JiraUserMapping {
+                account: person.account.clone(),
+                name: person.name.clone(),
+                email: person.email.clone(),
+                user_id: by_choice.or(by_email),
+            }
         })
         .collect();
 
@@ -272,7 +297,10 @@ mod tests {
     #[test]
     fn a_choice_beats_the_last_import_which_beats_the_default() {
         let structure = Structure {
-            types: vec![RemoteType { name: "Bug".into(), subtask: false, epic: false }, RemoteType { name: "Story".into(), subtask: false, epic: false }],
+            types: vec![
+                RemoteType { name: "Bug".into(), subtask: false, epic: false },
+                RemoteType { name: "Story".into(), subtask: false, epic: false },
+            ],
             statuses: vec![status("Open", "new"), status("Closed", "done")],
             priorities: vec!["High".into(), "Low".into()],
             people: vec![
@@ -284,13 +312,23 @@ mod tests {
         let stored = JiraMapping {
             board_mode: Some(BoardMode::Kanban),
             types: vec![JiraTypeMapping { jira_name: "bug".into(), name: "Defect".into(), level: TypeLevel::Standard }],
-            statuses: vec![JiraStatusMapping { jira_name: "Open".into(), jira_category: String::new(), name: "To Do".into(), category: StatusCategory::Todo }],
+            statuses: vec![JiraStatusMapping {
+                jira_name: "Open".into(),
+                jira_category: String::new(),
+                name: "To Do".into(),
+                category: StatusCategory::Todo,
+            }],
             users: vec![JiraUserMapping { account: "b2".into(), name: String::new(), email: None, user_id: Some(9) }],
             create_users: false,
             ..Default::default()
         };
         let chosen = JiraMapping {
-            statuses: vec![JiraStatusMapping { jira_name: "Closed".into(), jira_category: String::new(), name: " Done ".into(), category: StatusCategory::Done }],
+            statuses: vec![JiraStatusMapping {
+                jira_name: "Closed".into(),
+                jira_category: String::new(),
+                name: " Done ".into(),
+                category: StatusCategory::Done,
+            }],
             priorities: vec![JiraPriorityMapping { jira_name: "Low".into(), priority: 9 }],
             create_users: true,
             ..Default::default()

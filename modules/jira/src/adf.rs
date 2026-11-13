@@ -245,7 +245,9 @@ fn media(node: &Value) -> String {
     let name = text("alt").or(text("__fileName")).or(text("title"));
 
     match (kind(node), text("url")) {
-        ("media" | "mediaInline", Some(url)) if attrs["type"] == "external" => format!("![{}]({})", md::escape(name.unwrap_or("")), md::link_target(url)),
+        ("media" | "mediaInline", Some(url)) if attrs["type"] == "external" => {
+            format!("![{}]({})", md::escape(name.unwrap_or("")), md::link_target(url))
+        }
         ("media" | "mediaInline", _) => format!("\\[attachment: {}\\]", md::escape(name.or(text("id")).unwrap_or("file"))),
         _ => children(node).iter().map(media).collect::<Vec<_>>().join(" "),
     }
@@ -253,11 +255,13 @@ fn media(node: &Value) -> String {
 
 /// What a node's mark of this kind says: the address for a link, empty for the others.
 fn mark<'a>(node: &'a Value, wanted: &str) -> Option<&'a str> {
-    node["marks"]
-        .as_array()?
-        .iter()
-        .find(|mark| mark["type"] == wanted)
-        .map(|mark| if wanted == "link" { mark["attrs"]["href"].as_str().unwrap_or("") } else { "" })
+    node["marks"].as_array()?.iter().find(|mark| mark["type"] == wanted).map(|mark| {
+        if wanted == "link" {
+            mark["attrs"]["href"].as_str().unwrap_or("")
+        } else {
+            ""
+        }
+    })
 }
 
 fn has_code(node: &Value) -> bool {
@@ -406,10 +410,7 @@ mod tests {
             text("."),
         ])]);
 
-        assert_eq!(
-            markdown,
-            "**bold *and bold italic***, `code_x*`, ~~gone~~, under and [**the docs**](https://example.com/a%20b)."
-        );
+        assert_eq!(markdown, "**bold *and bold italic***, `code_x*`, ~~gone~~, under and [**the docs**](https://example.com/a%20b).");
     }
 
     #[test]
@@ -427,25 +428,23 @@ mod tests {
 
     #[test]
     fn nested_lists() {
-        let markdown = convert(vec![
-            node(
-                "bulletList",
-                vec![
-                    node("listItem", vec![paragraph(vec![text("one")])]),
-                    node(
-                        "listItem",
-                        vec![
-                            paragraph(vec![text("two")]),
-                            json!({ "type": "orderedList", "attrs": { "order": 3 }, "content": [
+        let markdown = convert(vec![node(
+            "bulletList",
+            vec![
+                node("listItem", vec![paragraph(vec![text("one")])]),
+                node(
+                    "listItem",
+                    vec![
+                        paragraph(vec![text("two")]),
+                        json!({ "type": "orderedList", "attrs": { "order": 3 }, "content": [
                                 node("listItem", vec![paragraph(vec![text("first")])]),
                                 node("listItem", vec![paragraph(vec![text("second")]), node("bulletList", vec![node("listItem", vec![paragraph(vec![text("deep")])])])]),
                             ] }),
-                        ],
-                    ),
-                    node("listItem", vec![paragraph(vec![text("three")]), paragraph(vec![text("with a second paragraph")])]),
-                ],
-            ),
-        ]);
+                    ],
+                ),
+                node("listItem", vec![paragraph(vec![text("three")]), paragraph(vec![text("with a second paragraph")])]),
+            ],
+        )]);
 
         assert_eq!(markdown, "- one\n- two\n  3. first\n  4. second\n     - deep\n- three\n\n  with a second paragraph");
     }
@@ -565,11 +564,39 @@ mod tests {
     }
 
     const KINDS: [&str; 30] = [
-        "doc", "paragraph", "heading", "bulletList", "orderedList", "listItem", "taskList", "taskItem", "codeBlock", "blockquote", "panel",
-        "table", "tableRow", "tableHeader", "tableCell", "rule", "mediaSingle", "media", "mention", "emoji", "hardBreak", "inlineCard", "text",
-        "date", "status", "expand", "mediaGroup", "unknownThing", "", "decisionList",
+        "doc",
+        "paragraph",
+        "heading",
+        "bulletList",
+        "orderedList",
+        "listItem",
+        "taskList",
+        "taskItem",
+        "codeBlock",
+        "blockquote",
+        "panel",
+        "table",
+        "tableRow",
+        "tableHeader",
+        "tableCell",
+        "rule",
+        "mediaSingle",
+        "media",
+        "mention",
+        "emoji",
+        "hardBreak",
+        "inlineCard",
+        "text",
+        "date",
+        "status",
+        "expand",
+        "mediaGroup",
+        "unknownThing",
+        "",
+        "decisionList",
     ];
-    const TEXTS: [&str; 12] = ["", " ", "plain", "*_`[]<>|\\~#", "żółć 👍", "line\nbreak", "```", "- x", "1. y", "> z", "https://x.io/a_b", "\t\u{0}"];
+    const TEXTS: [&str; 12] =
+        ["", " ", "plain", "*_`[]<>|\\~#", "żółć 👍", "line\nbreak", "```", "- x", "1. y", "> z", "https://x.io/a_b", "\t\u{0}"];
 
     fn random_node(random: &mut Random, depth: usize) -> Value {
         match random.next(12) {

@@ -1,0 +1,139 @@
+import { useEffect, useState } from 'react';
+
+import { Button, ConfirmDialog, ErrorNote, Field, Spinner, Tag, useBusy } from '@web/components/ui.tsx';
+import { currentLanguage, setLanguage, t, timeAgo } from '@web/i18n/index.ts';
+import { core } from '../api.ts';
+import type { ConnectionStatus } from '../bindings/ConnectionStatus.ts';
+import type { Settings } from '../bindings/Settings.ts';
+import { useRemote } from '../live.ts';
+import { useSession } from '../session.tsx';
+
+export function SettingsView({ onStatus }: { onStatus: (status: ConnectionStatus) => void }) {
+  const { status } = useSession();
+  const loaded = useRemote(() => core.settings(), []);
+  const models = useRemote(() => core.models(), []);
+  const [draft, setDraft] = useState<Settings | undefined>();
+  const [leaving, setLeaving] = useState(false);
+  const [busy, run] = useBusy();
+
+  useEffect(() => setDraft(loaded.data), [loaded.data]);
+
+  if (!draft) {
+    return loaded.error ? <ErrorNote message={loaded.error} /> : <Spinner />;
+  }
+
+  const change = <K extends keyof Settings>(name: K, value: Settings[K]) => setDraft({ ...draft, [name]: value });
+  const dirty = JSON.stringify(draft) !== JSON.stringify(loaded.data);
+
+  async function save(): Promise<void> {
+    const saved = await run(() => core.saveSettings(draft as Settings), t('Saved'));
+
+    if (saved) {
+      loaded.set(saved);
+      onStatus(await core.status());
+    }
+  }
+
+  return (
+    <div className="desk-view">
+      <h1>{t('Settings')}</h1>
+      <section className="panel settings-card">
+        <header className="panel-head">
+          <h2>{t('Connection')}</h2>
+          <Tag tone={status.online ? 'green' : 'amber'}>{status.online ? t('online') : t('offline')}</Tag>
+        </header>
+        <p>
+          <code>{status.serverUrl}</code> {status.user && <span className="muted">· {status.user.name}</span>} {status.serverVersion && <span className="muted">· team-hub {status.serverVersion}</span>}
+        </p>
+        <p className="muted">
+          {status.cache === 'encrypted'
+            ? t('The copy of the server’s data on this computer is encrypted; its key and the API token are in the system keychain.')
+            : t('This computer has no keychain the app can use, so the copy of the server’s data is not kept between runs.')}
+        </p>
+        {status.error && <ErrorNote message={status.error} />}
+        <div>
+          <Button variant="danger" onClick={() => setLeaving(true)}>
+            {t('Disconnect')}
+          </Button>
+        </div>
+      </section>
+      <section className="panel settings-card">
+        <header className="panel-head">
+          <h2>{t('Runner')}</h2>
+          {status.runner.runsApi === false && <Tag tone="amber">{t('this server has no agent runs')}</Tag>}
+          {status.runner.lastHeartbeat && <span className="muted">{t('last seen by the server {when}', { when: timeAgo(status.runner.lastHeartbeat) })}</span>}
+        </header>
+        <p className="muted">{t('As a runner this computer takes the work delegated to an AI agent on the web, for projects that have a repository mapped here, while the app is open.')}</p>
+        <label className="check">
+          <input type="checkbox" checked={draft.runnerEnabled} onChange={(event) => change('runnerEnabled', event.target.checked)} />
+          <span>{t('Take runs delegated on the web')}</span>
+        </label>
+        <div className="form-row">
+          <Field label={t('Name shown on the web')}>
+            <input className="input" value={draft.runnerName} onChange={(event) => change('runnerName', event.target.value)} />
+          </Field>
+          <Field label={t('Threads working at once')} hint={t('The rest wait their turn.')}>
+            <input className="input input-number" type="number" min={1} max={16} value={draft.maxRunning} onChange={(event) => change('maxRunning', Number(event.target.value))} />
+          </Field>
+        </div>
+        {status.runner.error && <ErrorNote message={status.runner.error} />}
+      </section>
+      <section className="panel settings-card">
+        <header className="panel-head">
+          <h2>{t('Agent')}</h2>
+          <Tag tone={status.sandbox === 'available' ? 'green' : 'amber'}>{status.sandbox === 'available' ? t('shell sandbox available') : t('no shell sandbox here')}</Tag>
+        </header>
+        <div className="form-row">
+          <Field label={t('Default model')}>
+            <input className="input" list="desk-models" value={draft.defaultModel} onChange={(event) => change('defaultModel', event.target.value)} />
+          </Field>
+          <Field label={t('Turns per run')}>
+            <input className="input input-number" type="number" min={1} max={500} value={draft.maxTurns} onChange={(event) => change('maxTurns', Number(event.target.value))} />
+          </Field>
+          <Field label={t('Node command')} hint={t('Runs the helper that talks to the Claude Agent SDK. Takes effect after a restart.')}>
+            <input className="input input-mono" value={draft.nodeCommand} onChange={(event) => change('nodeCommand', event.target.value)} />
+          </Field>
+        </div>
+        <datalist id="desk-models">
+          {(models.data ?? []).map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
+        <label className="check">
+          <input type="checkbox" checked={draft.allowUnsandboxedShell} onChange={(event) => change('allowUnsandboxedShell', event.target.checked)} />
+          <span>{t('Give threads a shell even where the system cannot confine it')}</span>
+        </label>
+        <p className="muted">
+          {t('Where the operating system has a sandbox, a thread’s shell has no network and can write only inside its working tree. Where it has none, threads work without a shell unless you allow it here; then only the deny list stands between the agent and this computer. Takes effect after a restart.')}
+        </p>
+      </section>
+      <section className="panel settings-card">
+        <header className="panel-head">
+          <h2>{t('Language')}</h2>
+        </header>
+        <div className="inline-field">
+          <select className="input" value={currentLanguage()} onChange={(event) => setLanguage(event.target.value === 'pl' ? 'pl' : 'en')}>
+            <option value="en">English</option>
+            <option value="pl">Polski</option>
+          </select>
+        </div>
+      </section>
+      <div className="row-end">
+        <span className="muted">team-hub desktop {status.appVersion}</span>
+        <Button variant="primary" disabled={!dirty || busy} onClick={save}>
+          {t('Save')}
+        </Button>
+      </div>
+      {leaving && (
+        <ConfirmDialog
+          title={t('Disconnect from the server?')}
+          body={t('The token is removed from the keychain and the stored copy of the server’s data is deleted. Threads, working trees and repositories stay.')}
+          confirm={t('Disconnect')}
+          danger
+          onConfirm={async () => onStatus(await core.disconnect())}
+          onClose={() => setLeaving(false)}
+        />
+      )}
+    </div>
+  );
+}

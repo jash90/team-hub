@@ -142,20 +142,49 @@ impl Inner {
             None => {
                 let suggested = || hub_core::keys::suggest_branch_name(&thread.issue_key, &thread.issue_summary, &private.issue_type);
                 let branch = thread.branch.clone().or(private.wanted_branch.clone()).unwrap_or_else(suggested);
-                let folder = self.config.worktrees_root.join(repo_folder_name(&repo)).join(format!("{}-t{}", thread.issue_key.to_lowercase(), thread.id));
-                let made = git::create_worktree(&repo, &folder, &branch)?;
-                let place = made.path.to_string_lossy().into_owned();
-                let how = if made.continued { "continuing branch" } else { "new branch" };
+                let holder = self.store.threads()?.into_iter().find(|other| {
+                    other.id != thread.id && other.repo_path == thread.repo_path && other.branch.as_deref() == Some(branch.as_str()) && other.worktree.as_deref().is_some_and(|tree| Path::new(tree).exists())
+                });
 
-                self.store.set_worktree(thread.id, Some(&place), Some(&made.branch), Some(&made.base), Some(&made.base_commit))?;
-                self.say(
-                    thread.id,
-                    EventKind::Status,
-                    &format!("Working tree ready: {how} {} from {}", made.branch, made.base),
-                    json!({ "worktree": place, "branch": made.branch, "base": made.base, "continued": made.continued }),
-                );
+                match holder {
+                    // One branch has one working tree. An earlier thread that is at rest hands
+                    // its tree over; one that is working keeps it.
+                    Some(other) if other.state.is_active() => {
+                        return Err(CoreError::not_possible(format!("Thread #{} is already working on branch {branch}; stop it or wait for it", other.id)));
+                    }
+                    Some(other) => {
+                        let place = other.worktree.clone().unwrap_or_default();
 
-                (made.path, made.branch)
+                        self.store.set_worktree(other.id, None, None, None, None)?;
+                        self.store.set_worktree(thread.id, Some(&place), Some(&branch), other.base.as_deref(), other.base_commit.as_deref())?;
+                        self.say(other.id, EventKind::Status, &format!("Thread #{} continues in this thread's working tree.", thread.id), Value::Null);
+                        self.changed(other.id);
+                        self.say(
+                            thread.id,
+                            EventKind::Status,
+                            &format!("Working tree ready: continuing branch {branch} in the tree of thread #{}", other.id),
+                            json!({ "worktree": place, "branch": branch, "continued": true }),
+                        );
+
+                        (PathBuf::from(place), branch)
+                    }
+                    None => {
+                        let folder = self.config.worktrees_root.join(repo_folder_name(&repo)).join(format!("{}-t{}", thread.issue_key.to_lowercase(), thread.id));
+                        let made = git::create_worktree(&repo, &folder, &branch)?;
+                        let place = made.path.to_string_lossy().into_owned();
+                        let how = if made.continued { "continuing branch" } else { "new branch" };
+
+                        self.store.set_worktree(thread.id, Some(&place), Some(&made.branch), Some(&made.base), Some(&made.base_commit))?;
+                        self.say(
+                            thread.id,
+                            EventKind::Status,
+                            &format!("Working tree ready: {how} {} from {}", made.branch, made.base),
+                            json!({ "worktree": place, "branch": made.branch, "base": made.base, "continued": made.continued }),
+                        );
+
+                        (made.path, made.branch)
+                    }
+                }
             }
         };
         let access = git::write_access(&repo, &worktree, &branch)?;
@@ -245,7 +274,7 @@ impl Inner {
             }
         });
 
-        if let Some(stderr) = stderr {
+        let complaining = stderr.map(|stderr| {
             let kept = Arc::clone(&complaints);
 
             tokio::spawn(async move {
@@ -260,8 +289,8 @@ impl Inner {
 
                     kept.push_back(line);
                 }
-            });
-        }
+            })
+        });
 
         let _ = to_helper.send(ToSidecar::Start(Box::new(start)));
         let _ = self.store.set_next_prompt(thread_id, None);
@@ -298,6 +327,11 @@ impl Inner {
             }
 
             let status = child.wait().await.ok();
+
+            // What the helper wrote last is still on its way through the pipe.
+            if let Some(complaining) = complaining {
+                let _ = tokio::time::timeout(Duration::from_millis(500), complaining).await;
+            }
 
             inner.running().remove(&thread_id);
 

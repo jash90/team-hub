@@ -12,6 +12,7 @@ import { agentsModule } from '../../modules/agents/web/index.tsx';
 import { confluenceModule } from '../../modules/confluence/web/index.tsx';
 import { e2eModule } from '../../modules/e2e/web/index.tsx';
 import { githubModule } from '../../modules/github/web/index.tsx';
+import { jiraModule } from '../../modules/jira/web/index.tsx';
 import { reportsModule } from '../../modules/reports/web/index.tsx';
 import { wikiModule } from '../../modules/wiki/web/index.tsx';
 
@@ -44,7 +45,7 @@ export type WebModule = {
   polish?: Record<string, string>;
 };
 
-const ALL: WebModule[] = [githubModule, wikiModule, confluenceModule, reportsModule, e2eModule, agentsModule];
+const ALL: WebModule[] = [githubModule, wikiModule, confluenceModule, jiraModule, reportsModule, e2eModule, agentsModule];
 
 for (const module of ALL) {
   if (module.polish) {
@@ -52,9 +53,19 @@ for (const module of ALL) {
   }
 }
 
-/** The modules that are compiled in and switched on. */
-export function useModules(): WebModule[] {
-  const { moduleEnabled } = useSession();
+/**
+ * The modules that are compiled in and switched on. Given a project (its key or its id),
+ * those that are not switched off in that project.
+ */
+export function useModules(project?: string | number | null): WebModule[] {
+  const { boot, moduleEnabled } = useSession();
+  const enabled = ALL.filter((module) => moduleEnabled(module.id));
 
-  return ALL.filter((module) => moduleEnabled(module.id));
+  if (project === undefined || project === null) {
+    return enabled;
+  }
+
+  const off = boot.projects.find((candidate) => (typeof project === 'number' ? candidate.id === project : candidate.key === project))?.disabledModules ?? [];
+
+  return off.length > 0 ? enabled.filter((module) => !off.includes(module.id)) : enabled;
 }

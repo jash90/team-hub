@@ -262,7 +262,8 @@ async fn a_thread_works_in_its_own_tree_and_shows_up_on_the_server_as_a_run() {
     let run = hub.run(run_id);
     let events = run["events"].as_array().unwrap();
 
-    assert_eq!(run["run"]["state"], "succeeded");
+    // Done here, but the push and the pull request still wait for the person: so does the run.
+    assert_eq!(run["run"]["state"], "waiting");
     assert_eq!(run["run"]["kind"], "implement");
     assert_eq!(run["run"]["instructions"], "Keep it small.");
     assert_eq!(run["run"]["branch"], branch);
@@ -288,7 +289,7 @@ async fn a_thread_works_in_its_own_tree_and_shows_up_on_the_server_as_a_run() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_run_delegated_on_the_web_is_claimed_and_carried_out() {
     let (bench, hub, _repo) = ready("delegated").await;
-    let run_id = hub.delegate("WEB-2", "implement", "From the web.");
+    let run_id = hub.delegate("WEB-2", "implement", "From the web. [fake:analyse]");
 
     bench.desktop.tick(true).await.unwrap();
 
@@ -304,7 +305,7 @@ async fn a_run_delegated_on_the_web_is_claimed_and_carried_out() {
     assert_eq!(done.origin, ThreadOrigin::Delegated);
     assert_eq!(done.run_id, Some(run_id));
     assert_eq!(done.branch.as_deref(), Some("fix/WEB-2-blad-logowania-500"));
-    assert_eq!(done.instructions, "From the web.");
+    assert_eq!(done.instructions, "From the web. [fake:analyse]");
     assert_eq!(hub.run(run_id)["run"]["state"], "succeeded");
     // A run of a kind this runner does not carry out stays queued.
     let refine = hub.delegate("WEB-2", "refine", "");
@@ -414,6 +415,36 @@ async fn only_two_threads_work_at_once_and_the_third_takes_the_freed_slot() {
     assert_eq!(bench.thread(second).await.state, ThreadState::Running);
 
     bench.desktop.stop_thread(second).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_second_thread_on_the_same_branch_takes_over_the_tree_of_one_at_rest_and_waits_for_one_at_work() {
+    let (bench, _hub, repo) = ready("same-branch").await;
+    let first = start(&bench, "WEB-1", ThreadKind::Implement, "").await;
+    let done = bench.until_state(first, ThreadState::Done).await;
+    let second = start(&bench, "WEB-1", ThreadKind::Custom, "[fake:slow]").await;
+    let working = bench.until(second, "working", |thread| thread.last_text.is_some()).await;
+
+    // The earlier thread was at rest: the new one continues in its tree, on its branch.
+    assert_eq!(working.worktree, done.worktree);
+    assert_eq!(working.branch, done.branch);
+    assert_eq!(working.base_commit, done.base_commit);
+    assert_eq!(bench.thread(first).await.worktree, None);
+    assert_eq!(git(&repo.clone, &["worktree", "list", "--porcelain"]).matches("worktree ").count(), 2);
+
+    // A third one while the second is working cannot have the tree.
+    let third = start(&bench, "WEB-1", ThreadKind::Analyse, "[fake:analyse]").await;
+    let refused = bench.until_state(third, ThreadState::Failed).await;
+    let reason = bench.desktop.run(move |core| core.thread(third)).await.unwrap().events.pop().unwrap().text;
+
+    assert_eq!(reason, format!("Thread #{second} is already working on branch feature/WEB-1-login-form-validation; stop it or wait for it"));
+    assert_eq!(refused.worktree, None);
+
+    bench.desktop.stop_thread(second).await.unwrap();
+
+    let diff = bench.desktop.run(move |core| core.thread_diff(second)).await.unwrap();
+
+    assert_eq!(diff.commits.len(), 1, "the second thread sees the first one's commit on the branch");
 }
 
 #[cfg(unix)]
@@ -527,7 +558,7 @@ async fn proposals_change_nothing_until_decided_in_the_app_or_on_the_web() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_push_goes_out_only_after_the_click_and_only_the_commit_that_was_shown() {
-    let (bench, _hub, repo) = ready("push").await;
+    let (bench, hub, repo) = ready("push").await;
     let id = start(&bench, "WEB-1", ThreadKind::Implement, "").await;
     let thread = bench.until_state(id, ThreadState::Done).await;
     let branch = thread.branch.clone().unwrap();
@@ -572,6 +603,24 @@ async fn a_push_goes_out_only_after_the_click_and_only_the_commit_that_was_shown
     assert_eq!(pull_request.title, "WEB-1 Login form validation");
     assert!(!pull_request.pushed);
     assert!(bench.desktop.run(move |core| core.open_pull_request(id, "WEB-1 Login", "")).await.unwrap_err().to_string().contains("Push the branch first"));
+
+    // While the pull request is undecided the run waits; once it is there, the run ends with it.
+    let run_id = thread.run_id.unwrap();
+
+    bench.desktop.tick(true).await.unwrap();
+
+    assert_eq!(hub.run(run_id)["run"]["state"], "waiting");
+    assert!(bench.desktop.run(move |core| core.record_pull_request(id, "javascript:alert(1)")).await.is_err());
+
+    bench.desktop.run(move |core| core.record_pull_request(id, "https://github.com/acme/web/pull/7")).await.unwrap();
+    bench.desktop.tick(true).await.unwrap();
+
+    let run = hub.run(run_id);
+
+    assert_eq!(run["run"]["state"], "succeeded");
+    assert_eq!(run["run"]["branch"], branch);
+    assert_eq!(run["run"]["pullRequestUrl"], "https://github.com/acme/web/pull/7");
+    assert!(texts(run["events"].as_array().unwrap(), "status").iter().any(|text| text.starts_with("Pushed feature/WEB-1-login-form-validation at ")));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -597,6 +646,32 @@ async fn a_push_that_touches_ci_or_looks_like_a_secret_needs_a_second_confirmati
     bench.desktop.run(move |core| core.push(id, &commit, true)).await.unwrap();
 
     assert_eq!(git(&repo.origin, &["rev-parse", "refs/heads/feature/WEB-1-login-form-validation"]), preview.commit);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_proposal_the_server_refuses_goes_back_to_the_agent_and_a_trusted_kind_is_applied_at_once() {
+    let (bench, hub, _repo) = ready("refused").await;
+
+    hub.state().trusted = vec!["comment".to_string()];
+
+    let id = start(&bench, "WEB-1", ThreadKind::Analyse, "[fake:bad-status]").await;
+
+    bench.until_state(id, ThreadState::Done).await;
+
+    let detail = bench.desktop.run(move |core| core.thread(id)).await.unwrap();
+    let said = detail.events.iter().rev().find(|event| event.kind == EventKind::Message).unwrap();
+
+    assert_eq!(said.text, "The first try was refused: Unknown status \"Shipped\" (valid: To Do, In Progress, In Review, Done)");
+    assert_eq!(detail.proposals.len(), 1);
+    assert_eq!(detail.proposals[0].payload, json!({ "status": "In Review" }));
+
+    let other = start(&bench, "WEB-2", ThreadKind::Analyse, "[fake:analyse]").await;
+    let done = bench.until_state(other, ThreadState::Done).await;
+    let trusted = bench.desktop.run(move |core| core.thread(other)).await.unwrap().proposals.remove(0);
+
+    assert_eq!((trusted.kind, trusted.state), (ProposalKind::Comment, ProposalState::Approved));
+    assert_eq!(done.pending_proposals, 0);
+    assert_eq!(hub.state().issues["WEB-2"].comments.len(), 1);
 }
 
 // ---------- without the runs API, after a restart, through the window's commands ----------
@@ -629,9 +704,10 @@ async fn on_a_server_without_the_runs_api_threads_work_locally_and_approved_prop
 #[tokio::test(flavor = "multi_thread")]
 async fn a_finished_thread_can_be_told_more_in_the_same_session_and_gets_a_new_run() {
     let (bench, hub, _repo) = ready("follow-up").await;
-    let id = start(&bench, "WEB-1", ThreadKind::Implement, "").await;
+    let id = start(&bench, "WEB-1", ThreadKind::Analyse, "[fake:analyse]").await;
     let first = bench.until_state(id, ThreadState::Done).await;
 
+    bench.desktop.tick(true).await.unwrap();
     bench.desktop.run(move |core| core.say_to_thread(id, Some("Also cover the empty password."))).await.unwrap();
 
     let second = bench.until(id, "a second turn", |thread| thread.state == ThreadState::Done && thread.turns == 6).await;
@@ -644,7 +720,9 @@ async fn a_finished_thread_can_be_told_more_in_the_same_session_and_gets_a_new_r
     assert_eq!(hub.run(second_run)["run"]["state"], "succeeded");
     assert_eq!(hub.run(second_run)["run"]["instructions"], "Also cover the empty password.");
     assert_eq!(texts(hub.run(second_run)["events"].as_array().unwrap(), "message"), vec!["Continuing. You said: Also cover the empty password."]);
-    assert_eq!(git(std::path::Path::new(&second.repo_path), &["rev-list", "--count", "origin/main..feature/WEB-1-login-form-validation"]), "2");
+    assert_eq!(texts(hub.run(second_run)["events"].as_array().unwrap(), "status")[0], "Said in the desktop app: Also cover the empty password.");
+    assert!(texts(hub.run(second_run)["events"].as_array().unwrap(), "answer").is_empty());
+    assert_eq!(git(std::path::Path::new(&second.repo_path), &["rev-list", "--count", "origin/main..feature/WEB-1-login-form-validation"]), "1");
 }
 
 #[tokio::test(flavor = "multi_thread")]

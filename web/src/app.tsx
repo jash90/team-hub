@@ -10,6 +10,7 @@ import { currentLanguage, setLanguage, t, timeAgo } from './i18n/index.ts';
 import { useModules, type NavEntry } from './modules.ts';
 import { Link, matchRoute, navigate, setParam, usePath, useSearchParams, type Params } from './router.tsx';
 import { ProjectProvider, SessionProvider, loadBootstrap, startLive, stopLive, useLive, useProjectData, useRemote, useSession, useStored } from './session.tsx';
+import { useClaimedProject } from './shell.ts';
 import { LoginView, SetupView } from './views/auth.tsx';
 import { BacklogView } from './views/backlog.tsx';
 import { BoardView } from './views/board.tsx';
@@ -137,11 +138,14 @@ function Shell() {
   const [creating, setCreating] = useState(false);
   const [lastProject, setLastProject] = useStored<string | null>('last-project', null);
   const [collapsed, setCollapsed] = useStored('nav-collapsed', false);
-  const pathProject = projectKeyOf(path);
+  // The address names the project, or else the page on screen may (see `shell.ts`).
+  const claimedProject = useClaimedProject();
+  const pathProject = projectKeyOf(path) ?? claimedProject;
   const projectKey = [pathProject, lastProject, boot.projects.find((project) => !project.archived)?.key ?? null].find(
     (key) => key && boot.projects.some((project) => project.key === key),
   );
   const project = boot.projects.find((candidate) => candidate.key === projectKey);
+  const projectModules = useModules(project?.key);
 
   useEffect(() => {
     if (pathProject && pathProject !== lastProject && boot.projects.some((candidate) => candidate.key === pathProject)) {
@@ -186,16 +190,23 @@ function Shell() {
       { pattern: '/p/:key/releases', render: inProject(<ReleasesView />) },
       { pattern: '/p/:key/settings/:tab?', render: (found) => <ProjectScope projectKey={found.key.toUpperCase()}><ProjectSettingsView tab={found.tab} /></ProjectScope> },
     ];
+    // A module switched off in a project has no pages there.
+    const offIn = (key: string, id: string) => boot.projects.find((candidate) => candidate.key === key)?.disabledModules.includes(id) ?? false;
     const fromModules = modules.flatMap((module) =>
       (module.routes ?? []).map((route) => ({
         pattern: route.pattern,
-        render: (found: Params) =>
-          route.pattern.startsWith('/p/:key/') ? <ProjectScope projectKey={found.key.toUpperCase()}>{route.render(found)}</ProjectScope> : route.render(found),
+        render: (found: Params) => {
+          if (!route.pattern.startsWith('/p/:key/')) {
+            return route.render(found);
+          }
+
+          return offIn(found.key.toUpperCase(), module.id) ? null : <ProjectScope projectKey={found.key.toUpperCase()}>{route.render(found)}</ProjectScope>;
+        },
       })),
     );
 
     return [...core, ...fromModules];
-  }, [modules]);
+  }, [modules, boot.projects]);
 
   let view: ReactNode = null;
 
@@ -228,7 +239,7 @@ function Shell() {
         { id: 'backlog', label: () => t('Backlog'), icon: 'list', path: `/p/${project.key}/backlog` },
         { id: 'issues', label: () => t('Issues'), icon: 'filter', path: `/p/${project.key}/issues` },
         { id: 'releases', label: () => t('Releases'), icon: 'rocket', path: `/p/${project.key}/releases` },
-        ...modules.flatMap((module) => module.projectNav?.(project.key) ?? []),
+        ...projectModules.flatMap((module) => module.projectNav?.(project.key) ?? []),
         { id: 'settings', label: () => t('Project settings'), icon: 'settings', path: `/p/${project.key}/settings` },
       ]
     : [];

@@ -44,8 +44,7 @@ pub fn list(connection: &Connection, limit: i64) -> ApiResult<Vec<JiraJob>> {
 /// Queues a job. One import runs at a time: two would wait for the same writer anyway, and
 /// two of the same project would trip over each other.
 pub fn create(tx: &Tx, kind: &str, project_key: &str, started_by: Id) -> ApiResult<JiraJob> {
-    let busy: Option<String> =
-        query_one(tx, "SELECT project_key FROM jira_job WHERE state IN ('queued', 'running') LIMIT 1", [], |row| row.get(0))?;
+    let busy: Option<String> = query_one(tx, "SELECT project_key FROM jira_job WHERE state IN ('queued', 'running') LIMIT 1", [], |row| row.get(0))?;
 
     if let Some(key) = busy {
         return Err(ApiError::conflict(format!("An import of {key} is still running; wait for it or cancel it")));
@@ -69,7 +68,17 @@ fn announce(tx: &Tx, job: &JiraJob) -> ApiResult<()> {
         EVENT,
         None,
         None,
-        json!({ "jobId": job.id, "projectKey": job.project_key, "state": job.state, "step": job.step, "processed": job.processed, "total": job.total }),
+        json!({
+            "jobId": job.id,
+            "projectKey": job.project_key,
+            "state": job.state,
+            "step": job.step,
+            "processed": job.processed,
+            "total": job.total,
+            "created": job.report.created,
+            "updated": job.report.updated,
+            "unchanged": job.report.unchanged,
+        }),
     )
 }
 

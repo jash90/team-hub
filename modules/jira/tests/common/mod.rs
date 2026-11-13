@@ -199,7 +199,8 @@ pub fn small(cloud: bool) -> fake::Upstream {
 
     let mut upstream = fake::Upstream::new(cloud, if cloud { BASIC } else { BEARER });
     let account = |name: &str| if cloud { format!("acc-{name}") } else { name.to_string() };
-    let user = |login: &str, name: &str, email: Option<&str>| FakeUser { account: account(login), name: name.to_string(), email: email.map(String::from) };
+    let user =
+        |login: &str, name: &str, email: Option<&str>| FakeUser { account: account(login), name: name.to_string(), email: email.map(String::from) };
     let points = if cloud { "Story point estimate" } else { "Story Points" };
 
     upstream.page_size = 3;
@@ -214,7 +215,12 @@ pub fn small(cloud: bool) -> fake::Upstream {
         name: "Web shop".to_string(),
         description: "The shop.".to_string(),
         lead: Some(account("ada")),
-        types: vec![("Epic".to_string(), false, true), ("Story".to_string(), false, false), ("Bug".to_string(), false, false), ("Sub-task".to_string(), true, false)],
+        types: vec![
+            ("Epic".to_string(), false, true),
+            ("Story".to_string(), false, false),
+            ("Bug".to_string(), false, false),
+            ("Sub-task".to_string(), true, false),
+        ],
         statuses: vec![
             ("Done".to_string(), "done".to_string()),
             ("In Progress".to_string(), "indeterminate".to_string()),
@@ -223,7 +229,13 @@ pub fn small(cloud: bool) -> fake::Upstream {
         ],
         components: vec!["Cart".to_string(), "Payments".to_string()],
         versions: vec![
-            FakeVersion { name: "1.0".to_string(), released: true, archived: false, start: Some("2024-03-01".to_string()), release: Some("2024-03-15".to_string()) },
+            FakeVersion {
+                name: "1.0".to_string(),
+                released: true,
+                archived: false,
+                start: Some("2024-03-01".to_string()),
+                release: Some("2024-03-15".to_string()),
+            },
             FakeVersion { name: "1.1".to_string(), released: false, archived: false, start: None, release: Some("2024-04-30".to_string()) },
         ],
         boards: vec![FakeBoard {
@@ -320,7 +332,12 @@ pub fn small(cloud: bool) -> fake::Upstream {
                 entry(203, &account("ada"), "03-03T09:00", vec![change("assignee", None, None, Some(&account("marek")), Some("Marek Member"))]),
                 entry(204, &account("marek"), "03-04T10:00", vec![status_change("Open", "In Progress")]),
                 entry(205, &account("marek"), "03-06T10:00", vec![status_change("In Progress", "In Review")]),
-                entry(206, &account("ada"), "03-08T12:00", vec![status_change("In Review", "Done"), change("resolution", None, None, Some("1"), Some("Done"))]),
+                entry(
+                    206,
+                    &account("ada"),
+                    "03-08T12:00",
+                    vec![status_change("In Review", "Done"), change("resolution", None, None, Some("1"), Some("Done"))],
+                ),
             ],
             ..issue("WEB-2", "Story", "Done", "Cart", "02-21T09:00", "03-08T12:00")
         },
@@ -344,7 +361,12 @@ pub fn small(cloud: bool) -> fake::Upstream {
             history: vec![
                 entry(501, &account("ada"), "03-01T09:30", vec![change("Sprint", None, None, Some("41"), Some("Sprint 1"))]),
                 entry(502, &account("olaf"), "03-10T10:00", vec![status_change("Open", "In Progress")]),
-                entry(503, &account("ada"), "03-18T09:30", vec![change("Sprint", Some("41"), Some("Sprint 1"), Some("41, 42"), Some("Sprint 1, Sprint 2"))]),
+                entry(
+                    503,
+                    &account("ada"),
+                    "03-18T09:30",
+                    vec![change("Sprint", Some("41"), Some("Sprint 1"), Some("41, 42"), Some("Sprint 1, Sprint 2"))],
+                ),
             ],
             ..issue("WEB-5", "Bug", "In Progress", "Rounding", "02-25T09:00", "03-18T09:30")
         },

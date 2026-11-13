@@ -3,7 +3,8 @@
 //! reads the issue through the core, writes a file in its working tree, commits, proposes,
 //! asks, crashes or hangs, depending on a marker in the prompt:
 //!
-//! `[fake:question]` asks and ends its turn, then works when resumed · `[fake:crash]` dies ·
+//! `[fake:question]` asks and ends its turn, then works when resumed (`[fake:full]`: then
+//! implements and proposes) · `[fake:crash]` dies ·
 //! `[fake:hang]` ignores `stop` · `[fake:slow]` works until stopped · `[fake:fail]` reports a
 //! failure · `[fake:error]` reports an error · `[fake:write-tool]` tries a tool that changes
 //! the tracker · `[fake:subtasks]` proposes subtasks and a status · `[fake:risky]` commits a
@@ -107,13 +108,44 @@ fn scenario(prompt: &str) -> &str {
     prompt.split("[fake:").nth(1).and_then(|rest| rest.split(']').next()).unwrap_or("implement")
 }
 
+/// What a real agent keeps in its session: here, a small file per working tree and session.
+fn memory_file(cwd: &str, session: &str) -> std::path::PathBuf {
+    let tree = cwd.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3));
+
+    std::env::temp_dir().join("hub-fake-agent").join(format!("{tree:016x}-{session}"))
+}
+
 fn work(agent: &mut Agent, start: &StartThread) -> Option<()> {
-    let key = issue_key(&start.prompt);
     let cwd = start.cwd.as_str();
     let resumed = start.resume.is_some();
-    let kind = scenario(&start.prompt).to_string();
+    let session = start.resume.clone().unwrap_or_else(|| format!("fake-session-{}", start.thread));
+    let memory = memory_file(cwd, &session);
+    let remembered = std::fs::read_to_string(&memory).unwrap_or_default();
+    let (key, kind) = match remembered.split_once('\n') {
+        Some((key, kind)) if resumed => (key.to_string(), kind.to_string()),
+        _ => (issue_key(&start.prompt), scenario(&start.prompt).to_string()),
+    };
 
-    emit(AgentEvent::Session { session_id: start.resume.clone().unwrap_or_else(|| format!("fake-session-{}", start.thread)) });
+    if let Some(folder) = memory.parent() {
+        let _ = std::fs::create_dir_all(folder);
+        let _ = std::fs::write(&memory, format!("{key}\n{kind}"));
+    }
+
+    emit(AgentEvent::Session { session_id: session });
+
+    if resumed && kind == "full" {
+        let answer = start.prompt.lines().last().unwrap_or_default();
+
+        say(&format!("Thanks. With \"{answer}\" I can finish."));
+        write(cwd, &format!("agent-notes/{key}.md"), &format!("# {key}\n\nDecision: {answer}\n\nImplemented by the fake agent.\n"));
+        commit(cwd, &format!("{key}: implement with the decided limit"));
+        agent.ask(protocol::PROPOSE_COMMENT, json!({ "body": format!("Implemented on a branch with the decision \"{answer}\"; a pull request follows.") }))?.ok();
+        agent.ask(protocol::PROPOSE_PUSH, json!({ "note": "One commit." }))?.ok();
+        agent.ask(protocol::PROPOSE_PULL_REQUEST, json!({ "title": format!("{key} implement"), "body": format!("Implements {key}.") }))?.ok();
+        result(true, &format!("Implemented {key} in one commit; proposed a comment, the push and a pull request."));
+
+        return Some(());
+    }
 
     if resumed {
         say(&format!("Continuing. You said: {}", start.prompt.lines().last().unwrap_or_default()));
@@ -162,7 +194,7 @@ fn work(agent: &mut Agent, start: &StartThread) -> Option<()> {
         }
         "fail" => result(false, "The tests of the project do not pass and I could not find out why."),
         "error" => emit(AgentEvent::Error { message: "The model could not be reached.".to_string() }),
-        "question" => {
+        "question" | "full" => {
             agent.ask(protocol::ASK_QUESTION, json!({ "question": "Should the limit be 10 or 20 attempts?" }))?.ok();
             result(true, "I need one decision before I can continue: the limit.");
         }
@@ -179,6 +211,19 @@ fn work(agent: &mut Agent, start: &StartThread) -> Option<()> {
             agent.ask(protocol::PROPOSE_SUBTASKS, json!({ "items": items }))?.ok();
             agent.ask(protocol::PROPOSE_STATUS, json!({ "status": "In Progress" }))?.ok();
             result(true, "Split the work into two subtasks and proposed to start the issue.");
+        }
+        "bad-status" => {
+            let refused = agent.ask(protocol::PROPOSE_STATUS, json!({ "status": "Shipped" }))?;
+
+            say(&format!("The first try was refused: {}", refused.err().unwrap_or_else(|| "it was not".into())));
+            agent.ask(protocol::PROPOSE_STATUS, json!({ "status": "In Review" }))?.ok();
+            result(true, "Proposed to move the issue to review.");
+        }
+        "env" => {
+            let seen: Vec<&str> = ["TEAM_HUB_TOKEN", "GH_TOKEN", "PATH"].into_iter().filter(|name| std::env::var_os(name).is_some()).collect();
+
+            say(&format!("In my environment: {}", seen.join(", ")));
+            result(true, "Looked at the environment.");
         }
         "analyse" => {
             agent.ask(protocol::PROPOSE_COMMENT, json!({ "body": format!("Analysis of {key}: the change belongs in one module.") }))?.ok();

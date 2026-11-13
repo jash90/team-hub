@@ -14,6 +14,7 @@ hub-app.workspace = true
 hub-mod-github = { path = "../../modules/github" }
 hub-mod-wiki = { path = "../../modules/wiki" }
 hub-mod-confluence = { path = "../../modules/confluence" }
+hub-mod-jira = { path = "../../modules/jira" }
 hub-mod-reports = { path = "../../modules/reports" }
 hub-mod-e2e = { path = "../../modules/e2e" }
 hub-mod-agents = { path = "../../modules/agents" }

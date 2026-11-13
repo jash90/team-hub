@@ -31,8 +31,8 @@ use crate::import::{self, Options, Request, Source};
 use crate::jobs;
 use crate::mapping::{self, Structure};
 use crate::types::{
-    JiraCsvPreview, JiraCsvProject, JiraCsvRequest, JiraImportRequest, JiraJob, JiraLocalProject, JiraMapping, JiraPreview, JiraRemoteProject, JiraSettings,
-    JiraSettingsUpdate, JiraTestResult,
+    JiraCsvPreview, JiraCsvProject, JiraCsvRequest, JiraImportRequest, JiraJob, JiraLocalProject, JiraMapping, JiraPreview, JiraRemoteProject,
+    JiraSettings, JiraSettingsUpdate, JiraTestResult,
 };
 
 type Reply<T> = ApiResult<Json<T>>;
@@ -211,7 +211,14 @@ fn describe(connection: &Connection, structure: &Structure, chosen: Option<&Jira
     let users: Vec<(Id, String)> = query_all(connection, "SELECT id, email FROM user", [], |row| Ok((row.get(0)?, row.get(1)?)))?;
     let stored = import::stored(connection, &structure.key)?.and_then(|stored| stored.mapping);
 
-    Ok((mapping::resolve(structure, &users, stored.as_ref(), chosen), local_project(connection, &structure.key)?))
+    let mut mapping = mapping::resolve(structure, &users, stored.as_ref(), chosen);
+
+    // Whoever an earlier import matched or created an account for is that person again.
+    for entry in mapping.users.iter_mut().filter(|entry| entry.user_id.is_none()) {
+        entry.user_id = query_one(connection, "SELECT user_id FROM jira_user WHERE account = ?1", [&entry.account], |row| row.get(0))?;
+    }
+
+    Ok((mapping, local_project(connection, &structure.key)?))
 }
 
 async fn preview(State(app): State<App>, user: AuthUser, Path(key): Path<String>) -> Reply<JiraPreview> {
@@ -320,7 +327,9 @@ fn percent_decode(text: &str) -> String {
 /// the issues an import of it would write.
 fn read_upload(app: &App, upload_id: Id, request: &JiraCsvRequest) -> ApiResult<(JiraCsvPreview, Parsed)> {
     let (filename, content): (String, String) = app
-        .read(|connection| query_one(connection, "SELECT filename, content FROM jira_upload WHERE id = ?1", [upload_id], |row| Ok((row.get(0)?, row.get(1)?))))?
+        .read(|connection| {
+            query_one(connection, "SELECT filename, content FROM jira_upload WHERE id = ?1", [upload_id], |row| Ok((row.get(0)?, row.get(1)?)))
+        })?
         .ok_or_else(|| ApiError::not_found("Upload"))?;
     let table = csv::parse(&content);
     let columns = csv::columns(&table, request.columns.as_deref());
@@ -334,7 +343,9 @@ fn read_upload(app: &App, upload_id: Id, request: &JiraCsvRequest) -> ApiResult<
     let projects = csv::projects(&table, &columns);
     let project_key = match request.project_key.as_deref().map(str::trim).filter(|key| !key.is_empty()) {
         Some(key) => key.to_uppercase(),
-        None => projects.first().map(|(key, _)| key.clone()).ok_or_else(|| ApiError::bad_request("No row of the file has an issue key such as WEB-12"))?,
+        None => {
+            projects.first().map(|(key, _)| key.clone()).ok_or_else(|| ApiError::bad_request("No row of the file has an issue key such as WEB-12"))?
+        }
     };
     let parsed = csv::read(&table, &columns, &project_key, request.project_name.as_deref(), &now_iso());
     let (mapping, local) = app.read(|connection| describe(connection, &parsed.structure, request.mapping.as_ref()))?;
@@ -372,7 +383,8 @@ async fn upload_csv(State(app): State<App>, user: AuthUser, headers: HeaderMap, 
             return Err(ApiError::bad_request("The file is empty"));
         }
 
-        let filename: String = filename.rsplit(['/', '\\']).next().unwrap_or("").chars().filter(|character| !character.is_control()).take(120).collect();
+        let filename: String =
+            filename.rsplit(['/', '\\']).next().unwrap_or("").chars().filter(|character| !character.is_control()).take(120).collect();
         let upload_id = app.db.write(|tx| {
             // Files nobody came back to are not kept.
             let stale = (chrono::Utc::now() - chrono::Duration::days(7)).to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
@@ -410,7 +422,8 @@ async fn import_csv(State(app): State<App>, user: AuthUser, Path(id): Path<Id>, 
     user.require_admin()?;
 
     let admin = user.clone();
-    let options = Options { into_existing: request.into_existing.unwrap_or(false), overwrite_local: request.overwrite_local.unwrap_or(false), full: true };
+    let options =
+        Options { into_existing: request.into_existing.unwrap_or(false), overwrite_local: request.overwrite_local.unwrap_or(false), full: true };
     let (job, parsed, mapping) = app
         .run(move |app| {
             let (preview, parsed) = read_upload(app, id, &request)?;

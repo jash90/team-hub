@@ -8,7 +8,25 @@ modules/<id>/       one optional feature each: a Rust crate (src/) and its scree
 web/                the interface: React, TypeScript, Vite
 integrations/       packages for other tools (the e2e reporter)
 e2e/                end-to-end tests of team-hub itself
+scripts/            new-module.sh: the skeleton of a module
 ```
+
+## Small units
+
+Each layer is cut by what it is about, one file per thing, behind a stable entry point:
+
+- `hub-server/src/api/`: one file per resource (`issues`, `comments`, `sprints`,
+  `project_config`, …), each exporting `routes()`; `api/mod.rs` merges them and
+  `api/shared.rs` holds what several of them use.
+- `web/src/components/ui/` and `components/issue-bits/`: one file per component or tight
+  family. `ui.tsx` and `issue-bits.tsx` re-export them, and that is what views and modules
+  import.
+- `web/src/views/<feature>/` for the large views (the issue page, search, project settings):
+  the frame, and a file per part or tab. `views/<feature>.tsx` re-exports the view.
+
+Dependencies point one way: `hub-core` ← `hub-app` ← modules ← `hub-server`, and in the
+interface `web/src` ← module screens, with `web/src/modules.ts` the only place that names a
+module. Tests and a build step enforce this (see "Boundaries" in [modules.md](modules.md)).
 
 ## One core, shared
 
@@ -65,4 +83,6 @@ needs no new table.
 
 See [modules.md](modules.md). A module adds tables, routes, webhooks, query-language fields,
 badges on cards, a panel on the issue page, a section of "My work", tools for AI agents and
-its own screens, and can be switched off at runtime.
+its own screens, and can be switched off at runtime: for the whole instance, or for one
+project (the `project_module_off` table lists what is off where; the host then leaves the
+module's badges and panel out of that project's issues, and the interface its navigation).

@@ -398,6 +398,9 @@ export const pl: Record<string, string> = {
   'Everything beyond the tracker itself is a module. A module that is off keeps its data but shows nothing and receives nothing.':
     'Wszystko poza samym trackerem to moduły. Wyłączony moduł zachowuje dane, ale niczego nie pokazuje i niczego nie odbiera.',
   needs: 'wymaga',
+  'A module switched off here keeps its data, but its navigation, its panel on issues and its marks on cards disappear from this project. Other projects are not affected.':
+    'Moduł wyłączony tutaj zachowuje dane, ale jego nawigacja, panel w zadaniach i oznaczenia na kartach znikają z tego projektu. Inne projekty pozostają bez zmian.',
+  'No modules are switched on for this instance.': 'W tej instancji nie włączono żadnych modułów.',
 };
 
 /** Polish plural forms (one, few, many), keyed by the English singular. */

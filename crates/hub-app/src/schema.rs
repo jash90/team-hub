@@ -1,6 +1,7 @@
 //! Core tables. Migrations only ever get appended to.
 
-pub const MIGRATIONS: &[&str] = &[r#"
+pub const MIGRATIONS: &[&str] = &[
+    r#"
 CREATE TABLE user (
     id INTEGER PRIMARY KEY,
     email TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -289,4 +290,14 @@ CREATE TABLE secret (
 );
 
 CREATE VIRTUAL TABLE issue_fts USING fts5 (key, summary, description, comments, tokenize = 'unicode61');
-"#];
+"#,
+    r#"
+-- Modules switched off in one project. No row means the module is on there, so a new
+-- module or a new project needs nothing here.
+CREATE TABLE project_module_off (
+    project_id INTEGER NOT NULL REFERENCES project (id) ON DELETE CASCADE,
+    module_id TEXT NOT NULL,
+    PRIMARY KEY (project_id, module_id)
+) WITHOUT ROWID;
+"#,
+];

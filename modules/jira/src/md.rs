@@ -111,7 +111,8 @@ pub fn fence(language: &str, code: &str) -> String {
     }
 
     let ticks = "`".repeat(longest.max(2) + 1);
-    let language: String = language.chars().filter(|character| character.is_alphanumeric() || matches!(character, '+' | '-' | '#' | '_')).take(24).collect();
+    let language: String =
+        language.chars().filter(|character| character.is_alphanumeric() || matches!(character, '+' | '-' | '#' | '_')).take(24).collect();
 
     format!("{ticks}{}\n{}\n{ticks}", language.to_lowercase(), code.trim_matches('\n'))
 }
@@ -124,7 +125,11 @@ pub fn quote(text: &str) -> String {
 pub fn indent_rest(text: &str, width: usize) -> String {
     let pad = " ".repeat(width);
 
-    text.lines().enumerate().map(|(index, line)| if index == 0 || line.is_empty() { line.to_string() } else { format!("{pad}{line}") }).collect::<Vec<_>>().join("\n")
+    text.lines()
+        .enumerate()
+        .map(|(index, line)| if index == 0 || line.is_empty() { line.to_string() } else { format!("{pad}{line}") })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn cell(text: &str) -> String {

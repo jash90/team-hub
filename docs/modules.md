@@ -3,7 +3,11 @@
 Everything beyond the tracker's core lives in a module: one folder under `modules/<id>/`
 holding a Rust crate (`Cargo.toml`, `src/`) and, when it has screens, a `web/` folder.
 A module can be switched off at runtime (Settings → Modules); while off, its routes answer
-404 and it receives no events.
+404 and it receives no events. A module that is on can also be switched off in one project
+(Project settings → Modules); see "Per project" below.
+
+`scripts/new-module.sh <id> "<Name>"` creates the skeleton described here (a crate with one
+tested route, a `web/` folder with one page) and prints the lines that register it.
 
 ## The crate
 
@@ -28,6 +32,22 @@ A module can be switched off at runtime (Settings → Modules); while off, its r
 | Tools for AI agents (MCP) | `fn tools` + `fn call_tool`. |
 | Background work | `fn start(&App)`: spawn a plain thread; never block the Rayon pool on the network. |
 | Demo data | `fn seed_demo(&App)`. |
+
+## Per project
+
+A project administrator can switch a module off for their project
+(`PUT /api/projects/{key}/modules/{id}` with `{ "enabled": false }`); the project then lists
+it in `disabledModules`. The module is not asked and does not have to know:
+
+- the host drops the module's `ext` entry from that project's issue rows and does not call
+  `issue_panel` for its issues;
+- the interface leaves the module out of that project: its project navigation, its pages
+  under `/p/:key/…`, its tab in the project's settings, its panel and its badges.
+
+Everything else stays per instance: the module's own routes, its events, its section of
+"My work", its tools, and its query-language fields, which still match that project's issues.
+A module that wants to respect the switch there reads
+`hub_app::services::project_modules::disabled_modules(connection, project_id)`.
 
 ## Rules
 
@@ -68,16 +88,23 @@ page, a section of "My work", tabs in project and instance settings.
   - `@/session.tsx`: `useSession()` (user, people, `moduleEnabled`), `useRemote(load, deps, live?)`
     (data that reloads when the server announces a change the predicate accepts),
     `useProject()` inside project pages, `useStored()` for per-browser interface state.
+  - `@/shell.ts`: `useShellProject(key)`, for a page outside `/p/:key/…` that belongs to a
+    project all the same (a knowledge-base space bound to one): the shell then shows that
+    project's navigation instead of the last one used.
   - `@/components/ui.tsx`: `Button`, `Dialog`, `ConfirmDialog`, `Picker`, `Menu`, `Popover`,
     `Tabs`, `Tag`, `Field`, `Empty`, `Spinner`, `ErrorNote`, `ProgressBar`, `Avatar`,
-    `InlineEdit`, `attempt()`, `useBusy()`, `toast()`, `copyText()`.
+    `InlineEdit`, `attempt()`, `useBusy()`, `toast()`, `copyText()`. Each lives in its own
+    file under `components/ui/`; import them from `ui.tsx`, which is what stays stable.
   - `@/components/icon.tsx` (`Icon`, the names are the keys of its table),
     `@/components/issue-bits.tsx` (`IssueLine`, `IssueKey`, pickers for issue fields),
     `@/components/markdown.tsx` (`Markdown`, `MarkdownEditor`), `@/router.tsx` (`Link`,
     `navigate`, `useSearchParams`, `setParam`), `@/views/settings.tsx` (`SettingsCard`).
+  - `@/modules.ts`: the `WebModule` type, and `useModules(project?)` for the rare module that
+    renders what other modules contribute.
   - `@/bindings/*`: the types generated from Rust. Never write those shapes by hand.
 - **Routes**: a pattern starting with `/p/:key/` renders inside the project (so `useProject()`
-  works); anything else is a top-level page.
+  works); anything else is a top-level page, which can still name its project with
+  `useShellProject()`.
 - **Text**: English in place through `t('…', { name })`; `modules/<id>/web/pl.ts` holds the
   Polish for every phrase the module uses (the key is the English text). Dates and durations
   come from `@/i18n/index.ts` (`formatDate`, `formatDateTime`, `timeAgo`, `countOf`).
@@ -89,3 +116,19 @@ page, a section of "My work", tabs in project and instance settings.
   with class names prefixed by the module id.
 - **Check**: `cd web && npx tsc --noEmit && npm run build`, then look at it in a browser in
   both themes and both languages.
+
+## Boundaries
+
+The rules about who may depend on whom are checked, not just written down:
+
+- `cargo test -p hub-server --test boundaries` reads the manifests. A module may depend on
+  another module's crate only when its `ModuleMeta::depends_on` names it; no module depends
+  on `hub-server`; `hub-app` depends on no module; `hub-core` depends on nothing that touches
+  the network, the disk or a runtime.
+- `npm run check:boundaries` (part of `npm run build`) reads the imports. A file under
+  `modules/<id>/web/` imports `react`, `@/…` and its own files, never another module's folder
+  and never a package of its own; under `web/src/` only `modules.ts` names a module's folder.
+
+A module that needs something from another one declares it in `depends_on` and uses its
+crate on the server; in the interface it goes through what the host offers (`useModules()`,
+the issue's `panels` and `ext`), not through the other module's files.

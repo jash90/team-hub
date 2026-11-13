@@ -1,0 +1,38 @@
+[package]
+name = "team-hub-desktop"
+description = "The team-hub desktop app: the window over hub-desktop-core."
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Not a member of the repository's workspace: it needs the system's WebKit libraries, and
+# `cargo test --workspace` has to work on machines without them. Build it from this folder.
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+hub-desktop-core = { path = "../core" }
+serde_json = "1"
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-window-state = "2"
+tokio = { version = "1", features = ["sync"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+strip = true

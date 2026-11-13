@@ -172,6 +172,9 @@ pub struct ProjectSummary {
     pub role: Option<ProjectRole>,
     pub issue_count: i64,
     pub open_count: i64,
+    /// Ids of the modules switched off in this project.
+    #[serde(default)]
+    pub disabled_modules: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

@@ -77,7 +77,8 @@ fn map_issue_row(row: &rusqlite::Row) -> rusqlite::Result<IssueRow> {
     })
 }
 
-/// Lets every enabled module add its badges to the rows.
+/// Lets every enabled module add its badges to the rows, except where a project has the
+/// module switched off.
 pub fn decorate(app: &App, connection: &Connection, rows: &mut [IssueRow]) -> ApiResult<()> {
     if rows.is_empty() {
         return Ok(());
@@ -87,7 +88,7 @@ pub fn decorate(app: &App, connection: &Connection, rows: &mut [IssueRow]) -> Ap
         module.decorate_issues(connection, rows)?;
     }
 
-    Ok(())
+    crate::services::project_modules::drop_disabled(connection, rows)
 }
 
 /// Issue rows for `tail`, the part of the statement after the FROM clause (`WHERE ... ORDER BY ...`).
@@ -1175,8 +1176,9 @@ pub fn issue_detail(app: &App, user: &AuthUser, key: &str) -> ApiResult<Issue> {
                         || {
                             app.read(|connection| {
                                 let mut panels = std::collections::BTreeMap::new();
+                                let off = crate::services::project_modules::disabled_modules(connection, row.project_id)?;
 
-                                for module in app.enabled_modules() {
+                                for module in app.enabled_modules().filter(|module| !off.iter().any(|id| id == module.meta().id)) {
                                     if let Some(panel) = module.issue_panel(app, connection, &row, user)? {
                                         panels.insert(module.meta().id.to_string(), panel);
                                     }

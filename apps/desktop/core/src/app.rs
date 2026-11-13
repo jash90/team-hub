@@ -27,7 +27,7 @@ use crate::model::{
 use crate::policy;
 use crate::protocol::{self, HubTool};
 use crate::push_guard;
-use crate::runs::{AgentRun, AgentRunDetail, NewRun, RunEventKind, RunKind, RunPatch, RunProposalState, RunState, RUNNER_KINDS};
+use crate::runs::{AgentRun, AgentRunDetail, NewRun, RunEventKind, RunKind, RunPatch, RunProposal, RunProposalState, RunState, RUNNER_KINDS};
 use crate::secrets::{self, CacheKey, Keychain, Secret};
 use crate::store::{self, Store, ThreadSeed};
 use crate::threads::{Host, Runtime, RuntimeConfig};
@@ -43,6 +43,8 @@ pub struct OpenOptions {
     pub keychain: Arc<dyn Keychain>,
     /// The helper process: the program and its arguments. None: `node` with the sidecar script.
     pub helper: Option<(String, Vec<String>)>,
+    /// Where the sidecar's `main.ts` is when the app is packaged (its resource folder).
+    pub sidecar_script: Option<PathBuf>,
     pub stop_grace: Duration,
     /// How often the runner looks at the server when nothing wakes it.
     pub poll_every: Duration,
@@ -52,7 +54,7 @@ pub struct OpenOptions {
 
 impl OpenOptions {
     pub fn new(paths: Paths, keychain: Arc<dyn Keychain>) -> Self {
-        Self { paths, keychain, helper: None, stop_grace: Duration::from_secs(5), poll_every: Duration::from_secs(5), sandbox: None }
+        Self { paths, keychain, helper: None, sidecar_script: None, stop_grace: Duration::from_secs(5), poll_every: Duration::from_secs(5), sandbox: None }
     }
 }
 
@@ -125,10 +127,9 @@ fn text_of<'a>(input: &'a Value, field: &str, max: usize) -> CoreResult<&'a str>
     Ok(text)
 }
 
-/// Where the sidecar's script is: beside the executable when packaged, else in the source tree.
-fn default_helper(node: &str) -> (String, Vec<String>) {
-    let packaged = std::env::current_exe().ok().and_then(|exe| exe.parent().map(|folder| folder.join("sidecar/src/main.ts"))).filter(|script| script.exists());
-    let script = packaged.unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar/src/main.ts"));
+/// Where the sidecar's script is: where the packaged app says, else in the source tree.
+fn default_helper(node: &str, packaged: Option<&Path>) -> (String, Vec<String>) {
+    let script = packaged.filter(|script| script.exists()).map(Path::to_path_buf).unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar/src/main.ts"));
 
     (node.to_string(), vec![frozen_copy(&script).to_string_lossy().into_owned()])
 }
@@ -732,14 +733,18 @@ impl Core {
         let mut mirrored = false;
 
         if let (true, Some(text), Some(run_id)) = (thread.pending_question, text, thread.run_id) {
-            // The answer goes to the run first, so the web shows who answered.
+            // The run has to know the question before it gets the answer; then the answer goes
+            // to the run first, so the web shows who answered.
+            self.sync_thread(&thread);
+
             if let Ok(detail) = self.client().and_then(|client| self.seen(client.answer_run(run_id, text))) {
                 let seen = detail.events.iter().filter(|event| event.kind == RunEventKind::Answer).map(|event| event.id).max().unwrap_or(0);
 
                 self.store.set_answers_seen(thread_id, seen)?;
                 mirrored = true;
             }
-        } else if matches!(thread.state, ThreadState::Done | ThreadState::Failed | ThreadState::Stopped) && thread.run_id.is_some() {
+        } else if thread.run_id.is_some() && self.patch_of(&thread).state.is_some_and(RunState::is_finished) {
+            // The run has ended on the server and takes no more writes: what happens next is a new run.
             self.sync_thread(&thread);
             self.store.mark_all_mirrored(thread_id)?;
             self.store.set_run(thread_id, None)?;
@@ -865,7 +870,7 @@ impl Core {
 
         // A kind the project trusts is applied by the server at once.
         if let Some(remote) = remote.filter(|remote| remote.state != RunProposalState::Pending) {
-            self.apply_run_detail(thread, &AgentRunDetail { run: self.client()?.run(remote.run_id)?.run, events: Vec::new(), proposals: vec![remote] })?;
+            self.apply_remote_proposals(thread, &[remote])?;
         }
 
         let what = match kind {
@@ -884,8 +889,9 @@ impl Core {
 
     // ---------- decisions ----------
 
-    fn apply_run_detail(&self, thread: &Thread, detail: &AgentRunDetail) -> CoreResult<()> {
-        for remote in &detail.proposals {
+    /// Takes over what the server says about proposals: decided on the web, or applied at once.
+    fn apply_remote_proposals(&self, thread: &Thread, proposals: &[RunProposal]) -> CoreResult<()> {
+        for remote in proposals {
             let Some(local) = self.store.proposal_by_remote(remote.id)? else { continue };
             let state = match remote.state {
                 RunProposalState::Pending | RunProposalState::Other => continue,
@@ -966,7 +972,7 @@ impl Core {
             (true, Some(remote_id), _) => {
                 let detail = self.seen(self.client()?.decide_proposal(remote_id, approve, note))?;
 
-                self.apply_run_detail(&thread, &detail)?;
+                self.apply_remote_proposals(&thread, &detail.proposals)?;
             }
             (true, None, true) => match self.seen(self.apply_here(&proposal)) {
                 Ok(result) => {
@@ -1349,6 +1355,8 @@ impl Core {
     fn sync_thread(&self, thread: &Thread) -> bool {
         let (Some(run_id), Ok(client)) = (thread.run_id, self.client()) else { return false };
 
+        let mut posted = false;
+
         for event in self.store.unmirrored_events(thread.id).unwrap_or_default() {
             // Answers on a run come from people through the web's own call; what the person
             // said to the thread here is told as a line of the runner.
@@ -1358,7 +1366,7 @@ impl Core {
             };
 
             match self.seen(client.add_run_event(run_id, kind, &text, &event.data)) {
-                Ok(_) => {}
+                Ok(_) => posted = true,
                 Err(error) if error.is_offline() => return false,
                 // The server refused this one (the run is over, or it is not ours any more);
                 // sending it again would not change that.
@@ -1369,8 +1377,15 @@ impl Core {
         }
 
         let Ok(private) = self.store.thread_private(thread.id) else { return false };
-        let sent: RunPatch = serde_json::from_value(private.run_sent).unwrap_or_default();
+        let mut sent: RunPatch = serde_json::from_value(private.run_sent).unwrap_or_default();
         let now = self.patch_of(thread);
+
+        // An event of the runner puts a waiting run back to running on the server; a run that
+        // still waits for a person has to say so again.
+        if posted && now.state == Some(RunState::Waiting) {
+            sent.state = None;
+        }
+
         let patch = now.changed_since(&sent);
 
         if patch.is_empty() {
@@ -1427,7 +1442,24 @@ impl Core {
                 let _ = self.runtime().resume(thread.id, Some(&answer.text), true);
             }
 
-            let _ = self.apply_run_detail(&thread, &detail);
+            let _ = self.apply_remote_proposals(&thread, &detail.proposals);
+
+            // The server moves a run by itself too (a decision puts a waiting run back to
+            // running). When the thread is at rest and the run says otherwise, say it again.
+            let wanted = self.patch_of(&thread).state;
+            let differs = wanted.is_some_and(|wanted| wanted != detail.run.state) && !detail.run.state.is_finished();
+
+            if differs && !thread.state.is_active() {
+                if let Ok(mut private) = self.store.thread_private(thread.id) {
+                    if let Some(sent) = private.run_sent.as_object_mut() {
+                        sent.remove("state");
+                    }
+
+                    let _ = self.store.set_run_sent(thread.id, &private.run_sent);
+                }
+
+                self.wake.notify_one();
+            }
         }
 
         to_stop
@@ -1530,7 +1562,7 @@ impl Desktop {
         let (program, arguments) = match (options.helper, from_env) {
             (Some(helper), _) => helper,
             (None, Some(parts)) => (parts[0].clone(), parts[1..].to_vec()),
-            (None, None) => default_helper(&settings.node_command),
+            (None, None) => default_helper(&settings.node_command, options.sidecar_script.as_deref()),
         };
         let runtime_config = RuntimeConfig {
             program,
