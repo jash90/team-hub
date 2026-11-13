@@ -153,8 +153,8 @@ runtime, or answers the thread with the reason why it cannot.
 
 The window holds two webviews.
 
-- **The app's own interface** (`ui/`), loaded from the files that came with the app: the bar
-  at the top, the threads and decisions on the left, and every view that belongs to this
+- **The app's own interface** (`ui/`), loaded from the files that came with the app: the tabs
+  at the top, the threads and decisions on the right, and every view that belongs to this
   computer (a thread and its diff, a push to look at, repositories, tests on this computer,
   settings). It is the only one that can call the core.
 - **The tracker**: your server's web interface, loaded from the server, laid over the rest
@@ -173,9 +173,9 @@ What joins the two:
   claims it, and it appears as a thread in the panel.
 - A run's card in the tracker has **Open the thread in the app** when the run belongs to
   this computer's runner; the thread's own header leads back to the issue.
-- Back, forward and reload for the tracker are in the bar at the top; the button beside the
-  name hides the panel when the tracker should have the whole window.
-- The language and the theme are chosen in the app's bar, and the tracker follows.
+- Back, forward and reload for the tracker are beside the tabs at the top; the button next
+  to them hides the column of threads when the tracker should have the whole window.
+- The language and the theme are chosen in the app's Settings, and the tracker follows.
 
 The tracker **cannot call the app**. Tauri refuses a command that comes from a page which is
 not the app's own unless a capability names that page's address, and none does
@@ -260,7 +260,7 @@ The app is one of the team's **runners** ([`docs/runners.md`](../../docs/runners
 machine with the repositories that carries out agent runs and test suites, with this
 computer's processor, memory and disk. The same list and the same work as on the web:
 
-- **Runners** in the bar opens the tracker's page of runners: every runner you may see,
+- **Runners** in the tracker's sidebar is its page of runners: every runner you may see,
   with this computer marked, other people's computers, services such as the cloud runner;
   what each takes and what it is carrying out now.
 - **Where** on a new thread: *This computer* (the default: the agent works here, with your
@@ -268,11 +268,11 @@ computer's processor, memory and disk. The same list and the same work as on the
   that fits. Work sent elsewhere starts nothing here; the app follows the run (what the
   agent said, its proposals) and can decide what the web can decide: changes to the issue,
   and the push or pull request of a runner nobody sits at.
-- **My work** lists your runs wherever they are carried out, each with its runner's name.
-- **Tests** in the bar opens the tracker's page of test jobs, for the project the tracker
-  shows or else the first one: it starts the suite on this computer (offered first while
-  this computer takes test jobs), on a runner by name, or on any that fits, follows a job
-  live and cancels it. The app had views of its own for these two until 0.3.0; the
+- **My work**, the tracker's start page, lists your runs wherever they are carried out, each
+  with its runner's name.
+- **Tests** in the tracker's sidebar is the project's page of test jobs: it starts the suite
+  on this computer (offered first while this computer takes test jobs), on a runner by name,
+  or on any that fits, follows a job live and cancels it. The app had views of its own for these two until 0.3.0; the
   tracker's pages do the same and more, so they are gone.
 
 ### Test suites on this computer

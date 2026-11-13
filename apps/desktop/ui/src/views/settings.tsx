@@ -9,6 +9,59 @@ import type { Settings } from '../bindings/Settings.ts';
 import { useRemote } from '../live.ts';
 import { useSession } from '../session.tsx';
 
+/** The language and the theme are chosen here, once; the tracker in the window follows. */
+function Appearance() {
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+
+  function choose(next: 'light' | 'dark'): void {
+    document.documentElement.dataset.theme = next;
+    setTheme(next);
+    void web.set('theme', next).catch(() => undefined);
+
+    try {
+      window.localStorage.setItem('team-hub:theme', next);
+    } catch {
+      // The theme still applies to this window.
+    }
+  }
+
+  function speak(next: 'en' | 'pl'): void {
+    if (next !== currentLanguage()) {
+      // The tracker follows; told first, because the app's own interface reloads next.
+      void web
+        .set('language', next)
+        .catch(() => undefined)
+        .then(() => setLanguage(next));
+    }
+  }
+
+  return (
+    <section className="panel settings-card">
+      <header className="panel-head">
+        <h2>{t('Appearance')}</h2>
+      </header>
+      <div className="list-row">
+        <span className="desk-setting-name">{t('Language')}</span>
+        <Button size="sm" variant={currentLanguage() === 'pl' ? 'primary' : 'default'} onClick={() => speak('pl')}>
+          Polski
+        </Button>
+        <Button size="sm" variant={currentLanguage() === 'en' ? 'primary' : 'default'} onClick={() => speak('en')}>
+          English
+        </Button>
+      </div>
+      <div className="list-row">
+        <span className="desk-setting-name">{t('Theme')}</span>
+        <Button size="sm" variant={theme === 'light' ? 'primary' : 'default'} icon="sun" onClick={() => choose('light')}>
+          {t('Light')}
+        </Button>
+        <Button size="sm" variant={theme === 'dark' ? 'primary' : 'default'} icon="moon" onClick={() => choose('dark')}>
+          {t('Dark')}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 export function SettingsView({ onStatus }: { onStatus: (status: ConnectionStatus) => void }) {
   const { status } = useSession();
   const loaded = useRemote(() => core.settings(), []);
@@ -38,6 +91,7 @@ export function SettingsView({ onStatus }: { onStatus: (status: ConnectionStatus
   return (
     <div className="desk-view">
       <h1>{t('Settings')}</h1>
+      <Appearance />
       <section className="panel settings-card">
         <header className="panel-head">
           <h2>{t('Connection')}</h2>
@@ -118,17 +172,6 @@ export function SettingsView({ onStatus }: { onStatus: (status: ConnectionStatus
         <p className="muted">
           {t('Where the operating system has a sandbox, a thread’s shell has no network and can write only inside its working tree. Where it has none, threads work without a shell unless you allow it here; then only the deny list stands between the agent and this computer. Takes effect after a restart.')}
         </p>
-      </section>
-      <section className="panel settings-card">
-        <header className="panel-head">
-          <h2>{t('Language')}</h2>
-        </header>
-        <div className="inline-field">
-          <select className="input" value={currentLanguage()} onChange={(event) => setLanguage(event.target.value === 'pl' ? 'pl' : 'en')}>
-            <option value="en">English</option>
-            <option value="pl">Polski</option>
-          </select>
-        </div>
       </section>
       <div className="row-end">
         <span className="muted">team-hub desktop {status.appVersion}</span>

@@ -1,40 +1,23 @@
 /** Polish for the desktop app's own phrases. Words shared with the web interface come from its dictionary. */
 export const polish: Record<string, string> = {
   // the shell
-  'Search issues, or type a key such as WEB-12': 'Szukaj zadań albo wpisz klucz, np. WEB-12',
   online: 'połączono',
   offline: 'bez połączenia',
-  runner: 'runner',
   Reload: 'Wczytaj ponownie',
-  Refresh: 'Odśwież',
   Fold: 'Zwiń',
   Unfold: 'Rozwiń',
   'Threads and decisions': 'Wątki i decyzje',
   'To decide': 'Do decyzji',
   'Nothing waits for you.': 'Nic na Ciebie nie czeka.',
-  'Working now': 'Pracują teraz',
   'No thread is working.': 'Żaden wątek nie pracuje.',
   Threads: 'Wątki',
-  New: 'Nowy',
   'No threads yet. Start one from an issue.': 'Nie ma jeszcze wątków. Uruchom pierwszy z zadania.',
   'newest {when}': 'najnowszy {when}',
   'asks a question': 'zadaje pytanie',
   '{count} to decide': 'do decyzji: {count}',
 
   // my work
-  'offline copy': 'kopia lokalna',
-  'The server cannot be reached; this is the copy from {when}.': 'Nie ma połączenia z serwerem; to kopia z {when}.',
-  'Filter my work, Enter searches everything': 'Filtruj moją pracę, Enter szuka wszędzie',
-  'Quick filters': 'Szybkie filtry',
   All: 'Wszystko',
-  'No thread yet': 'Bez wątku',
-  'Code disagrees': 'Kod się nie zgadza',
-  'High priority': 'Wysoki priorytet',
-  'Agent runs waiting for me': 'Zlecenia agentów czekające na mnie',
-  'My issues with failing tests': 'Moje zadania z nieprzechodzącymi testami',
-  'as of {when}': 'stan z {when}',
-  'Start a thread': 'Uruchom wątek',
-  'Open its thread': 'Otwórz jego wątek',
 
   // connecting
   'Connect to your team-hub': 'Połącz ze swoim team-hubem',
@@ -58,7 +41,6 @@ export const polish: Record<string, string> = {
   'Connecting…': 'Łączę…',
 
   // an issue
-  Tests: 'Testy',
 
   // a thread
   Implement: 'Implementacja',
@@ -235,7 +217,6 @@ export const polish: Record<string, string> = {
     'Decyzja zapada w aplikacji na komputerze, który wykonuje to zlecenie, gdzie można obejrzeć zmiany.',
   'waits for a runner': 'czeka na runner',
   'Carried out elsewhere; this app only follows it.': 'Wykonywane gdzie indziej; ta aplikacja tylko to śledzi.',
-  'Carried out on this computer': 'Wykonywane na tym komputerze',
   Proposals: 'Propozycje',
   'What the agent said and did': 'Co agent powiedział i zrobił',
   'Nothing yet.': 'Jeszcze nic.',
@@ -244,7 +225,6 @@ export const polish: Record<string, string> = {
   'On another runner: nothing runs on this computer, and its pushes and pull requests are decided where that runner says.':
     'Na innym runnerze: nic nie działa na tym komputerze, a o jego wypchnięciach i pull requestach decyduje się tam, gdzie wskazuje ten runner.',
   'Send the work': 'Wyślij pracę',
-  'Agent runs at work': 'Zlecenia w toku',
   'Run test suites on this computer': 'Uruchamiaj zestawy testów na tym komputerze',
   'Also take the team’s queued test jobs': 'Bierz też zadania testów z kolejki zespołu',
   'Running a suite is running a repository’s code on this computer, so by default it happens only for the jobs you send here by name. A job gets a folder of its own and only the variables its project’s test settings list; where the system has a sandbox it can write nowhere else and cannot read your keys.':
@@ -262,4 +242,13 @@ export const polish: Record<string, string> = {
   'Try again': 'Spróbuj ponownie',
   'The server cannot be reached, so its pages cannot be shown. Threads keep working on this computer.':
     'Nie można połączyć się z serwerem, więc jego stron nie da się pokazać. Wątki dalej działają na tym komputerze.',
+  'A thread is an agent working on one issue, in a working tree of its own on this computer.': 'Wątek to praca agenta nad jednym zadaniem, we własnym katalogu roboczym na tym komputerze.',
+  Appearance: 'Wygląd',
+  Dark: 'Ciemny',
+  Light: 'Jasny',
+  'No thread matches.': 'Żaden wątek nie pasuje.',
+  Theme: 'Motyw',
+  Views: 'Widoki',
+  'Waiting for you': 'Czekają na Ciebie',
+  'At work': 'Pracują',
 };

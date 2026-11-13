@@ -13,6 +13,7 @@ export type View =
   | { name: 'thread'; id: number }
   | { name: 'new-thread'; key?: string }
   | { name: 'repos' }
+  | { name: 'threads' }
   | { name: 'run'; id: number }
   | { name: 'settings' };
 
@@ -26,6 +27,8 @@ function toHash(view: View): string {
       return '#/repos';
     case 'run':
       return `#/run/${view.id}`;
+    case 'threads':
+      return '#/threads';
     case 'settings':
       return '#/settings';
     default:
@@ -46,6 +49,8 @@ function fromHash(hash: string): View {
       return { name: 'repos' };
     case 'run':
       return Number.isInteger(Number(value)) && value ? { name: 'run', id: Number(value) } : { name: 'web' };
+    case 'threads':
+      return { name: 'threads' };
     case 'settings':
       return { name: 'settings' };
     default:

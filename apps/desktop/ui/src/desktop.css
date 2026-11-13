@@ -13,42 +13,8 @@
   height: 100%;
 }
 
-.desk-topbar {
-  flex: none;
-  padding: 8px 14px;
-}
-
-.desk-brand {
-  white-space: nowrap;
-  border: 0;
-  background: none;
-  padding: 0 8px 0 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.desk-search {
-  width: min(420px, 36vw);
-}
-
 .desk-grow {
   flex: 1;
-}
-
-.desk-columns {
-  display: grid;
-  grid-template-columns: var(--desk-left) minmax(0, 1fr) var(--desk-right);
-  gap: var(--desk-gap);
-  flex: 1;
-  min-height: 0;
-  padding: var(--desk-gap);
-}
-
-.desk-center-web {
-  display: flex;
-  padding: 0;
-  overflow: hidden;
 }
 
 /* What shows through until the first page of the server is there. */
@@ -63,11 +29,6 @@
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
-}
-
-.desk-columns-alone .desk-web {
-  border: 0;
-  border-radius: 0;
 }
 
 .desk-web-note {
@@ -128,28 +89,6 @@
   right: auto;
 }
 
-.desk-column,
-.desk-center {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.desk-column {
-  display: flex;
-  flex-direction: column;
-  gap: var(--desk-gap);
-}
-
-/* Panels in a scrolling column keep their height; without this they shrink into each other. */
-.desk-column > * {
-  flex-shrink: 0;
-}
-
-.desk-center {
-  padding-right: 2px;
-}
-
 .desk-view {
   display: flex;
   flex-direction: column;
@@ -202,26 +141,6 @@ h3.desk-pad {
 
 .desk-row:hover {
   background: var(--sunk);
-}
-
-.desk-row-selected {
-  background: var(--accent-soft);
-}
-
-.desk-right .issue-line,
-.desk-right .pr-row {
-  padding-left: 12px;
-  padding-right: 8px;
-  gap: 7px;
-}
-
-.desk-right .issue-line-summary {
-  flex: 1 1 0;
-  min-width: 60px;
-}
-
-.desk-right .drift-kinds {
-  padding: 0 12px 8px;
 }
 
 /* the left column's items */
@@ -291,18 +210,6 @@ h3.desk-pad {
   font-weight: 600;
 }
 
-/* my work */
-.desk-queue-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 2px 0;
-}
-
-.desk-queue-search {
-  width: 100%;
-}
-
 .desk-chips {
   display: flex;
   flex-wrap: wrap;
@@ -328,7 +235,6 @@ h3.desk-pad {
 }
 
 /* an issue and a thread in the middle */
-.desk-issue-head,
 .desk-thread-head {
   display: flex;
   flex-direction: column;
@@ -378,30 +284,6 @@ h3.desk-pad {
   align-items: center;
   gap: 6px;
   margin-bottom: 2px;
-}
-
-.desk-event-message,
-.desk-event-question,
-.desk-event-answer,
-.desk-event-error {
-  padding: 8px 12px;
-  border-radius: var(--radius);
-  background: var(--sunk);
-}
-
-.desk-event-question {
-  background: var(--amber-soft);
-}
-
-.desk-event-answer {
-  align-self: flex-end;
-  max-width: 85%;
-  background: var(--accent-soft);
-}
-
-.desk-event-error {
-  background: var(--red-soft);
-  color: var(--red);
 }
 
 .desk-error-text {
@@ -570,14 +452,6 @@ h3.desk-pad {
   white-space: pre;
 }
 
-.desk-line-add {
-  background: var(--green-soft);
-}
-
-.desk-line-del {
-  background: var(--red-soft);
-}
-
 .desk-commit {
   display: flex;
   align-items: center;
@@ -601,8 +475,7 @@ h3.desk-pad {
   margin-bottom: 14px;
 }
 
-.desk-kind,
-.desk-step {
+.desk-kind {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -616,8 +489,7 @@ h3.desk-pad {
   cursor: pointer;
 }
 
-.desk-kind:hover,
-.desk-step:hover {
+.desk-kind:hover {
   background: var(--sunk);
 }
 
@@ -626,19 +498,8 @@ h3.desk-pad {
   background: var(--accent-soft);
 }
 
-.desk-kind .muted,
-.desk-step .muted {
+.desk-kind .muted {
   font-size: 12.5px;
-}
-
-.desk-steps {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.desk-home {
-  padding-top: 24px;
 }
 
 /* repositories */
@@ -693,55 +554,6 @@ h3.desk-pad {
   margin-bottom: 8px;
 }
 
-/* Narrower windows: my work moves under the middle and the page scrolls as one; the left
-   column stays in view. Narrower still, everything stacks. */
-@media (max-width: 1280px) {
-  .desk-columns {
-    grid-template-columns: var(--desk-left) minmax(0, 1fr);
-    grid-auto-rows: max-content;
-    align-items: start;
-    overflow-y: auto;
-  }
-
-  .desk-left {
-    grid-row: 1 / span 2;
-    position: sticky;
-    top: 0;
-    max-height: calc(100vh - 78px);
-  }
-
-  .desk-center,
-  .desk-right {
-    grid-column: 2;
-    min-height: auto;
-    overflow: visible;
-  }
-}
-
-@media (max-width: 860px) {
-  .desk-columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .desk-left,
-  .desk-center,
-  .desk-right {
-    grid-column: 1;
-    grid-row: auto;
-    position: static;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .desk-search {
-    width: 100%;
-  }
-
-  .desk-topbar {
-    flex-wrap: wrap;
-  }
-}
-
 /* runners, tests, and runs followed from elsewhere */
 .desk-view-head {
   display: flex;
@@ -755,37 +567,6 @@ h3.desk-pad {
 
 .desk-view-head select.input {
   width: auto;
-}
-
-.desk-runner.is-here {
-  border-color: var(--accent);
-}
-
-.desk-runner-work {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 12px;
-  padding: 8px 14px;
-  border-top: 1px solid var(--line);
-}
-
-.desk-runner-work > strong {
-  min-width: 96px;
-}
-
-.desk-log {
-  margin: 0;
-  padding: 10px 14px;
-  max-height: 340px;
-  overflow: auto;
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: var(--sunk);
-  border-top: 1px solid var(--line);
 }
 
 .desk-proposal {
@@ -824,53 +605,207 @@ h3.desk-pad {
   color: var(--red, #c0392b);
 }
 
-/* The tracker: threads, and beside them the place the server's web interface is laid over.
-   After the rules for narrow windows, and stronger than them: at any width the place for
-   the web interface is as tall as the window allows, and the page inside does the scrolling. */
-.desk-columns.desk-columns-web {
-  grid-template-columns: var(--desk-left) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
-  grid-auto-rows: auto;
-  align-items: stretch;
-  overflow: hidden;
+.desk-event-message,
+.desk-event-question,
+.desk-event-answer,
+.desk-event-error {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--sunk);
 }
 
-.desk-columns.desk-columns-web.desk-columns-alone {
-  grid-template-columns: minmax(0, 1fr);
-  padding: 0;
+.desk-event-question {
+  background: var(--amber-soft);
 }
 
-.desk-columns-web > .desk-left {
-  grid-column: 1;
-  grid-row: 1;
-  position: static;
-  max-height: none;
-  overflow-y: auto;
+.desk-event-answer {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--accent-soft);
 }
 
-.desk-columns-web > .desk-center {
-  grid-column: 2;
-  grid-row: 1;
+.desk-event-error {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.desk-line-add {
+  background: var(--green-soft);
+}
+
+.desk-line-del {
+  background: var(--red-soft);
+}
+
+/* The tabs across the top: the views, then what stands in for a browser's buttons, the
+   connection, and the two switches. */
+.desk-tabbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 6px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.desk-tabs {
+  border-bottom: 0;
+}
+
+.desk-tabs .tab {
+  margin-bottom: 0;
+  padding: 10px 12px;
+}
+
+.desk-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.desk-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.desk-body {
+  flex: 1;
   min-height: 0;
+  display: flex;
+}
+
+.desk-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--desk-gap);
+}
+
+.desk-main-web {
+  display: flex;
+  padding: 0;
   overflow: hidden;
 }
 
-.desk-columns-alone > .desk-center {
-  grid-column: 1;
+.desk-main-web .desk-web {
+  border: 0;
+  border-radius: 0;
 }
 
-/* The local views with the panel of threads hidden. */
-.desk-columns.desk-columns-no-panel {
-  grid-template-columns: minmax(0, 1fr) var(--desk-right);
+/* Threads and decisions, beside every view. */
+.desk-inspector {
+  flex: none;
+  width: var(--desk-right);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-@media (max-width: 1280px) {
-  .desk-columns.desk-columns-no-panel {
-    grid-template-columns: minmax(0, 1fr);
+.desk-inspector > * {
+  flex-shrink: 0;
+}
+
+.desk-seg {
+  display: flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--sunk);
+}
+
+.desk-seg-item {
+  flex: 1;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.desk-seg-on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+.desk-seg-count {
+  color: var(--muted);
+}
+
+.desk-seg-count-waiting {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.desk-thread-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(0, 2fr) 130px minmax(0, 1.4fr) 110px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.desk-thread-row:last-child {
+  border-bottom: 0;
+}
+
+.desk-thread-row:hover {
+  background: var(--sunk);
+}
+
+.desk-thread-row-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-thread-row-when {
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.desk-setting-name {
+  min-width: 90px;
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .desk-inspector {
+    width: 280px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .desk-thread-row {
+    grid-template-columns: minmax(150px, 1fr) minmax(0, 2fr) 130px 110px;
   }
 
-  .desk-columns-no-panel > .desk-center,
-  .desk-columns-no-panel > .desk-right {
-    grid-column: 1;
+  .desk-thread-row > code {
+    display: none;
   }
 }
