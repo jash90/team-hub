@@ -366,6 +366,7 @@ export const pl: Record<string, string> = {
   'Lets commits and pull requests be recognised as yours.': 'Pozwala rozpoznać Twoje commity i pull requesty.',
   'Password changed': 'Hasło zmienione',
   'New password': 'Nowe hasło',
+  'Current password': 'Obecne hasło',
   'Change password': 'Zmień hasło',
   Language: 'Język',
   'A token acts as you, with your permissions: for scripts, CI and AI agents. Send it as “Authorization: Bearer …”.':

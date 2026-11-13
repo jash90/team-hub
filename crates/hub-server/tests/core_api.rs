@@ -427,3 +427,25 @@ async fn the_demo_instance_has_weeks_of_history() {
     assert!(client.get("/api/activity?limit=5").await.as_array().unwrap().len() == 5);
     assert_eq!(client.get("/api/quick?q=blik").await[0]["id"], "WEB-10");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn changing_your_own_password_needs_the_current_one() {
+    let mut admin = fresh().await;
+    let (mut anna, anna_id) = admin.member("Anna Nowak", "anna@example.com").await;
+    let path = format!("/api/users/{anna_id}");
+
+    assert_eq!(anna.refused(Method::PATCH, &path, Some(json!({ "password": "a new password" }))).await, StatusCode::FORBIDDEN);
+    assert_eq!(
+        anna.refused(Method::PATCH, &path, Some(json!({ "password": "a new password", "currentPassword": "not this one" }))).await,
+        StatusCode::FORBIDDEN
+    );
+    anna.patch(&path, json!({ "password": "a new password", "currentPassword": "long enough" })).await;
+    assert_eq!(anna.refused(Method::PATCH, &path, Some(json!({ "role": "admin" }))).await, StatusCode::FORBIDDEN);
+
+    let mut again = Client::new(admin.router.clone());
+    again.post("/api/login", json!({ "email": "anna@example.com", "password": "a new password" })).await;
+
+    admin.patch(&path, json!({ "password": "reset by admin" })).await;
+    admin.patch(&path, json!({ "active": false })).await;
+    assert_eq!(again.refused(Method::GET, "/api/projects", None).await, StatusCode::UNAUTHORIZED, "deactivating ends their sessions");
+}

@@ -16,7 +16,13 @@ use tower_http::set_header::SetResponseHeaderLayer;
 
 /// Every module compiled into this build, in the order they are loaded.
 pub fn modules() -> Vec<Arc<dyn Module>> {
-    vec![Arc::new(hub_mod_github::GithubModule), Arc::new(hub_mod_reports::ReportsModule), Arc::new(hub_mod_agents::AgentsModule)]
+    vec![
+        Arc::new(hub_mod_github::GithubModule),
+        Arc::new(hub_mod_wiki::WikiModule),
+        Arc::new(hub_mod_confluence::ConfluenceModule),
+        Arc::new(hub_mod_reports::ReportsModule),
+        Arc::new(hub_mod_agents::AgentsModule),
+    ]
 }
 
 /// Wraps a module's routes so that they do not exist while the module is switched off.

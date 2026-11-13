@@ -22,10 +22,6 @@ const DONE = 'var(--reports-done)';
 const CONTEXT = 'var(--reports-context)';
 const DAY = 24 * 3600 * 1000;
 
-function unitName(unit: ReportUnit): string {
-  return unit === 'points' ? t('points') : t('issues');
-}
-
 function days(value: number): string {
   return t('{days} d', { days: formatNumber(value) });
 }
@@ -129,7 +125,7 @@ function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
 }
 
-function BurndownChart({ data, unit }: { data: ReportBurndown; unit: string }) {
+function BurndownChart({ data }: { data: ReportBurndown }) {
   const measured = data.days;
   const first = measured[0].date;
   const last = measured[measured.length - 1];
@@ -151,10 +147,10 @@ function BurndownChart({ data, unit }: { data: ReportBurndown; unit: string }) {
     <>
       <Stats
         items={[
-          { label: t('Committed'), value: formatNumber(data.committed), note: unit },
-          { label: t('Remaining'), value: formatNumber(last.remaining), note: unit },
-          { label: t('Completed'), value: formatNumber(last.completed), note: unit },
-          { label: t('Scope changes'), value: `+${formatNumber(added)} / −${formatNumber(removed)}`, note: unit },
+          { label: t('Committed'), value: formatNumber(data.committed) },
+          { label: t('Remaining'), value: formatNumber(last.remaining) },
+          { label: t('Completed'), value: formatNumber(last.completed) },
+          { label: t('Scope changes'), value: `+${formatNumber(added)} / −${formatNumber(removed)}`, note: t('added / removed') },
         ]}
       />
       <TimeChart
@@ -226,7 +222,7 @@ export function Burndown({ project }: { project: Project }) {
         </>
       }
     >
-      {(data) => (data.days.length === 0 ? <Empty icon="chart" title={t('This sprint has no days to show yet')} /> : <BurndownChart data={data} unit={unitName(data.unit)} />)}
+      {(data) => (data.days.length === 0 ? <Empty icon="chart" title={t('This sprint has no days to show yet')} /> : <BurndownChart data={data} />)}
     </Report>
   );
 }
@@ -260,7 +256,7 @@ export function Velocity({ project }: { project: Project }) {
           <>
             <Stats
               items={[
-                { label: t('Average completed'), value: formatNumber(average), note: unitName(unit) },
+                { label: t('Average completed'), value: formatNumber(average), note: t('per sprint') },
                 { label: t('Last sprint'), value: `${formatNumber(completed(latest))} / ${formatNumber(committed(latest))}`, note: t('completed / committed') },
               ]}
             />
@@ -523,12 +519,19 @@ export function Workload({ project }: { project: Project }) {
               ]}
             />
             <div className="reports-load">
+              <div className="reports-load-row reports-load-head">
+                <span />
+                <span className="reports-load-track" />
+                <span>{t('Open issues')}</span>
+                <span>{categoryLabel('in_progress')}</span>
+                <span>{t('Points')}</span>
+              </div>
               {data.assignees.map((row) => {
                 const waiting = row.openIssues - row.inProgress;
                 const name = row.assigneeId === null ? t('Unassigned') : row.name;
 
                 return (
-                  <div key={row.assigneeId ?? 0} className="reports-load-row" title={`${name}: ${row.inProgress} ${categoryLabel('in_progress')}, ${waiting} ${t('Not started')}`}>
+                  <div key={row.assigneeId ?? 0} className="reports-load-row" title={`${name}: ${categoryLabel('in_progress')} ${row.inProgress}, ${t('Not started')} ${waiting}`}>
                     <span className="with-avatar reports-load-name">
                       <Avatar user={userById(row.assigneeId)} size={22} label={name} />
                       <span>{name}</span>
@@ -537,15 +540,9 @@ export function Workload({ project }: { project: Project }) {
                       {row.inProgress > 0 && <span className="reports-load-doing" style={{ width: `${(row.inProgress / most) * 100}%` }} />}
                       {waiting > 0 && <span className="reports-load-waiting" style={{ width: `${(waiting / most) * 100}%` }} />}
                     </span>
-                    <span className="reports-load-figures">
-                      <strong>{row.openIssues}</strong> {t('open')}
-                      <span className="muted">
-                        {' · '}
-                        {t('{count} in progress', { count: row.inProgress })}
-                        {' · '}
-                        {formatNumber(row.openPoints)} {t('points')}
-                      </span>
-                    </span>
+                    <strong>{row.openIssues}</strong>
+                    <span>{row.inProgress}</span>
+                    <span>{formatNumber(row.openPoints)}</span>
                   </div>
                 );
               })}

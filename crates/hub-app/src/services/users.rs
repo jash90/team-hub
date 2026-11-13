@@ -108,6 +108,8 @@ pub struct UserPatch {
     pub role: Option<Role>,
     pub active: Option<bool>,
     pub password: Option<String>,
+    /// Required when people change their own password.
+    pub current_password: Option<String>,
     pub github_login: Option<String>,
 }
 
@@ -152,6 +154,19 @@ pub fn update_user(tx: &Tx, caller: &AuthUser, id: Id, patch: &UserPatch) -> Api
 
         if !active {
             tx.execute("DELETE FROM session WHERE user_id = ?1", [id])?;
+        }
+    }
+
+    if patch.password.is_some() && own {
+        let stored: Option<String> = tx.query_row("SELECT password_hash FROM user WHERE id = ?1", [id], |row| row.get(0))?;
+        let confirmed = match (&stored, &patch.current_password) {
+            (Some(hash), Some(current)) => auth::verify_password(current, hash),
+            (None, _) => true,
+            _ => false,
+        };
+
+        if !confirmed {
+            return Err(ApiError::forbidden("The current password is not right"));
         }
     }
 

@@ -1,2 +1,33 @@
-/** Polish for this module's phrases. */
-export const polish: Record<string, string> = {};
+/** Polish for the agents module's phrases. */
+export const polish: Record<string, string> = {
+  'AI agents': 'Agenci AI',
+  'Connect an AI agent': 'Podłącz agenta AI',
+  'team-hub speaks MCP (Model Context Protocol), the standard way for coding agents such as Claude Code to use the tools of other systems. A connected agent can read, create and update issues from inside a repository, as you and with your permissions.':
+    'team-hub obsługuje MCP (Model Context Protocol), czyli standard, przez który agenci programistyczni, tacy jak Claude Code, korzystają z narzędzi innych systemów. Podłączony agent może czytać, tworzyć i zmieniać zadania wprost z repozytorium, jako Ty i z Twoimi uprawnieniami.',
+  'Create an API token': 'Utwórz token API',
+  'The agent signs in with a token of yours. A token is shown once, when you create it.': 'Agent loguje się Twoim tokenem. Token jest pokazywany raz, w chwili utworzenia.',
+  'Open Settings → API tokens': 'Otwórz Ustawienia → Tokeny API',
+  'Register the server with Claude Code': 'Zarejestruj serwer w Claude Code',
+  'Run this in the repository, with your token in place of <token>.': 'Uruchom to polecenie w repozytorium, wstawiając swój token w miejsce <token>.',
+  'Copy the command': 'Kopiuj polecenie',
+  'Or point any other MCP client at the endpoint': 'Albo wskaż ten adres dowolnemu innemu klientowi MCP',
+  'Streamable HTTP, with the header Authorization: Bearer <token>.': 'Streamable HTTP, z nagłówkiem Authorization: Bearer <token>.',
+  'Copy the address': 'Kopiuj adres',
+  Tools: 'Narzędzia',
+  'What a connected agent can call. Every tool runs as the person whose token the agent uses; modules that are switched on add their own.':
+    'To, co podłączony agent może wywołać. Każde narzędzie działa jako osoba, której tokenu używa agent; włączone moduły dodają własne.',
+  'Issues and projects': 'Zadania i projekty',
+  'read-only': 'tylko odczyt',
+  writes: 'zapisuje',
+  'Calling it changes nothing': 'Wywołanie niczego nie zmienia',
+  'Calling it changes data, as the person whose token the agent uses': 'Wywołanie zmienia dane jako osoba, której tokenu używa agent',
+  'Takes no arguments.': 'Nie przyjmuje argumentów.',
+  Argument: 'Argument',
+  Type: 'Typ',
+  Description: 'Opis',
+  required: 'wymagany',
+  'list of {type}': 'lista: {type}',
+  or: 'lub',
+  any: 'dowolny',
+  'One of: {values}': 'Jedno z: {values}',
+};

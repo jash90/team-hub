@@ -66,6 +66,7 @@ function Profile() {
   const me = boot.users.find((candidate) => candidate.id === user.id);
   const [form, setForm] = useState({ name: user.name, email: user.email, githubLogin: me?.githubLogin ?? '' });
   const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [busy, run] = useBusy();
 
   function save(event: FormEvent): void {
@@ -103,11 +104,15 @@ function Profile() {
           className="inline-form"
           onSubmit={(event) => {
             event.preventDefault();
-            void run(() => api.patch(`/api/users/${user.id}`, { password }), t('Password changed')).then(() => setPassword(''));
+            void run(() => api.patch(`/api/users/${user.id}`, { password, currentPassword }), t('Password changed')).then(() => {
+              setPassword('');
+              setCurrentPassword('');
+            });
           }}
         >
+          <input className="input" type="password" placeholder={t('Current password')} autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
           <input className="input" type="password" minLength={8} placeholder={t('New password')} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
-          <Button type="submit" disabled={busy || password.length < 8}>
+          <Button type="submit" disabled={busy || password.length < 8 || !currentPassword}>
             {t('Change password')}
           </Button>
         </form>
