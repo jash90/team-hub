@@ -1215,6 +1215,7 @@ dependencies = [
  "http-body-util",
  "hub-app",
  "hub-core",
+ "mime",
  "rayon",
  "roxmltree",
  "rusqlite",
@@ -1222,6 +1223,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tower",
+ "tower-http",
  "tracing",
  "ts-rs",
 ]

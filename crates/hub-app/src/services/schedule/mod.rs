@@ -14,4 +14,4 @@ mod ticker;
 pub use running::{finish, run_slot, run_task, Outcome};
 pub use settings::{save_settings, settings};
 pub use tasks::{create, delete, list, task_kinds, update, NewTask, TaskPatch};
-pub use ticker::{mark_ran, Ticker};
+pub use ticker::Ticker;

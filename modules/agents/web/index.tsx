@@ -16,6 +16,7 @@ const agentsModule: WebModule = {
   dashboard: DashboardPart,
   projectSettings: [{ id: 'agents', label: () => t('AI agent'), render: (project) => <ProjectTrust project={project} /> }],
   settings: [{ id: 'agents', label: () => t('AI agents'), render: () => <AgentsSettings /> }],
+  runnerWork: (work) => t('Agent runs: {kinds}', { kinds: work.what.map((kind) => t(kind)).join(', ') }),
   polish,
 };
 

@@ -3,12 +3,11 @@ import { useState, type Dispatch, type SetStateAction } from 'react';
 import type { QueryFieldInfo } from '../../bindings/QueryFieldInfo.ts';
 import { Icon } from '../../components/icon.tsx';
 import { PRIORITIES } from '../../components/issue-bits.tsx';
-import { Button, Picker, Popover } from '../../components/ui.tsx';
+import { QueryHints, withClause } from '../../components/query-hints.tsx';
+import { Button, Picker } from '../../components/ui.tsx';
 import { t } from '../../i18n/index.ts';
 import type { Remote } from '../../session.tsx';
 import type { Chips } from './query.ts';
-
-const FUNCTIONS = ['currentUser()', 'openSprints()', 'now()', 'startOfDay()', 'startOfWeek()', 'startOfMonth()'];
 
 type QueryBarProps = {
   advanced: boolean;
@@ -97,24 +96,7 @@ export function QueryBar({ advanced, setAdvanced, text, setText, error, run, chi
         </button>
       </div>
 
-      {hints && fields.data && (
-        <Popover anchor={hints} onClose={() => setHints(null)} align="end" width={460}>
-          <div className="hints">
-            <p className="muted">{t('Combine clauses with AND, OR, NOT and parentheses; finish with ORDER BY. Click an example to add it.')}</p>
-            <div className="hints-grid">
-              {fields.data.map((field) => (
-                <button key={field.name} type="button" className="hint" onClick={() => setText((current) => (current.trim() ? `${field.example} AND ${current}` : field.example))}>
-                  <strong>{field.name}</strong>
-                  <code>{field.example}</code>
-                </button>
-              ))}
-            </div>
-            <p className="muted">
-              {t('Functions')}: {FUNCTIONS.join(', ')} · {t('dates')}: 2026-11-30, -7d, 2w
-            </p>
-          </div>
-        </Popover>
-      )}
+      {hints && fields.data && <QueryHints anchor={hints} fields={fields.data} onPick={(example) => setText((current) => withClause(current, example))} onClose={() => setHints(null)} />}
     </>
   );
 }

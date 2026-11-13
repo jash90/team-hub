@@ -4,6 +4,10 @@ import type { E2eRunResult } from "./E2eRunResult";
 
 export type E2eRunDetail = { run: E2eRun, 
 /**
+ * The job that produced the run, when one did.
+ */
+jobId: number | null, 
+/**
  * Failures first, then flaky, passed and skipped tests.
  */
 results: Array<E2eRunResult>, };

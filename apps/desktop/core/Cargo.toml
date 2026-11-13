@@ -12,6 +12,11 @@ name = "hub_desktop_core"
 name = "hub"
 path = "src/bin/hub.rs"
 
+# The headless runner for a container: docs/cloud-runner.md, apps/runner.
+[[bin]]
+name = "hub-runner"
+path = "src/bin/hub_runner.rs"
+
 # The agent used by tests and trials: it speaks the sidecar's JSON lines without any model.
 [[bin]]
 name = "hub-fake-agent"

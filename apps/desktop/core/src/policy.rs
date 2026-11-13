@@ -74,6 +74,30 @@ pub const WITHHELD_VARIABLES: [&str; 12] = [
     "GOOGLE_APPLICATION_CREDENTIALS",
 ];
 
+/// The model provider's key, as the Claude Agent SDK reads it.
+pub const MODEL_KEY_VARIABLE: &str = "ANTHROPIC_API_KEY";
+
+/// What a headless runner hands on to the helper from its own environment, and nothing
+/// else: where programs are, how to reach the model provider, and the provider's key (which
+/// the runner adds itself). None of the runner's own tokens has a name on this list.
+pub const PASSED_TO_A_HEADLESS_HELPER: [&str; 15] = [
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "TZ",
+    "TMPDIR",
+    "ANTHROPIC_BASE_URL",
+    "HTTPS_PROXY",
+    "HTTP_PROXY",
+    "NO_PROXY",
+    "https_proxy",
+    "http_proxy",
+    "no_proxy",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "NODE_EXTRA_CA_CERTS",
+];
+
 const MAX_INSTRUCTIONS: u64 = 40_000;
 
 /// The repository's `CLAUDE.md`, read by the app itself: the helper loads no settings from
@@ -109,11 +133,49 @@ pub fn sandbox_state() -> SandboxState {
     }
 }
 
+/// Whether the sandbox does more than exist: in a container bubblewrap is often installed
+/// and still not allowed to make its namespaces. A runner nobody sits at asks before it
+/// promises a thread a confined shell.
+pub fn sandbox_probe() -> SandboxState {
+    if sandbox_state() == SandboxState::Unavailable || !cfg!(target_os = "linux") {
+        return sandbox_state();
+    }
+
+    let confined = std::process::Command::new("bwrap")
+        .args(["--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--unshare-net", "--unshare-pid", "--die-with-parent", "true"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+
+    if confined.is_ok_and(|status| status.success()) {
+        SandboxState::Available
+    } else {
+        SandboxState::Unavailable
+    }
+}
+
 /// What a thread may not read: the usual homes of credentials, and the app's own state.
 pub fn private_paths(state_dir: &Path) -> Vec<PathBuf> {
     let home = dirs::home_dir().unwrap_or_default();
 
     PRIVATE_IN_HOME.iter().map(|name| home.join(name)).chain([state_dir.to_path_buf()]).collect()
+}
+
+/// The entries `depth` folders below `root`, without those that lead to one of `own`: the
+/// other clones and the other threads' trees, which a confined shell is not shown.
+pub fn others_under(root: &Path, depth: usize, own: &[&Path]) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(root) else { return Vec::new() };
+
+    entries
+        .flatten()
+        .map(|entry| entry.path())
+        .flat_map(|path| match (own.iter().any(|kept| kept.starts_with(&path)), depth > 1) {
+            (true, true) => others_under(&path, depth - 1, own),
+            (true, false) => Vec::new(),
+            (false, _) => vec![path],
+        })
+        .collect()
 }
 
 /// A permission rule spells an absolute path with a leading double slash.
@@ -130,8 +192,18 @@ pub fn read_denials(folders: &[String]) -> Vec<String> {
 /// The allow list of one thread. A thread that only reads (review, analyse) gets no file
 /// tools that write.
 pub fn allowed_tools(kind: ThreadKind, worktree: &str, shell: bool) -> Vec<String> {
-    let mut tools: Vec<String> = READ_TOOLS.iter().map(|tool| (*tool).to_string()).collect();
+    tools_with(READ_TOOLS.iter().map(|tool| (*tool).to_string()).collect(), kind, worktree, shell)
+}
 
+/// The allow list of a thread nobody sits beside: reading is tied to the working tree as
+/// well. A scoped `Read` rule covers the tools that search files too, and the helper checks
+/// every path itself before a file tool runs (`sidecar/src/confine.ts`), so nothing outside
+/// the tree is read: not `/proc`, not the runner's state, not another clone.
+pub fn confined_tools(kind: ThreadKind, worktree: &str, shell: bool) -> Vec<String> {
+    tools_with(vec![format!("Read({}/**)", rule_path(worktree))], kind, worktree, shell)
+}
+
+fn tools_with(mut tools: Vec<String>, kind: ThreadKind, worktree: &str, shell: bool) -> Vec<String> {
     if writes_files(kind) {
         tools.extend(["Edit", "Write"].map(|tool| format!("{tool}({}/**)", rule_path(worktree))));
     }
@@ -201,10 +273,14 @@ const SANDBOX_PLACEHOLDERS: [&str; 12] = [
     ".claude/",
 ];
 
+pub fn sandbox_excludes_file(worktrees_root: &Path) -> PathBuf {
+    worktrees_root.join(".sandbox-excludes")
+}
+
 /// An excludes file for the thread's own git: the person's global one, plus the sandbox's
 /// placeholders. Returns its path, or none when it could not be written.
 pub fn sandbox_excludes(worktrees_root: &Path, global: Option<&str>) -> Option<PathBuf> {
-    let file = worktrees_root.join(".sandbox-excludes");
+    let file = sandbox_excludes_file(worktrees_root);
     let own = SANDBOX_PLACEHOLDERS.iter().map(|name| format!("/{name}")).collect::<Vec<_>>().join("\n");
     let content = format!("{}\n# Placeholders of the shell sandbox (written by team-hub desktop).\n{own}\n", global.unwrap_or_default().trim_end());
 
@@ -282,6 +358,41 @@ mod tests {
         let review = allowed_tools(ThreadKind::Review, "/w", true);
 
         assert!(!review.iter().any(|tool| tool.starts_with("Edit") || tool.starts_with("Write")));
+    }
+
+    #[test]
+    fn a_thread_nobody_sits_beside_reads_only_its_working_tree() {
+        let implement = confined_tools(ThreadKind::Implement, "/data/worktrees/web/web-1-t1", false);
+
+        assert_eq!(
+            implement,
+            vec!["Read(//data/worktrees/web/web-1-t1/**)", "Edit(//data/worktrees/web/web-1-t1/**)", "Write(//data/worktrees/web/web-1-t1/**)"]
+        );
+        assert_eq!(confined_tools(ThreadKind::Review, "/w", false), vec!["Read(//w/**)"]);
+        assert!(confined_tools(ThreadKind::Review, "/w", true).contains(&"Bash".to_string()));
+    }
+
+    #[test]
+    fn a_headless_helper_is_handed_none_of_the_runners_tokens() {
+        for name in WITHHELD_VARIABLES.iter().chain(["ANTHROPIC_API_KEY", "RUNNER_DATA_DIR"].iter()) {
+            assert!(!PASSED_TO_A_HEADLESS_HELPER.contains(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn the_other_clones_and_trees_are_found_and_the_threads_own_are_not() {
+        let root = std::env::temp_dir().join(format!("hub-desktop-others-{}", std::process::id()));
+
+        for folder in ["acme/web", "acme/api", "other/site"] {
+            std::fs::create_dir_all(root.join(folder)).unwrap();
+        }
+
+        let mut closed = others_under(&root, 2, &[&root.join("acme/web")]);
+
+        closed.sort();
+        assert_eq!(closed, vec![root.join("acme/api"), root.join("other")]);
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

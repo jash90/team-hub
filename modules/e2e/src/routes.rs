@@ -16,8 +16,8 @@ use serde_json::Value;
 
 use crate::ingest::{delete_run, delete_test, project_keys, set_manual_link, store_run, RunMeta};
 use crate::model::{count_tests, project_runs, project_tests, run_by_id, run_results, state_of, tests_of_issues};
-use crate::report;
-use crate::types::{E2eDashboard, E2eDashboardIssue, E2eIngestResult, E2eIssuePanel, E2eProjectTests, E2eRunDetail};
+use crate::types::{E2eDashboard, E2eDashboardIssue, E2eIngestResult, E2eIssuePanel, E2eProjectTests, E2eRunDetail, E2eSession};
+use crate::{artifacts, jobs, report, session, settings};
 
 type Reply<T> = ApiResult<Json<T>>;
 
@@ -30,8 +30,12 @@ pub fn routes() -> Router<App> {
         .route("/projects/{key}", get(project_page))
         .route("/projects/{key}/runs", post(post_run).layer(DefaultBodyLimit::max(MAX_REPORT_BYTES)))
         .route("/runs/{id}", get(run_detail).delete(remove_run))
+        .route("/results/{id}", get(result_session))
         .route("/tests/{id}", delete(remove_test))
         .route("/tests/{id}/issues/{issue_key}", put(link_issue).delete(unlink_issue))
+        .merge(settings::routes())
+        .merge(jobs::routes())
+        .merge(artifacts::routes())
 }
 
 fn base_url(app: &App) -> &str {
@@ -84,14 +88,22 @@ struct WithMeta {
     meta: Option<Value>,
 }
 
+/// The job a posted report belongs to, when a runner posts it: `?job=<id>`.
+#[derive(Deserialize)]
+struct OfJob {
+    job: Option<Id>,
+}
+
 /// Takes a run report: the framework's JSON document as it is (optionally with a `meta`
 /// object beside `run`), or JUnit XML. Branch, commit, pull request, CI address, run name
-/// and, for a report without one, a run id can also come as query parameters.
+/// and, for a report without one, a run id can also come as query parameters. A runner
+/// names its job with `job`, and the stored run is tied to it.
 async fn post_run(
     State(app): State<App>,
     user: AuthUser,
     Path(key): Path<String>,
     Query(query): Query<RunMeta>,
+    Query(of_job): Query<OfJob>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Reply<E2eIngestResult> {
@@ -118,7 +130,17 @@ async fn post_run(
             let access = project_access(tx, &user, &key)?;
             access.require_edit()?;
 
-            store_run(tx, Some(&user), access.id, &run, query.or(in_body))
+            if let Some(job_id) = of_job.job {
+                jobs::check_report_job(tx, &user, job_id, access.id)?;
+            }
+
+            let stored = store_run(tx, Some(&user), access.id, &run, query.or(in_body))?;
+
+            if let Some(job_id) = of_job.job {
+                jobs::tie_run(tx, job_id, stored.run_id)?;
+            }
+
+            Ok(stored)
         })?;
 
         app.read(|connection| {
@@ -145,11 +167,16 @@ async fn run_detail(State(app): State<App>, user: AuthUser, Path(id): Path<Id>) 
             let (run, project_id) = run_by_id(connection, id)?.ok_or_else(|| ApiError::not_found("Run"))?;
             project_access_by_id(connection, &user, project_id).map_err(|_| ApiError::not_found("Run"))?;
 
-            Ok(E2eRunDetail { results: run_results(connection, &user, id)?, run })
+            Ok(E2eRunDetail { results: run_results(connection, &user, id)?, job_id: jobs::job_of_run(connection, id)?, run })
         })
     })
     .await
     .map(Json)
+}
+
+/// One result of a run with what its report said happened: the session view's data.
+async fn result_session(State(app): State<App>, user: AuthUser, Path(id): Path<Id>) -> Reply<E2eSession> {
+    app.run(move |app| app.read(|connection| session::load(connection, &user, id))).await.map(Json)
 }
 
 async fn remove_run(State(app): State<App>, user: AuthUser, Path(id): Path<Id>) -> Reply<Value> {
@@ -159,7 +186,11 @@ async fn remove_run(State(app): State<App>, user: AuthUser, Path(id): Path<Id>) 
             project_access_by_id(tx, &user, project_id).map_err(|_| ApiError::not_found("Run"))?.require_admin()?;
 
             delete_run(tx, id, project_id)
-        })
+        })?;
+        // The rows went with the run; its recordings and screenshots are files.
+        artifacts::remove_run_files(app, id);
+
+        Ok(())
     })
     .await?;
 

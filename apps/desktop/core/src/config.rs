@@ -56,14 +56,24 @@ impl Paths {
 }
 
 #[cfg(unix)]
-fn private_to_owner(folder: &Path) {
+fn set_mode(folder: &Path, mode: u32) {
     use std::os::unix::fs::PermissionsExt;
 
-    let _ = std::fs::set_permissions(folder, std::fs::Permissions::from_mode(0o700));
+    let _ = std::fs::set_permissions(folder, std::fs::Permissions::from_mode(mode));
 }
 
 #[cfg(not(unix))]
-fn private_to_owner(_folder: &Path) {}
+fn set_mode(_folder: &Path, _mode: u32) {}
+
+/// Nobody but the owner gets into the folder.
+pub fn private_to_owner(folder: &Path) {
+    set_mode(folder, 0o700);
+}
+
+/// Others may pass through the folder to one of their own inside it, and see nothing of it.
+pub fn passable(folder: &Path) {
+    set_mode(folder, 0o711);
+}
 
 fn random_id() -> String {
     let mut bytes = [0u8; 8];

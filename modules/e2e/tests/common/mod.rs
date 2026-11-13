@@ -4,13 +4,14 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::http::{header, Method, Request, StatusCode};
-use axum::Router;
+use axum::http::{header, HeaderMap, Method, Request, StatusCode};
+use axum::{Extension, Router};
 use http_body_util::BodyExt;
 use hub_app::services::issues::{create_issue, update_issue};
 use hub_app::services::projects::{create_project, set_member, NewProject};
 use hub_app::services::search::search;
 use hub_app::services::users::{create_token, create_user, NewUser};
+use hub_app::auth::ModuleScope;
 use hub_app::{access, Actor, App, AuthUser, Config, Module};
 use hub_core::{Id, IssuePatch, NewIssue, ProjectRole, Role};
 use hub_mod_e2e::E2eModule;
@@ -26,8 +27,20 @@ pub fn test_app() -> App {
     App::new(Config::for_tests(directory), vec![Arc::new(E2eModule) as Arc<dyn Module>]).expect("the test application starts")
 }
 
+/// The module's routes as the server mounts them: each request is marked as the module's, so
+/// a project that has switched the module off is not there for it.
 pub fn router(app: &App) -> Router {
-    Router::new().nest("/api/m/e2e", E2eModule.routes().expect("the module has routes")).with_state(app.clone())
+    let routes = E2eModule.routes().expect("the module has routes").layer(Extension(ModuleScope("e2e")));
+
+    Router::new().nest("/api/m/e2e", routes).with_state(app.clone())
+}
+
+/// Switches the module off (or on again) in one project, as its administrator does.
+pub fn switch_module(app: &App, owner: &Client, key: &str, enabled: bool) {
+    app.write(owner.user.actor(), |tx| {
+        hub_app::services::project_modules::set_project_module(tx, &access::project_access(tx, &owner.user, key)?, "e2e", enabled)
+    })
+    .expect("a module switch");
 }
 
 /// Somebody (or a CI job) signed in with an API token.
@@ -111,6 +124,25 @@ pub fn events(app: &App) -> Vec<(String, Option<String>)> {
 }
 
 impl Client {
+    /// A request as it is, answered as it is: for files, whose headers and bytes matter.
+    pub async fn request(&self, method: Method, path: &str, headers: &[(&str, &str)], body: Vec<u8>) -> (StatusCode, HeaderMap, Vec<u8>) {
+        let mut request = Request::builder().method(method).uri(format!("/api/m/e2e{path}"));
+
+        if let Some(bearer) = &self.bearer {
+            request = request.header(header::AUTHORIZATION, format!("Bearer {bearer}"));
+        }
+
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+
+        let response = self.router.clone().oneshot(request.body(Body::from(body)).expect("a valid request")).await.expect("the router answers");
+        let (status, headers) = (response.status(), response.headers().clone());
+        let bytes = response.into_body().collect().await.expect("a readable body").to_bytes();
+
+        (status, headers, bytes.to_vec())
+    }
+
     pub async fn send_raw(&self, method: Method, path: &str, content_type: Option<&str>, body: Vec<u8>) -> (StatusCode, Value) {
         let mut request = Request::builder().method(method).uri(format!("/api/m/e2e{path}"));
 
@@ -154,6 +186,14 @@ impl Client {
 
     pub async fn put(&self, path: &str) -> Value {
         self.expect_ok(Method::PUT, path, None).await
+    }
+
+    pub async fn put_json(&self, path: &str, body: Value) -> Value {
+        self.expect_ok(Method::PUT, path, Some(body)).await
+    }
+
+    pub async fn patch(&self, path: &str, body: Value) -> Value {
+        self.expect_ok(Method::PATCH, path, Some(body)).await
     }
 
     pub async fn delete(&self, path: &str) -> Value {

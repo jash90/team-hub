@@ -13,6 +13,7 @@ use crate::diff::{parse_patch, untracked_file};
 use crate::error::{CoreError, CoreResult};
 use crate::model::{CommitInfo, PatchFile};
 use crate::push_guard::CommitReading;
+use crate::secrets::Secret;
 
 const FALLBACK_BASES: [&str; 3] = ["origin/main", "origin/master", "origin/develop"];
 /// More commits than one thread makes; past it the push is not read, so it does not go.
@@ -557,12 +558,21 @@ pub fn read_push(repo: &Path, branch: &str, commit: Option<&str>, fork_point: &s
 /// Sends exactly `commit` to `branch` on origin. Never forced: when the server's branch has
 /// moved on, git refuses and so does this.
 pub fn push(repo: &Path, branch: &str, commit: &str) -> CoreResult<()> {
+    push_as(repo, branch, commit, None)
+}
+
+/// `push`, with a token for the remote where nobody is there to have signed git in.
+pub fn push_as(repo: &Path, branch: &str, commit: &str, auth: Option<&RemoteAuth>) -> CoreResult<()> {
     if !is_branch_name(branch) || !is_full_sha(commit) {
         return Err(CoreError::git("push", "the branch or the commit is not spelled in full"));
     }
 
     let refspec = format!("{commit}:refs/heads/{branch}");
-    let output = hardened_git().arg("-C").arg(repo).args(["push", "--porcelain", "origin", &refspec]).env_remove("GIT_OPTIONAL_LOCKS").output()?;
+    let mut command = match auth {
+        Some(auth) => remote_git(Some(auth)),
+        None => hardened_git(),
+    };
+    let output = command.arg("-C").arg(repo).args(["push", "--porcelain", "origin", &refspec]).env_remove("GIT_OPTIONAL_LOCKS").output()?;
 
     finished(output, &["push"]).map(|_| ())
 }
@@ -570,6 +580,138 @@ pub fn push(repo: &Path, branch: &str, commit: &str) -> CoreResult<()> {
 /// Whether the server's branch, as this clone last saw it, is at `commit`.
 pub fn is_pushed(repo: &Path, branch: &str, commit: &str) -> bool {
     git(repo, &["rev-parse", "--verify", "--quiet", &format!("refs/remotes/origin/{branch}")]).is_ok_and(|tip| tip == commit)
+}
+
+// ---------- clones a runner keeps by itself ----------
+
+/// The variable the token travels in: set for the one git command that needs it, read by the
+/// credential helper below, and part of nothing else.
+const REMOTE_PASSWORD_VARIABLE: &str = "TEAM_HUB_GIT_PASSWORD";
+/// Answers git's question for a password from that variable and keeps nothing: `store` and
+/// `erase` are ignored. GitHub takes a token as the password of any user name.
+const CREDENTIAL_HELPER: &str = "!f() { test \"$1\" = get && printf 'username=x-access-token\\npassword=%s\\n' \"$TEAM_HUB_GIT_PASSWORD\"; }; f";
+
+/// A token for one git host. It reaches git through the environment of a single command and
+/// is offered only to addresses under `base`; it is never written to a config or put in a
+/// remote's address.
+#[derive(Debug, Clone)]
+pub struct RemoteAuth {
+    base: String,
+    token: Secret,
+}
+
+impl RemoteAuth {
+    pub fn new(base: &str, token: Secret) -> Self {
+        Self { base: base.trim_end_matches('/').to_string(), token }
+    }
+}
+
+/// Git for a command that talks to the remote without a person: no credential helper of the
+/// machine sees the token or is asked to keep it, and nothing prompts.
+fn remote_git(auth: Option<&RemoteAuth>) -> Command {
+    let mut command = hardened_git();
+
+    command.args(["-c", "credential.helper="]).env_remove("GIT_OPTIONAL_LOCKS");
+
+    if let Some(auth) = auth {
+        command.args(["-c", &format!("credential.{}.helper={CREDENTIAL_HELPER}", auth.base)]).env(REMOTE_PASSWORD_VARIABLE, auth.token.expose());
+    }
+
+    command
+}
+
+/// Clones `url` into `path` without checking anything out: the clone only holds history, and
+/// every piece of work gets a tree of its own.
+pub fn clone(url: &str, path: &Path, auth: Option<&RemoteAuth>) -> CoreResult<()> {
+    if url.starts_with('-') {
+        return Err(CoreError::git("clone", "the repository's address is not usable"));
+    }
+
+    let output = remote_git(auth).args(["clone", "--quiet", "--no-checkout", "--", url]).arg(path).output()?;
+
+    finished(output, &["clone"]).map(|_| ())
+}
+
+/// Brings the clone up to date with origin: branches, tags, and branches deleted there.
+pub fn fetch(repo: &Path, auth: Option<&RemoteAuth>) -> CoreResult<()> {
+    let output = remote_git(auth).arg("-C").arg(repo).args(["fetch", "--quiet", "--prune", "--tags", "origin"]).output()?;
+
+    finished(output, &["fetch"]).map(|_| ())
+}
+
+pub fn remote_url(repo: &Path) -> CoreResult<String> {
+    git(repo, &["remote", "get-url", "origin"])
+}
+
+/// The commit a branch, a tag or a commit id names, as the clone last fetched it. A branch
+/// is read from origin, never from a local branch a thread may have moved.
+pub fn resolve_commit(repo: &Path, reference: &str) -> CoreResult<String> {
+    let reference = reference.trim();
+    let unknown = || CoreError::git("rev-parse", format!("\"{reference}\" is not a branch, a tag or a commit of this repository"));
+
+    if is_full_sha(reference) || (reference.len() >= 7 && reference.bytes().all(|byte| byte.is_ascii_hexdigit())) {
+        if let Ok(commit) = git(repo, &["rev-parse", "--verify", "--quiet", &format!("{reference}^{{commit}}")]) {
+            return Ok(commit);
+        }
+    }
+
+    if !is_branch_name(reference) {
+        return Err(unknown());
+    }
+
+    [format!("refs/remotes/origin/{reference}"), format!("refs/tags/{reference}")]
+        .iter()
+        .find_map(|name| git(repo, &["rev-parse", "--verify", "--quiet", &format!("{name}^{{commit}}")]).ok())
+        .ok_or_else(unknown)
+}
+
+/// A checkout of one commit in a folder of its own, with a repository of its own that holds
+/// only that commit: whoever works there cannot reach the clone it came from. `branch`
+/// names the checkout when the commit was asked for by branch, so tools that look show it.
+pub fn checkout_copy(repo: &Path, commit: &str, folder: &Path, branch: Option<&str>) -> CoreResult<()> {
+    if !is_full_sha(commit) {
+        return Err(CoreError::git("checkout", "the commit to check out is not a full commit id"));
+    }
+
+    std::fs::create_dir_all(folder)?;
+
+    let source = std::fs::canonicalize(repo)?.to_string_lossy().into_owned();
+    // A commit is asked for by id, which a repository hands out only when told it may.
+    let upload = "git -c uploadpack.allowAnySHA1InWant=true upload-pack";
+
+    git(folder, &["init", "--quiet"])?;
+    git(folder, &["fetch", "--quiet", "--depth=1", "--no-tags", "--upload-pack", upload, &source, commit])?;
+
+    match branch.filter(|name| is_branch_name(name)) {
+        Some(name) => git(folder, &["checkout", "--quiet", "-B", name, "FETCH_HEAD"])?,
+        None => git(folder, &["checkout", "--quiet", "--detach", "FETCH_HEAD"])?,
+    };
+
+    Ok(())
+}
+
+/// What a thread has committed: the commits after `base` up to `head`, and their diff.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Committed {
+    pub commits: Vec<CommitInfo>,
+    pub files: Vec<PatchFile>,
+    pub patch: String,
+}
+
+/// Read the way a push is read: nothing the thread configured changes what is shown.
+pub fn committed(repo: &Path, base: &str, head: &str) -> CoreResult<Committed> {
+    if !is_full_sha(base) || !is_full_sha(head) {
+        return Err(CoreError::git("diff", "the commits to compare are not full commit ids"));
+    }
+
+    let patch = review_git(repo, &["diff", "--no-ext-diff", "--no-textconv", "--no-color", "-M", base, head])?;
+
+    Ok(Committed { commits: commits_between(repo, &format!("{base}..{head}"))?, files: parse_patch(&patch), patch })
+}
+
+/// Whether origin has the branch at all, as this clone last saw it.
+pub fn on_remote(repo: &Path, branch: &str) -> bool {
+    is_branch_name(branch) && exists(repo, &format!("refs/remotes/origin/{branch}"))
 }
 
 #[cfg(test)]

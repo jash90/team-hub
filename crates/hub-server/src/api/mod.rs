@@ -12,11 +12,13 @@ mod notifications;
 mod overview;
 mod project_config;
 mod projects;
+mod runners;
 mod search;
 mod session;
 mod shared;
 mod sprints;
 mod stream;
+mod tasks;
 mod users;
 mod versions;
 mod worklogs;
@@ -44,6 +46,8 @@ pub fn router() -> Router<App> {
         .merge(filters::routes())
         .merge(overview::routes())
         .merge(notifications::routes())
+        .merge(runners::routes())
+        .merge(tasks::routes())
         .merge(stream::routes())
         .merge(admin::routes())
 }

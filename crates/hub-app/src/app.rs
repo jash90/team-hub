@@ -270,6 +270,12 @@ impl App {
             module.start(self);
         }
     }
+
+    /// The core's own background work, next to the modules': the schedule's check, once a
+    /// minute, on the real clock.
+    pub fn start_schedule(&self) {
+        crate::services::schedule::Ticker::new(self, chrono::Utc::now).start();
+    }
 }
 
 pub fn get_setting<T: DeserializeOwned>(connection: &Connection, key: &str) -> ApiResult<Option<T>> {

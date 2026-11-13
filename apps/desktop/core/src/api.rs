@@ -14,12 +14,16 @@ use ureq::Agent;
 
 use crate::error::{CoreError, CoreResult};
 use crate::protocol::HubTool;
-use crate::runs::{AgentRun, AgentRunDetail, NewRun, RunEventKind, RunKind, RunPatch, RunProposal};
+use crate::jobs::{ClaimedJob, JobPatch, TestJob};
+use crate::runs::{AgentRun, AgentRunDetail, NewRun, RunChanges, RunEventKind, RunKind, RunPatch, RunProposal};
 use crate::secrets::Secret;
 
 const TIMEOUT: Duration = Duration::from_secs(30);
+/// A recording can be 200 MB; it gets longer than a request does.
+const UPLOAD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 const AGENTS: &str = "/api/m/agents";
+const E2E: &str = "/api/m/e2e";
 const MCP_PROTOCOL: &str = "2025-06-18";
 
 /// A change announced on `GET /api/stream`.
@@ -41,8 +45,29 @@ pub struct RunnerIdentity {
     pub id: String,
     pub name: String,
     pub kinds: Vec<RunKind>,
-    pub projects: Vec<String>,
+    /// The projects it works for; none: every project the person can edit.
+    pub projects: Option<Vec<String>>,
     pub version: String,
+    /// False for a runner nobody sits at: its pushes and pull requests are decided on the web.
+    pub interactive: bool,
+}
+
+impl RunnerIdentity {
+    /// The heartbeat's body. What the desktop app sends stays as it always was; `interactive`
+    /// is said only when it is false, and `projects` is left out when there is no list.
+    fn announcement(&self) -> Value {
+        let mut body = json!({ "runnerId": self.id, "name": self.name, "kinds": self.kinds, "version": self.version });
+
+        if let Some(projects) = &self.projects {
+            body["projects"] = json!(projects);
+        }
+
+        if !self.interactive {
+            body["interactive"] = json!(false);
+        }
+
+        body
+    }
 }
 
 #[derive(Clone)]
@@ -51,6 +76,7 @@ pub struct HubClient {
     token: Secret,
     agent: Agent,
     stream_agent: Agent,
+    upload_agent: Agent,
 }
 
 impl std::fmt::Debug for HubClient {
@@ -96,7 +122,13 @@ fn encode(text: &str) -> String {
 
 impl HubClient {
     pub fn new(base: &str, token: Secret) -> Self {
-        Self { base: base.to_string(), token, agent: agent_for(base, Some(TIMEOUT)), stream_agent: agent_for(base, None) }
+        Self {
+            base: base.to_string(),
+            token,
+            agent: agent_for(base, Some(TIMEOUT)),
+            stream_agent: agent_for(base, None),
+            upload_agent: agent_for(base, Some(UPLOAD_TIMEOUT)),
+        }
     }
 
     pub fn base(&self) -> &str {
@@ -210,15 +242,18 @@ impl HubClient {
     // ---------- agent runs: docs/agent-runs.md ----------
 
     pub fn heartbeat(&self, runner: &RunnerIdentity) -> CoreResult<()> {
-        let body =
-            json!({ "runnerId": runner.id, "name": runner.name, "kinds": runner.kinds, "projects": runner.projects, "version": runner.version });
-
-        self.post::<Value>(&format!("{AGENTS}/runners/heartbeat"), &body).map(|_| ())
+        self.post::<Value>(&format!("{AGENTS}/runners/heartbeat"), &runner.announcement()).map(|_| ())
     }
 
     /// The oldest queued run this runner may take, now claimed by it.
     pub fn claim(&self, runner: &RunnerIdentity) -> CoreResult<Option<AgentRunDetail>> {
-        self.post(&format!("{AGENTS}/runs/claim"), &json!({ "runnerId": runner.id, "kinds": runner.kinds, "projects": runner.projects }))
+        let mut body = json!({ "runnerId": runner.id, "kinds": runner.kinds });
+
+        if let Some(projects) = &runner.projects {
+            body["projects"] = json!(projects);
+        }
+
+        self.post(&format!("{AGENTS}/runs/claim"), &body)
     }
 
     pub fn create_run(&self, issue_key: &str, new: &NewRun) -> CoreResult<AgentRun> {
@@ -267,6 +302,75 @@ impl HubClient {
 
     pub fn cancel_run(&self, id: i64) -> CoreResult<AgentRun> {
         self.post(&format!("{AGENTS}/runs/{id}/cancel"), &json!({}))
+    }
+
+    // ---------- headless runners: what is decided on the web ----------
+
+    /// What the run's thread has committed, for the person who decides its push.
+    pub fn put_changes(&self, run_id: i64, changes: &RunChanges) -> CoreResult<()> {
+        self.send::<Value>("PUT", &format!("{AGENTS}/runs/{run_id}/changes"), &serde_json::to_value(changes)?).map(|_| ())
+    }
+
+    /// How a push or a pull request approved on the web went: what it produced, or why not.
+    pub fn report_proposal(&self, id: i64, outcome: &Result<Value, String>) -> CoreResult<()> {
+        let body = match outcome {
+            Ok(result) => json!({ "result": result }),
+            Err(reason) => json!({ "error": reason }),
+        };
+
+        self.post::<Value>(&format!("{AGENTS}/proposals/{id}/result"), &body).map(|_| ())
+    }
+
+    // ---------- test jobs: docs/e2e-jobs.md ----------
+
+    /// The oldest queued job this person may run, now claimed, with the project's settings
+    /// and the values of its secrets.
+    pub fn claim_job(&self, runner_id: &str, runner_name: &str, projects: Option<&[String]>) -> CoreResult<Option<ClaimedJob>> {
+        let mut body = json!({ "runnerId": runner_id, "runnerName": runner_name });
+
+        if let Some(projects) = projects {
+            body["projects"] = json!(projects);
+        }
+
+        self.post(&format!("{E2E}/jobs/claim"), &body)
+    }
+
+    pub fn patch_job(&self, id: i64, patch: &JobPatch) -> CoreResult<TestJob> {
+        self.patch(&format!("{E2E}/jobs/{id}"), &serde_json::to_value(patch)?)
+    }
+
+    pub fn job_log(&self, id: i64, lines: &[String]) -> CoreResult<()> {
+        self.post::<Value>(&format!("{E2E}/jobs/{id}/log"), &json!({ "lines": lines })).map(|_| ())
+    }
+
+    /// Sends the suite's report for a job; the id of the run the server stored it as.
+    pub fn send_report(&self, project_key: &str, job_id: i64, report: Vec<u8>) -> CoreResult<i64> {
+        let url = format!("{}{E2E}/projects/{}/runs?job={job_id}", self.base, encode(project_key));
+        let request = self.upload_agent.post(url).header("Authorization", self.authorization()).header("Content-Type", "application/json");
+        let answer: Value = Self::finish(request.send(&report[..]))?;
+
+        answer["run"]["id"].as_i64().ok_or_else(|| CoreError::Api {
+            status: 200,
+            code: "unreadable".into(),
+            message: "The server took the report but did not say which run it became".into(),
+        })
+    }
+
+    /// One file of a run, under the path the report names it by.
+    pub fn send_artifact(&self, run_id: i64, path: &str, content_type: &str, file: std::fs::File) -> CoreResult<()> {
+        let url = format!("{}{E2E}/runs/{run_id}/artifacts?path={}", self.base, encode(path));
+        let request = self.upload_agent.put(url).header("Authorization", self.authorization()).header("Content-Type", content_type);
+
+        Self::finish::<Value>(request.send(file)).map(|_| ())
+    }
+
+    pub fn finish_job(&self, id: i64, error: Option<&str>) -> CoreResult<TestJob> {
+        let body = match error {
+            Some(error) => json!({ "error": error }),
+            None => json!({}),
+        };
+
+        self.post(&format!("{E2E}/jobs/{id}/finish"), &body)
     }
 
     // ---------- the server's MCP endpoint ----------

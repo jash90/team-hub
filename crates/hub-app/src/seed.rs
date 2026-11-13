@@ -11,6 +11,7 @@ use crate::db::query_one;
 use crate::error::{ApiError, ApiResult};
 use crate::services::issues::{add_comment, add_link, add_worklog, create_issue, issue_id_by_key, update_issue};
 use crate::services::projects::{add_component, create_project, ComponentInput, NewProject};
+use crate::services::schedule::Ticker;
 use crate::services::sprints::{complete_sprint, create_sprint, start_sprint, SprintInput};
 use crate::services::users::{create_user, get_user, NewUser};
 use crate::services::versions::{create_version, set_released, VersionInput};
@@ -357,5 +358,7 @@ pub fn seed_demo(app: &App, owner_id: Id) -> ApiResult<()> {
         module.seed_demo(app)?;
     }
 
-    Ok(())
+    // The demo appears all at once, tasks of the schedule included. Without this, a demo
+    // made in the afternoon would run its morning's tasks a minute later.
+    Ticker::new(app, Utc::now).skip_due()
 }

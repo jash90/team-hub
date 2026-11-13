@@ -2,13 +2,20 @@
 //! the issues it verifies, and the issue, the board and a project page show whether the
 //! behaviour an issue describes actually works.
 
+pub mod artifacts;
 pub mod ingest;
+pub mod jobs;
 pub mod model;
 pub mod report;
 pub mod routes;
+pub mod runners;
 mod schema;
 mod seed;
+pub mod session;
+pub mod settings;
 pub mod types;
+
+use std::time::{Duration, Instant};
 
 use axum::Router;
 use hub_app::access::project_access;
@@ -24,6 +31,10 @@ use crate::model::{badges, issue_state_sql, project_runs, project_tests};
 use crate::types::{E2eIssuePanel, E2eIssueState, E2eStatus, E2eTest};
 
 pub struct E2eModule;
+
+/// How often the background thread looks for jobs whose runner went quiet.
+const CHECK_JOBS_EVERY: Duration = Duration::from_secs(30);
+const SWEEP_EVERY: Duration = Duration::from_secs(3600);
 
 /// `tests = failing`, `tests in (failing, flaky)`, `tests != passing`, `tests is empty`.
 /// The value is what the issue's tests say together; `none` is an issue without tests.
@@ -184,6 +195,42 @@ impl Module for E2eModule {
                 }))
             })),
             _ => None,
+        }
+    }
+
+    fn runners(&self, connection: &Connection, viewer: &AuthUser, now: chrono::DateTime<chrono::Utc>) -> ApiResult<Vec<hub_core::runners::Runner>> {
+        runners::known(connection, viewer, now)
+    }
+
+    /// Jobs whose runner went quiet are failed here when nobody is looking at them, and
+    /// files no run names any more are removed.
+    fn start(&self, app: &App) {
+        let app = app.clone();
+
+        let spawned = std::thread::Builder::new().name("e2e-jobs".to_string()).spawn(move || {
+            let mut swept: Option<Instant> = None;
+
+            loop {
+                if app.module_enabled("e2e") {
+                    if let Err(error) = jobs::fail_stale(&app) {
+                        tracing::warn!("could not check for jobs without a runner: {}", error.message);
+                    }
+
+                    if swept.is_none_or(|at| at.elapsed() > SWEEP_EVERY) {
+                        swept = Some(Instant::now());
+
+                        if let Err(error) = artifacts::sweep(&app) {
+                            tracing::warn!("could not sweep test artifacts: {}", error.message);
+                        }
+                    }
+                }
+
+                std::thread::sleep(CHECK_JOBS_EVERY);
+            }
+        });
+
+        if let Err(error) = spawned {
+            tracing::error!("could not start the test jobs thread: {error}");
         }
     }
 

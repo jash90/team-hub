@@ -5,6 +5,7 @@ use axum::Router;
 use chrono::{DateTime, Utc};
 use hub_core::query::{Clause, QueryFieldInfo};
 use hub_core::schedule::{ScheduledTask, TaskKind, TaskStarted};
+use hub_core::runners::Runner;
 use hub_core::{IssueRow, QuickHit};
 use rusqlite::types::Value;
 use rusqlite::Connection;
@@ -122,6 +123,13 @@ pub trait Module: Send + Sync + 'static {
     /// end with `services::schedule::finish`.
     fn start_task(&self, _app: &App, _task: &ScheduledTask, _actor: &AuthUser) -> Option<ApiResult<TaskStarted>> {
         None
+    }
+
+    /// The runners this module knows (`docs/runners.md`), each with the one kind of work
+    /// the module gives out: the viewer's own, and other people's while they are connected.
+    /// The core makes one list of what the modules say.
+    fn runners(&self, _connection: &Connection, _viewer: &AuthUser, _now: DateTime<Utc>) -> ApiResult<Vec<Runner>> {
+        Ok(Vec::new())
     }
 
     /// Background work; called once the application is up.

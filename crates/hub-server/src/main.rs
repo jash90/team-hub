@@ -22,6 +22,7 @@ fn start() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = App::new(config.clone(), modules())?;
     app.start_modules();
+    app.start_schedule();
 
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
 

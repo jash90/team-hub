@@ -34,7 +34,7 @@ const SELECT: &str = "SELECT r.id, i.key, i.summary, p.key, r.kind, r.instructio
         (SELECT count(*) FROM agent_proposal a WHERE a.run_id = r.id AND a.state = 'pending'),
         r.question_pending, r.created_at, r.started_at, r.finished_at, r.issue_id, r.project_id, r.runner_user_id,
         coalesce((SELECT n.interactive FROM agent_runner n WHERE n.id = r.runner_id), 1),
-        EXISTS (SELECT 1 FROM agent_run_changes c WHERE c.run_id = r.id)
+        EXISTS (SELECT 1 FROM agent_run_changes c WHERE c.run_id = r.id), r.on_runner, r.on_runner_name
     FROM agent_run r JOIN issue i ON i.id = r.issue_id JOIN project p ON p.id = r.project_id";
 
 /// A run with what the contract's shape leaves out.
@@ -86,6 +86,8 @@ fn map_row(row: &rusqlite::Row) -> rusqlite::Result<RunRow> {
             pending_question: row.get(21)?,
             runner_interactive: row.get(28)?,
             has_changes: row.get(29)?,
+            on_runner: row.get(30)?,
+            on_runner_name: row.get(31)?,
             created_at: row.get(22)?,
             started_at: row.get(23)?,
             finished_at: row.get(24)?,
@@ -220,6 +222,8 @@ pub struct NewRun {
     /// The caller's own runner that carries the run out. The run is created already claimed
     /// by it, so no other runner can take it in between.
     pub runner_id: Option<String>,
+    /// A runner the run is sent to by name: it stays queued for that one (docs/runners.md).
+    pub on_runner: Option<String>,
 }
 
 fn optional(text: Option<&str>, what: &str, max: usize) -> ApiResult<Option<String>> {
@@ -257,14 +261,22 @@ pub fn create(tx: &Tx, user: &AuthUser, key: &str, new: &NewRun) -> ApiResult<Ag
     )?;
     let id = tx.last_insert_rowid();
 
-    match &new.runner_id {
-        Some(runner) => {
+    match (&new.runner_id, &new.on_runner) {
+        (Some(_), Some(_)) => return Err(ApiError::bad_request("Give either runnerId (the caller is the runner) or onRunner (send it to one), not both")),
+        (Some(runner), None) => {
             let runner = runner_id(runner)?;
             let name = own_runner(tx, user, runner)?.ok_or_else(|| ApiError::bad_request("That runner has not announced itself yet; send a heartbeat first"))?;
 
             hold(tx, id, runner, &name, Some(user.id))?;
         }
-        None => announce(tx, id)?,
+        (None, Some(runner)) => {
+            let name = pinnable(tx, user, runner_id(runner)?, new.kind, &access.key)?;
+
+            tx.execute("UPDATE agent_run SET on_runner = ?1, on_runner_name = ?2 WHERE id = ?3", (runner.trim(), &name, id))?;
+            add_event(tx, id, AgentEventKind::Status, &format!("Sent to {name}"), None, None)?;
+            announce(tx, id)?;
+        }
+        (None, None) => announce(tx, id)?,
     }
 
     Ok(load(tx, id)?.run)
@@ -577,6 +589,9 @@ pub struct Heartbeat {
     /// False for a runner with nobody at it; absent means there is someone (the desktop app).
     #[serde(default = "yes")]
     pub interactive: bool,
+    /// Take only the runs sent to this runner by name.
+    #[serde(default)]
+    pub pinned_only: bool,
 }
 
 fn yes() -> bool {
@@ -606,8 +621,8 @@ pub fn heartbeat(tx: &Tx, user: &AuthUser, beat: &Heartbeat) -> ApiResult<()> {
     let kinds: Vec<&str> = beat.kinds.iter().map(|kind| kind.as_str()).collect();
 
     tx.execute(
-        "INSERT INTO agent_runner (id, name, user_id, kinds, projects, version, last_seen_at, interactive) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-         ON CONFLICT (id) DO UPDATE SET name = ?2, kinds = ?4, projects = ?5, version = ?6, last_seen_at = ?7, interactive = ?8",
+        "INSERT INTO agent_runner (id, name, user_id, kinds, projects, version, last_seen_at, interactive, pinned_only) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+         ON CONFLICT (id) DO UPDATE SET name = ?2, kinds = ?4, projects = ?5, version = ?6, last_seen_at = ?7, interactive = ?8, pinned_only = ?9",
         (
             id,
             name,
@@ -617,10 +632,41 @@ pub fn heartbeat(tx: &Tx, user: &AuthUser, beat: &Heartbeat) -> ApiResult<()> {
             beat.version.trim(),
             &tx.now,
             beat.interactive,
+            beat.pinned_only,
         ),
     )?;
 
     Ok(())
+}
+
+/// The name of the runner a run of this kind in this project may be sent to by name.
+/// Somebody's computer takes such work from its owner only; a service from anyone who may
+/// start the run.
+fn pinnable(tx: &Tx, user: &AuthUser, runner: &str, kind: AgentRunKind, project_key: &str) -> ApiResult<String> {
+    let found: Option<(Id, String, String, Option<String>, bool)> =
+        query_one(tx, "SELECT user_id, name, kinds, projects, interactive FROM agent_runner WHERE id = ?1", [runner], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+        })?;
+    let Some((owner, name, kinds, projects, interactive)) = found else {
+        return Err(ApiError::bad_request("That runner has not connected to this server"));
+    };
+
+    if interactive && owner != user.id {
+        return Err(ApiError::forbidden("That runner is somebody's computer; only its owner sends work to it by name"));
+    }
+
+    let kinds: Vec<String> = serde_json::from_str(&kinds).unwrap_or_default();
+    let projects: Option<Vec<String>> = projects.and_then(|projects| serde_json::from_str(&projects).ok());
+
+    if !kinds.iter().any(|taken| taken == kind.as_str()) {
+        return Err(ApiError::bad_request("That runner does not take runs of this kind"));
+    }
+
+    if projects.is_some_and(|projects| !projects.iter().any(|key| key.trim().eq_ignore_ascii_case(project_key))) {
+        return Err(ApiError::bad_request("That runner does not work for this project"));
+    }
+
+    Ok(name)
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -657,14 +703,21 @@ pub fn claim(tx: &Tx, user: &AuthUser, wanted: &Claim) -> ApiResult<Option<Id>> 
 
     tx.execute("UPDATE agent_runner SET last_seen_at = ?1 WHERE id = ?2", (&tx.now, runner))?;
 
+    let pinned_only: bool = query_one(tx, "SELECT pinned_only FROM agent_runner WHERE id = ?1", [runner], |row| row.get(0))?.unwrap_or(false);
     let (visible, mut params) = visible_projects(user, "r.project_id");
     let mut conditions = vec![
         visible,
         "r.state = 'queued'".to_string(),
-        "(r.requested_by = ? OR r.shared = 1)".to_string(),
+        // Sent to this runner by name; or to nobody, and then its requester's or shared.
+        if pinned_only { "r.on_runner = ?" } else { "(r.on_runner = ? OR (r.on_runner IS NULL AND (r.requested_by = ? OR r.shared = 1)))" }.to_string(),
         format!("r.kind IN ({})", placeholders(wanted.kinds.len())),
     ];
-    params.push(SqlValue::Integer(user.id));
+    params.push(SqlValue::Text(runner.to_string()));
+
+    if !pinned_only {
+        params.push(SqlValue::Integer(user.id));
+    }
+
     params.extend(wanted.kinds.iter().map(|kind| SqlValue::Text(kind.as_str().to_string())));
 
     if let Some(projects) = wanted.projects.as_ref().filter(|projects| !projects.is_empty()) {
@@ -677,7 +730,7 @@ pub fn claim(tx: &Tx, user: &AuthUser, wanted: &Claim) -> ApiResult<Option<Id>> 
         params.push(SqlValue::Integer(run_id));
     }
 
-    let Some(row) = rows(tx, &format!("WHERE {} ORDER BY r.id LIMIT 1", conditions.join(" AND ")), params)?.pop() else { return Ok(None) };
+    let Some(row) = rows(tx, &format!("WHERE {} ORDER BY r.on_runner IS NULL, r.id LIMIT 1", conditions.join(" AND ")), params)?.pop() else { return Ok(None) };
     let name = owner.unwrap_or_else(|| runner.to_string());
 
     hold(tx, row.run.id, runner, &name, Some(user.id))?;
@@ -694,6 +747,45 @@ pub fn hold(tx: &Tx, id: Id, runner: &str, name: &str, user_id: Option<Id>) -> A
     add_event(tx, id, AgentEventKind::Status, &format!("Taken by {name}"), None, None)?;
 
     announce(tx, id)
+}
+
+/// The runners as the list every module contributes to shows them (`docs/runners.md`), each
+/// with the runs it holds in projects the viewer may see.
+pub fn known(connection: &Connection, user: &AuthUser, now: DateTime<Utc>) -> ApiResult<Vec<hub_core::runners::Runner>> {
+    use hub_core::runners::{Runner, RunnerActive, RunnerWork};
+
+    let (visible, params) = visible_projects(user, "r.project_id");
+    let held = rows(connection, &format!("WHERE {visible} AND r.state IN ('claimed', 'running', 'waiting') AND r.runner_id IS NOT NULL ORDER BY r.id"), params)?;
+
+    Ok(runners(connection, user, now)?
+        .into_iter()
+        .map(|runner| {
+            let active = held
+                .iter()
+                .filter(|row| row.run.runner_id.as_deref() == Some(runner.id.as_str()))
+                .map(|row| RunnerActive { title: format!("{} · {}", row.run.issue_key, row.run.issue_summary), href: format!("/issue/{}", row.run.issue_key) })
+                .collect();
+
+            Runner {
+                work: vec![RunnerWork {
+                    module: crate::catalog::OWN_MODULE.to_string(),
+                    what: runner.kinds.iter().map(|kind| kind.as_str().to_string()).collect(),
+                    projects: runner.projects,
+                    pinned_only: runner.pinned_only,
+                    online: runner.online,
+                    last_seen_at: runner.last_seen_at.clone(),
+                    active,
+                }],
+                id: runner.id,
+                name: runner.name,
+                user_id: runner.user_id,
+                interactive: runner.interactive,
+                online: runner.online,
+                last_seen_at: runner.last_seen_at,
+                version: Some(runner.version).filter(|version| !version.is_empty()),
+            }
+        })
+        .collect())
 }
 
 fn requeue(tx: &Tx, id: Id, why: &str) -> ApiResult<()> {
@@ -749,7 +841,7 @@ pub fn runners(connection: &Connection, user: &AuthUser, now: DateTime<Utc>) -> 
     let online_since = iso(now - Duration::seconds(ONLINE_FOR_SECONDS));
     let all = query_all(
         connection,
-        "SELECT id, name, user_id, kinds, projects, version, last_seen_at, interactive FROM agent_runner ORDER BY last_seen_at DESC",
+        "SELECT id, name, user_id, kinds, projects, version, last_seen_at, interactive, pinned_only FROM agent_runner ORDER BY last_seen_at DESC",
         [],
         |row| {
             let kinds: String = row.get(3)?;
@@ -766,6 +858,7 @@ pub fn runners(connection: &Connection, user: &AuthUser, now: DateTime<Utc>) -> 
                 online: last_seen_at >= online_since,
                 last_seen_at,
                 interactive: row.get(7)?,
+                pinned_only: row.get(8)?,
             })
         },
     )?;

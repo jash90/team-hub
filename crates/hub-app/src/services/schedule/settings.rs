@@ -2,8 +2,9 @@
 
 use hub_core::schedule::{parse_time, parse_zone, ScheduleSettings};
 use rusqlite::Connection;
+use serde_json::json;
 
-use crate::app::{get_setting, set_setting};
+use crate::app::{get_setting, set_setting, Tx};
 use crate::auth::AuthUser;
 use crate::error::{ApiError, ApiResult};
 
@@ -20,8 +21,8 @@ fn time(text: &str, which: &str) -> ApiResult<String> {
         .ok_or_else(|| ApiError::bad_request(format!("The {which} time has to be written as hours and minutes, like 10:00")))
 }
 
-/// Saves the settings as an administrator. Times come back as "HH:MM", the zone as written.
-pub fn save_settings(connection: &Connection, user: &AuthUser, wanted: &ScheduleSettings) -> ApiResult<ScheduleSettings> {
+/// Saves the settings as an administrator, and tells open pages. Times come back as "HH:MM".
+pub fn save_settings(tx: &Tx, user: &AuthUser, wanted: &ScheduleSettings) -> ApiResult<ScheduleSettings> {
     user.require_admin()?;
 
     let timezone = wanted.timezone.trim();
@@ -41,7 +42,8 @@ pub fn save_settings(connection: &Connection, user: &AuthUser, wanted: &Schedule
         return Err(ApiError::bad_request("The morning run has to come before the afternoon one"));
     }
 
-    set_setting(connection, SETTING, &saved)?;
+    set_setting(tx, SETTING, &saved)?;
+    tx.emit("schedule.settings", None, None, json!({ "timezone": saved.timezone }))?;
 
     Ok(saved)
 }

@@ -15,10 +15,13 @@ serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 ts-rs.workspace = true
+# Artifacts: the upload is written to disk as it arrives, and served back with Range support.
+tokio = { workspace = true, features = ["io-util"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["fs"] }
+http-body-util = "0.1"
+mime = "0.3"
 # JUnit XML. A read-only tree with no DTD support, so entity tricks in a posted file do nothing.
 roxmltree = "0.21"
 
 [dev-dependencies]
-tokio.workspace = true
-tower = { version = "0.5", features = ["util"] }
-http-body-util = "0.1"

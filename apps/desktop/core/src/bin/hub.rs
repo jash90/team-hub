@@ -9,7 +9,8 @@ use std::time::Duration;
 use clap::{Parser, Subcommand, ValueEnum};
 use hub_core::priority_name;
 use hub_desktop_core::config::Paths;
-use hub_desktop_core::model::{AppEvent, EventKind, NewThread, Thread, ThreadEvent, ThreadKind, ThreadState};
+use hub_desktop_core::model::{AppEvent, NewThread, Thread, ThreadKind, ThreadState};
+use hub_desktop_core::runner::{self, line_of};
 use hub_desktop_core::secrets::{OsKeychain, TOKEN_VARIABLE};
 use hub_desktop_core::{CoreError, CoreResult, Desktop, OpenOptions};
 use serde::Serialize;
@@ -149,19 +150,6 @@ enum ThreadCommand {
 
 fn print_json<T: Serialize>(value: &T) {
     println!("{}", serde_json::to_string_pretty(value).unwrap_or_default());
-}
-
-fn line_of(event: &ThreadEvent) -> String {
-    let mark = match event.kind {
-        EventKind::Message => "agent ",
-        EventKind::Tool => "tool  ",
-        EventKind::Status => "      ",
-        EventKind::Question => "ASKS  ",
-        EventKind::Answer => "you   ",
-        EventKind::Error => "ERROR ",
-    };
-
-    format!("{mark}{}", event.text.replace('\n', "\n      "))
 }
 
 fn line_of_thread(thread: &Thread) -> String {
@@ -533,39 +521,7 @@ async fn run(cli: Cli, desktop: &Desktop) -> CoreResult<ExitCode> {
                 }
             }
         }
-        Command::Runner { once } => {
-            let mut events = desktop.subscribe();
-            let mut idle_rounds = 0;
-
-            println!("Runner {} is looking for runs. Ctrl-C to stop.", desktop.core().settings().runner_name);
-
-            loop {
-                tokio::select! {
-                    event = events.recv() => match event {
-                        Ok(AppEvent::ThreadEvent { thread_id, event }) => println!("#{thread_id} {}", line_of(&event)),
-                        Ok(AppEvent::Notify { title, .. }) => println!("* {title}"),
-                        _ => {}
-                    },
-                    () = tokio::time::sleep(Duration::from_millis(500)) => {
-                        desktop.tick(true).await?;
-
-                        let busy = desktop.run(|core| Ok(core.threads()?.iter().any(|thread| thread.state.is_active()))).await?;
-
-                        idle_rounds = if busy { 0 } else { idle_rounds + 1 };
-
-                        if once && idle_rounds >= 3 {
-                            break;
-                        }
-                    }
-                    _ = tokio::signal::ctrl_c() => {
-                        println!("Stopping…");
-                        desktop.shutdown().await;
-
-                        break;
-                    }
-                }
-            }
-        }
+        Command::Runner { once } => runner::attended(desktop, once).await?,
         Command::Proposals => {
             let pending = desktop.run(|core| core.pending_proposals()).await?;
 

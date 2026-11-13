@@ -17,4 +17,8 @@ online: boolean,
 /**
  * False for a runner with nobody at it (a container): see `AgentRun::runner_interactive`.
  */
-interactive: boolean, };
+interactive: boolean, 
+/**
+ * Takes only runs sent to it by name.
+ */
+pinnedOnly: boolean, };

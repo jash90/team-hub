@@ -304,6 +304,7 @@ pub(crate) struct DocStep {
 #[serde(rename_all = "camelCase", default)]
 pub(crate) struct DocEvent {
     pub(crate) kind: Option<String>,
+    pub(crate) started_at: Option<String>,
     pub(crate) status: Option<String>,
     pub(crate) duration_ms: Option<f64>,
     pub(crate) detail: Option<String>,

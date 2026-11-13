@@ -16,6 +16,7 @@ mod routes;
 pub mod rpc;
 mod runner_tools;
 pub mod runs;
+mod scheduled;
 mod schema;
 pub mod settings;
 pub mod types;
@@ -30,6 +31,7 @@ use axum::{Json, Router};
 use hub_app::access::visible_projects;
 use hub_app::db::{placeholders, query_all};
 use hub_app::{ApiResult, App, AuthUser, Module, ModuleMeta};
+use hub_core::schedule::{ScheduledTask, TaskKind, TaskStarted};
 use hub_core::{Id, IssueRow};
 use rusqlite::types::Value as SqlValue;
 use rusqlite::Connection;
@@ -121,8 +123,25 @@ impl Module for AgentsModule {
         Ok(if waiting.is_empty() { None } else { Some(json!({ "waiting": waiting })) })
     }
 
+    /// What the schedule can run: see `scheduled`.
+    fn runners(&self, connection: &Connection, viewer: &AuthUser, now: chrono::DateTime<chrono::Utc>) -> ApiResult<Vec<hub_core::runners::Runner>> {
+        runs::known(connection, viewer, now)
+    }
+
+    fn task_kinds(&self) -> Vec<TaskKind> {
+        scheduled::kinds()
+    }
+
+    fn start_task(&self, app: &App, task: &ScheduledTask, actor: &AuthUser) -> Option<ApiResult<TaskStarted>> {
+        (task.kind == scheduled::RUN_KIND).then(|| scheduled::start(app, task, actor))
+    }
+
     fn start(&self, app: &App) {
         worker::start(app);
+    }
+
+    fn seed_demo(&self, app: &App) -> ApiResult<()> {
+        scheduled::seed_demo(app)
     }
 }
 

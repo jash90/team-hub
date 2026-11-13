@@ -2,7 +2,7 @@
 //! repositories, the threads and the runner, behind one object. The window, the command line
 //! and the tests all drive this.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock, Weak};
@@ -19,6 +19,7 @@ use crate::api::{HubClient, LiveEvent, RunnerIdentity};
 use crate::config::{self, Paths};
 use crate::error::{CoreError, CoreResult};
 use crate::git;
+use crate::headless::Headless;
 use crate::model::{
     AppEvent, CacheMode, ConnectionStatus, DashboardView, EventKind, IssueView, NewThread, Proposal, ProposalKind, ProposalState, PullRequestPreview,
     PullRequestResult, PushPreview, PushResult, RepoCheck, RepoMapping, RepoStatus, RunnerStatus, SandboxState, SearchView, Settings, Thread,
@@ -27,10 +28,13 @@ use crate::model::{
 use crate::policy;
 use crate::protocol::{self, HubTool};
 use crate::push_guard;
-use crate::runs::{AgentRun, AgentRunDetail, NewRun, RunEventKind, RunKind, RunPatch, RunProposal, RunProposalState, RunState, RUNNER_KINDS};
+use crate::repos::Repos;
+use crate::runs::{
+    AgentRun, AgentRunDetail, NewRun, RunChanges, RunEventKind, RunKind, RunPatch, RunProposal, RunProposalState, RunState, RUNNER_KINDS,
+};
 use crate::secrets::{self, CacheKey, Keychain, Secret};
 use crate::store::{self, Store, ThreadSeed};
-use crate::threads::{Host, Runtime, RuntimeConfig};
+use crate::threads::{Host, Runtime, RuntimeConfig, Unattended};
 
 const HEARTBEAT_EVERY: Duration = Duration::from_secs(30);
 const MAX_CLAIMS_PER_TICK: usize = 20;
@@ -52,6 +56,8 @@ pub struct OpenOptions {
     pub sandbox: Option<SandboxState>,
     /// Whether GitHub's `gh` command is used to open pull requests. None: when it is installed.
     pub github_cli: Option<bool>,
+    /// Set for a runner nobody sits at (docs/cloud-runner.md); none: the desktop app.
+    pub headless: Option<Headless>,
 }
 
 impl OpenOptions {
@@ -65,6 +71,7 @@ impl OpenOptions {
             poll_every: Duration::from_secs(5),
             sandbox: None,
             github_cli: None,
+            headless: None,
         }
     }
 }
@@ -88,8 +95,34 @@ struct RunnerState {
     attach: HashMap<i64, i64>,
 }
 
+/// What a runner nobody sits at keeps beside the rest.
+struct HeadlessState {
+    kinds: Vec<RunKind>,
+    projects: Option<Vec<String>>,
+    repos: Repos,
+    /// Claimed runs whose repository is being cloned or fetched: they hold a slot already.
+    preparing: Mutex<HashSet<i64>>,
+    /// The head last sent as a run's changes: run id → commit.
+    changes_sent: Mutex<HashMap<i64, String>>,
+    /// How approved pushes and pull requests went, where the server has not heard it yet.
+    unreported: Mutex<Vec<(i64, Result<Value, String>)>>,
+    /// Threads the runner was working on when it last stopped. They are continued once the
+    /// server says their runs are still this runner's; until then the runs are told nothing.
+    interrupted: Mutex<Vec<i64>>,
+    /// Whether runs this runner holds without a thread have been looked for since it started.
+    orphans_adopted: AtomicBool,
+    /// Set when the runner is told to stop: from then on the server hears nothing about
+    /// threads, so that stopping for a redeploy does not read as cancelling them.
+    suspended: AtomicBool,
+}
+
 /// The logic. Its methods block (network, git, disk); `Desktop` gives them a thread.
 pub struct Core {
+    /// Itself, for work that outlives the call that started it.
+    this: Weak<Core>,
+    headless: Option<HeadlessState>,
+    /// Poked when the server announces something about a test job.
+    jobs_wake: Arc<Notify>,
     paths: Paths,
     store: Arc<Store>,
     keychain: Arc<dyn Keychain>,
@@ -890,8 +923,10 @@ impl Core {
             protocol::PROPOSE_PUSH => {
                 let branch = thread.branch.clone().ok_or_else(|| CoreError::not_possible("The thread has no branch to push"))?;
                 let note = input["note"].as_str().unwrap_or_default().trim();
+                // The commit the branch is at now: what a person is shown, and all that an approval covers.
+                let commit = thread.worktree.as_deref().and_then(|worktree| git::head(Path::new(&thread.repo_path), Path::new(worktree)).ok());
 
-                self.propose(thread, ProposalKind::Push, json!({ "branch": branch, "note": hub_core::text::truncate(note, 2000) }))
+                self.propose(thread, ProposalKind::Push, json!({ "branch": branch, "note": hub_core::text::truncate(note, 2000), "commit": commit }))
             }
             protocol::PROPOSE_PULL_REQUEST => {
                 let branch = thread.branch.clone().ok_or_else(|| CoreError::not_possible("The thread has no branch to open a pull request from"))?;
@@ -935,6 +970,11 @@ impl Core {
     /// Tells the run how a push or a pull request decided here went. The run only shows it,
     /// so a server that cannot be told now is told on a later round (`settle_decided`).
     fn settle_on_run(&self, proposal: &Proposal) {
+        // A headless runner's pushes and pull requests are decided on the web, not settled from here.
+        if self.headless.is_some() {
+            return;
+        }
+
         let (Some(remote_id), false) = (proposal.remote_id, proposal.kind.is_remote()) else { return };
         let approve = match proposal.state {
             ProposalState::Approved => true,
@@ -971,6 +1011,11 @@ impl Core {
             self.settle_on_run(&self.store.proposal(existing.id)?);
         }
 
+        // The person deciding on the web has to see what the proposal is about before it arrives.
+        if !kind.is_remote() {
+            self.upload_changes(thread);
+        }
+
         let shown = if kind.is_remote() { payload.clone() } else { Self::shown_on_run(kind, &payload) };
         let remote = match thread.run_id {
             Some(run_id) => match self.client().and_then(|client| self.seen(client.add_run_proposal(run_id, kind.as_str(), &shown))) {
@@ -990,12 +1035,14 @@ impl Core {
             self.apply_remote_proposals(thread, &[remote])?;
         }
 
-        let what = match kind {
-            ProposalKind::Comment => "a comment on the issue",
-            ProposalKind::Transition => "a status change",
-            ProposalKind::CreateSubtasks => "subtasks",
-            ProposalKind::Push => "pushing the branch (decided in the desktop app)",
-            ProposalKind::PullRequest => "opening a pull request (decided in the desktop app)",
+        let what = match (kind, self.headless.is_some()) {
+            (ProposalKind::Comment, _) => "a comment on the issue",
+            (ProposalKind::Transition, _) => "a status change",
+            (ProposalKind::CreateSubtasks, _) => "subtasks",
+            (ProposalKind::Push, false) => "pushing the branch (decided in the desktop app)",
+            (ProposalKind::PullRequest, false) => "opening a pull request (decided in the desktop app)",
+            (ProposalKind::Push, true) => "pushing the branch (decided on the web)",
+            (ProposalKind::PullRequest, true) => "opening a pull request (decided on the web)",
         };
         let event = self.store.add_event(
             thread.id,
@@ -1018,6 +1065,9 @@ impl Core {
             let Some(local) = self.store.proposal_by_remote(remote.id)? else { continue };
             let state = match remote.state {
                 RunProposalState::Pending | RunProposalState::Other => continue,
+                // Approved on the web for a headless runner means "carry it out", which
+                // `carry_out_approved` does and records.
+                RunProposalState::Approved if self.headless.is_some() && !local.kind.is_remote() => continue,
                 RunProposalState::Approved => ProposalState::Approved,
                 RunProposalState::Rejected => ProposalState::Rejected,
                 RunProposalState::Failed => ProposalState::Failed,
@@ -1183,24 +1233,24 @@ impl Core {
         }
 
         git::push(Path::new(&thread.repo_path), &branch, &read.commit)?;
+        self.say_pushed(thread_id, &branch, &read)?;
 
         let result = PushResult { branch: branch.clone(), commit: read.commit.clone(), remote_url: read.remote_url };
-        let short: String = read.commit.chars().take(8).collect();
-        let event = self.store.add_event(
-            thread_id,
-            EventKind::Status,
-            &format!(
-                "Pushed {branch} at {short} ({})",
-                if read.commits.len() == 1 { "1 commit".to_string() } else { format!("{} commits", read.commits.len()) }
-            ),
-            &json!({ "commit": read.commit }),
-            false,
-        )?;
 
-        self.emit(AppEvent::ThreadEvent { thread_id, event });
         self.settle_local(thread_id, ProposalKind::Push, ProposalState::Approved, &serde_json::to_value(&result)?)?;
 
         Ok(result)
+    }
+
+    fn say_pushed(&self, thread_id: i64, branch: &str, read: &git::PushRead) -> CoreResult<()> {
+        let short: String = read.commit.chars().take(8).collect();
+        let count = if read.commits.len() == 1 { "1 commit".to_string() } else { format!("{} commits", read.commits.len()) };
+        let event =
+            self.store.add_event(thread_id, EventKind::Status, &format!("Pushed {branch} at {short} ({count})"), &json!({ "commit": read.commit }), false)?;
+
+        self.emit(AppEvent::ThreadEvent { thread_id, event });
+
+        Ok(())
     }
 
     fn default_branch_name(repo: &Path) -> String {
@@ -1375,6 +1425,21 @@ impl Core {
 
     fn identity(&self) -> CoreResult<RunnerIdentity> {
         let settings = self.settings();
+        let version = env!("CARGO_PKG_VERSION").to_string();
+
+        // A headless runner clones what a run names, so it works for the projects it was
+        // told to, or for all of them; the desktop app works for those it has a clone of.
+        if let Some(headless) = &self.headless {
+            return Ok(RunnerIdentity {
+                id: settings.runner_id,
+                name: settings.runner_name,
+                kinds: headless.kinds.clone(),
+                projects: headless.projects.clone(),
+                version,
+                interactive: false,
+            });
+        }
+
         let mut projects: Vec<String> = self.store.repos()?.into_iter().map(|repo| repo.project_key).collect();
 
         projects.sort();
@@ -1384,8 +1449,9 @@ impl Core {
             id: settings.runner_id,
             name: settings.runner_name,
             kinds: RUNNER_KINDS.to_vec(),
-            projects,
-            version: env!("CARGO_PKG_VERSION").to_string(),
+            projects: Some(projects),
+            version,
+            interactive: true,
         })
     }
 
@@ -1432,8 +1498,11 @@ impl Core {
 
         while taken < MAX_CLAIMS_PER_TICK && self.runs_api() {
             let waiting_for_own = !lock(&self.runner).attach.is_empty();
-            let busy = self.store.threads().map(|threads| threads.iter().filter(|thread| thread.state.is_active()).count()).unwrap_or(usize::MAX);
-            let has_slot = settings.runner_enabled && !identity.projects.is_empty() && busy < settings.max_running as usize;
+            let preparing = self.headless.as_ref().map_or(0, |headless| lock(&headless.preparing).len());
+            let working = self.store.threads().map(|threads| threads.iter().filter(|thread| thread.state.is_active()).count()).unwrap_or(usize::MAX);
+            let busy = working.saturating_add(preparing);
+            let has_work = !identity.kinds.is_empty() && identity.projects.as_ref().is_none_or(|projects| !projects.is_empty());
+            let has_slot = settings.runner_enabled && has_work && busy < settings.max_running as usize;
 
             if !waiting_for_own && !has_slot {
                 break;
@@ -1444,12 +1513,7 @@ impl Core {
                     taken += 1;
 
                     if let Err(error) = self.adopt(&client, &detail) {
-                        let patch = RunPatch {
-                            state: Some(RunState::Failed),
-                            summary: Some(format!("The desktop runner could not start this run: {error}")),
-                            ..Default::default()
-                        };
-                        let _ = client.patch_run(detail.run.id, &patch);
+                        self.refuse_run(&client, detail.run.id, &error);
                     }
                 }
                 Ok(None) => {
@@ -1479,6 +1543,13 @@ impl Core {
         taken
     }
 
+    /// Ends a claimed run that could not be started here, with the reason for the person.
+    fn refuse_run(&self, client: &HubClient, run_id: i64, error: &CoreError) {
+        let who = if self.headless.is_some() { "The runner" } else { "The desktop runner" };
+        let patch = RunPatch { state: Some(RunState::Failed), summary: Some(format!("{who} could not start this run: {error}")), ..Default::default() };
+        let _ = client.patch_run(run_id, &patch);
+    }
+
     /// Turns a claimed run into a thread, or ties it to the thread it was created for.
     fn adopt(&self, client: &HubClient, detail: &AgentRunDetail) -> CoreResult<()> {
         let run = &detail.run;
@@ -1496,7 +1567,50 @@ impl Core {
         }
 
         let (project_key, _) = hub_core::keys::parse_issue_key(&run.issue_key).ok_or_else(|| CoreError::not_possible("the run names no issue"))?;
+
+        if let (Some(headless), Some(core)) = (&self.headless, self.this.upgrade()) {
+            // Cloning can take minutes, and the runner has to keep answering meanwhile.
+            let (client, detail) = (client.clone(), detail.clone());
+
+            lock(&headless.preparing).insert(run.id);
+            std::thread::spawn(move || core.adopt_with_clone(&client, &detail, &project_key));
+
+            return Ok(());
+        }
+
         let repo = self.repo_for(&project_key, None, run.repo.as_deref())?;
+
+        self.enqueue_run(client, detail, project_key, repo)
+    }
+
+    /// The headless way to a repository: the clone of what the run names, made or fetched
+    /// now and mapped to the run's project. The run then becomes a thread like any other.
+    fn adopt_with_clone(&self, client: &HubClient, detail: &AgentRunDetail, project_key: &str) {
+        let Some(headless) = &self.headless else { return };
+        let run = &detail.run;
+        let cloned = || -> CoreResult<RepoMapping> {
+            let name = run.repo.as_deref().map(str::trim).filter(|name| !name.is_empty()).ok_or_else(|| {
+                CoreError::not_possible(
+                    "the run names no repository. A cloud runner works in the repository a run names as owner/name: connect one to the project and start the run again",
+                )
+            })?;
+            let path = headless.repos.ensure(name)?;
+
+            self.store.add_repo(project_key, Some(&name.to_lowercase()), &path.to_string_lossy())
+        };
+        let started = cloned().and_then(|repo| self.enqueue_run(client, detail, project_key.to_string(), repo));
+
+        lock(&headless.preparing).remove(&run.id);
+
+        if let Err(error) = started {
+            self.refuse_run(client, run.id, &error);
+        }
+
+        self.wake.notify_one();
+    }
+
+    fn enqueue_run(&self, client: &HubClient, detail: &AgentRunDetail, project_key: String, repo: RepoMapping) -> CoreResult<()> {
+        let run = &detail.run;
         let (issue, project) = Self::issue_with_project(client, &run.issue_key)?;
         let kind = run.kind.thread_kind();
         let seed = ThreadSeed {
@@ -1516,7 +1630,7 @@ impl Core {
         let thread = self.runtime().enqueue(&seed)?;
 
         self.emit(AppEvent::Notify {
-            title: format!("{} was delegated to this computer", thread.issue_key),
+            title: format!("{} was delegated to this {}", thread.issue_key, if self.headless.is_some() { "runner" } else { "computer" }),
             body: thread.issue_summary.clone(),
             thread_id: Some(thread.id),
             issue_key: Some(thread.issue_key),
@@ -1556,6 +1670,10 @@ impl Core {
     /// Sends what the run on the server does not have yet: the thread's events in order, then
     /// its state. Says whether the server asked for the run to be cancelled.
     fn sync_thread(&self, thread: &Thread) -> bool {
+        if self.holds_back(thread.id) {
+            return false;
+        }
+
         let (Some(run_id), Ok(client)) = (thread.run_id, self.client()) else { return false };
 
         let mut posted = false;
@@ -1608,6 +1726,11 @@ impl Core {
             return false;
         }
 
+        // A run that ends takes no more writes: what the thread committed goes first.
+        if patch.state.is_some() {
+            self.upload_changes(thread);
+        }
+
         match self.seen(client.patch_run(run_id, &patch)) {
             Ok(run) => {
                 let _ = self.store.set_run_sent(thread.id, &serde_json::to_value(&now).unwrap_or_default());
@@ -1657,6 +1780,9 @@ impl Core {
                 let _ = self.store.set_answers_seen(thread.id, answer.id);
                 let _ = self.runtime().resume(thread.id, Some(&answer.text), true);
             }
+
+            self.upload_changes(&thread);
+            self.carry_out_approved(&thread, &detail.proposals);
 
             let _ = self.apply_remote_proposals(&thread, &detail.proposals);
 
@@ -1709,6 +1835,11 @@ impl Core {
     /// One round of the runner. `full` also talks to the server about things that did not
     /// start here: heartbeat, queued runs, answers and decisions. Returns threads to stop.
     pub fn tick(&self, full: bool) -> Vec<i64> {
+        // A runner that is stopping claims nothing more and tells the server nothing.
+        if self.headless.as_ref().is_some_and(|headless| headless.suspended.load(Ordering::SeqCst)) {
+            return Vec::new();
+        }
+
         let Ok(client) = self.client() else { return Vec::new() };
         let mut to_stop = Vec::new();
 
@@ -1720,6 +1851,10 @@ impl Core {
             return to_stop;
         }
 
+        if full {
+            self.continue_interrupted(&client);
+        }
+
         for thread in self.store.threads().unwrap_or_default().iter().filter(|thread| thread.run_id.is_some()) {
             if self.sync_thread(thread) {
                 to_stop.push(thread.id);
@@ -1729,7 +1864,12 @@ impl Core {
         if full {
             self.claim_runs();
             to_stop.extend(self.poll_runs(&client));
-            self.check_notifications(&client);
+            self.report_unreported();
+
+            // Mentions and assignments are news for a person; a headless runner has none.
+            if self.headless.is_none() {
+                self.check_notifications(&client);
+            }
         }
 
         to_stop.sort_unstable();
@@ -1742,11 +1882,284 @@ impl Core {
     }
 
     fn on_live(&self, event: &LiveEvent) {
+        // A job's log lines are not news for whoever would run a job.
+        if event.kind == "e2e.job" {
+            self.jobs_wake.notify_one();
+
+            return;
+        }
+
+        if event.kind.starts_with("e2e.") {
+            return;
+        }
+
         let key = event.payload["issueKey"].as_str().or_else(|| event.payload["key"].as_str());
         let scope = if event.kind.starts_with("agent.") { "runs" } else { "issue" };
 
         self.data_changed(scope, key);
         self.wake.notify_one();
+    }
+}
+
+// ---------- a runner nobody sits at: docs/cloud-runner.md ----------
+
+impl Core {
+    pub fn is_headless(&self) -> bool {
+        self.headless.is_some()
+    }
+
+    /// The clones a headless runner keeps by itself.
+    pub fn clones(&self) -> CoreResult<&Repos> {
+        self.headless.as_ref().map(|headless| &headless.repos).ok_or_else(|| CoreError::not_possible("Only a headless runner clones repositories by itself"))
+    }
+
+    /// The projects a headless runner was told to work for; none: all the person can edit.
+    pub fn runner_projects(&self) -> Option<Vec<String>> {
+        self.headless.as_ref().and_then(|headless| headless.projects.clone())
+    }
+
+    /// Poked when the server announces a change to a test job.
+    pub fn jobs_wake(&self) -> Arc<Notify> {
+        Arc::clone(&self.jobs_wake)
+    }
+
+    /// Whether the server is told nothing about this thread for now: the runner is stopping,
+    /// or it has yet to learn whether the thread's run is still its own.
+    fn holds_back(&self, thread_id: i64) -> bool {
+        self.headless.as_ref().is_some_and(|headless| headless.suspended.load(Ordering::SeqCst) || lock(&headless.interrupted).contains(&thread_id))
+    }
+
+    /// Sends what the thread has committed to its run, when the run does not have that head
+    /// yet (`PUT /runs/{id}/changes`), so a person can look before anything is pushed.
+    fn upload_changes(&self, thread: &Thread) {
+        let Some(headless) = &self.headless else { return };
+        let (Some(run_id), Some(worktree), Some(base)) = (thread.run_id, thread.worktree.as_deref(), thread.base_commit.as_deref()) else { return };
+        let repo = Path::new(&thread.repo_path);
+        let Ok(head) = git::head(repo, Path::new(worktree)) else { return };
+
+        if head == base || lock(&headless.changes_sent).get(&run_id) == Some(&head) {
+            return;
+        }
+
+        let sent = git::committed(repo, base, &head)
+            .map(|committed| RunChanges::of(base, &head, committed))
+            .and_then(|changes| self.seen(self.client()?.put_changes(run_id, &changes)));
+
+        // A server that could not be reached is asked again on the next round. One that
+        // refused (the run is over) would refuse this head again, so it is not asked twice.
+        if !sent.is_err_and(|error| error.is_offline()) {
+            lock(&headless.changes_sent).insert(run_id, head);
+        }
+    }
+
+    fn push_is_undecided(&self, thread_id: i64) -> bool {
+        self.store
+            .proposals(thread_id)
+            .unwrap_or_default()
+            .iter()
+            .any(|proposal| proposal.kind == ProposalKind::Push && proposal.state == ProposalState::Pending)
+    }
+
+    /// Carries out the pushes and pull requests of this thread that a person approved on the
+    /// web: `approved` with no result means "approved, the runner is carrying it out". Pushes
+    /// go first, and a pull request waits while a push of the thread is still undecided,
+    /// because there is nothing to open it from before the branch is on the server.
+    fn carry_out_approved(&self, thread: &Thread, proposals: &[RunProposal]) {
+        if self.headless.is_none() {
+            return;
+        }
+
+        let waits = |remote: &&RunProposal| {
+            remote.state == RunProposalState::Approved && remote.result.is_null() && matches!(remote.kind.as_str(), "push" | "pull_request")
+        };
+        let mut approved: Vec<&RunProposal> = proposals.iter().filter(waits).collect();
+
+        approved.sort_by_key(|remote| remote.kind != "push");
+
+        for remote in approved {
+            let Ok(Some(local)) = self.store.proposal_by_remote(remote.id) else { continue };
+            let outcome = match local.state {
+                ProposalState::Pending if local.kind == ProposalKind::PullRequest && self.push_is_undecided(thread.id) => continue,
+                ProposalState::Pending => {
+                    let done = match local.kind {
+                        ProposalKind::Push => self.push_approved(thread, &local, remote),
+                        _ => self.pull_request_approved(thread, remote),
+                    };
+                    let outcome = done.map_err(|error| error.to_string());
+                    let _ = match &outcome {
+                        Ok(result) => self.store.decide_proposal(local.id, ProposalState::Approved, None, result),
+                        Err(reason) => self.store.decide_proposal(local.id, ProposalState::Failed, Some(reason), &Value::Null),
+                    };
+
+                    self.emit(AppEvent::ThreadChanged { thread_id: thread.id });
+                    outcome
+                }
+                // Carried out on an earlier round, and the server did not hear how it went.
+                ProposalState::Approved => Ok(local.result.clone()),
+                ProposalState::Failed | ProposalState::Rejected => Err(local.note.clone().unwrap_or_else(|| "It was not carried out.".to_string())),
+            };
+
+            self.report_outcome(remote.id, outcome);
+        }
+    }
+
+    /// Tells the server how an approved push or pull request went. An answer that cannot be
+    /// delivered now is kept and sent on a later round.
+    fn report_outcome(&self, remote_id: i64, outcome: Result<Value, String>) {
+        let Some(headless) = &self.headless else { return };
+        let sent = self.client().and_then(|client| self.seen(client.report_proposal(remote_id, &outcome)));
+        let mut unreported = lock(&headless.unreported);
+
+        unreported.retain(|(id, _)| *id != remote_id);
+
+        if sent.is_err_and(|error| error.is_offline()) {
+            unreported.push((remote_id, outcome));
+        }
+    }
+
+    fn report_unreported(&self) {
+        let waiting = self.headless.as_ref().map(|headless| lock(&headless.unreported).clone()).unwrap_or_default();
+
+        for (remote_id, outcome) in waiting {
+            self.report_outcome(remote_id, outcome);
+        }
+    }
+
+    /// Pushes the commit a person approved on the web: exactly the one the proposal showed,
+    /// never a later one, never forced. What the desktop app would ask a second confirmation
+    /// for (CI and build files, something like a secret, a binary) is not pushed from here
+    /// at all: nobody is at this machine to give it.
+    fn push_approved(&self, thread: &Thread, local: &Proposal, remote: &RunProposal) -> CoreResult<Value> {
+        let shown = remote.payload["commit"].as_str().unwrap_or_default();
+
+        if shown.is_empty() || local.payload["commit"].as_str() != Some(shown) {
+            return Err(CoreError::not_possible("The approved proposal does not name the commit this runner showed, so nothing was pushed."));
+        }
+
+        // The server's branch as it is now, so that what is read and judged is what would be sent.
+        self.clones()?.fetch(Path::new(&thread.repo_path))?;
+
+        let (read, branch) = self.push_read(thread, Some(shown))?;
+
+        if let Some(blocked) = read.blocked {
+            return Err(CoreError::not_possible(blocked));
+        }
+
+        let findings = push_guard::review(&read.readings);
+
+        if !findings.is_empty() {
+            let listed = findings.iter().map(|found| found.detail.clone()).collect::<Vec<_>>().join("; ");
+
+            return Err(CoreError::not_possible(format!(
+                "Not pushed. This needs a second look that a runner nobody sits at cannot give: {listed}. The diff is on the run; apply it by hand if it is wanted."
+            )));
+        }
+
+        self.clones()?.push(Path::new(&thread.repo_path), &branch, &read.commit)?;
+        self.say_pushed(thread.id, &branch, &read)?;
+
+        Ok(json!({ "commit": read.commit }))
+    }
+
+    /// Opens the pull request a person approved on the web, through the server and with the
+    /// server's GitHub token: a headless runner has no `gh` and no browser to fall back on.
+    fn pull_request_approved(&self, thread: &Thread, remote: &RunProposal) -> CoreResult<Value> {
+        let branch = thread.branch.clone().ok_or_else(|| CoreError::not_possible("The thread has no branch yet"))?;
+        let repo_path = Path::new(&thread.repo_path);
+
+        if !git::on_remote(repo_path, &branch) {
+            return Err(CoreError::not_possible(format!("Branch {branch} is not on GitHub: its push has to be approved first.")));
+        }
+
+        let code = self.code_on_server(thread);
+
+        if let Some(url) = thread.pull_request_url.clone().or_else(|| Self::known_pull_request(code.as_ref(), thread)) {
+            self.store.set_pull_request(thread.id, &url)?;
+
+            return Ok(json!({ "url": url }));
+        }
+
+        let repo = self.store.repo(thread.repo_id).ok().and_then(|mapping| mapping.github_repo);
+        let repo_id = Self::repo_on_server(code.as_ref(), repo.as_deref()).ok_or_else(|| {
+            CoreError::not_possible(format!(
+                "The server cannot open the pull request: {} is not connected to project {} there (Code → Repositories).",
+                repo.as_deref().unwrap_or("the repository"),
+                thread.project_key
+            ))
+        })?;
+        let text = |field: &str| remote.payload[field].as_str().map(str::trim).filter(|text| !text.is_empty());
+        let title = text("title").map(String::from).unwrap_or_else(|| format!("{} {}", thread.issue_key, thread.issue_summary));
+        let base = text("base").map(String::from).unwrap_or_else(|| Self::default_branch_name(repo_path));
+        let new = json!({ "repoId": repo_id, "head": branch, "base": base, "title": title, "body": text("body").unwrap_or_default() });
+        let opened = self.seen(self.client()?.open_pull_request(&thread.issue_key, &new))?;
+        let url = opened["url"].as_str().ok_or_else(|| CoreError::not_possible("The server opened the pull request but did not say where it is."))?;
+
+        self.store.set_pull_request(thread.id, url)?;
+
+        let event = self.store.add_event(thread.id, EventKind::Status, &format!("Pull request opened: {url}"), &json!({ "url": url }), false)?;
+
+        self.emit(AppEvent::ThreadEvent { thread_id: thread.id, event });
+
+        Ok(json!({ "url": url }))
+    }
+
+    /// After a restart: threads that were working when the runner stopped go on where they
+    /// were, in the same session, when the server says their runs are still this runner's.
+    /// A run that went back to the queue or to another runner meanwhile is let go, and one
+    /// that was cancelled is told so by the ordinary round. Runs this runner holds without
+    /// a thread (it stopped while cloning for them) are taken up again.
+    fn continue_interrupted(&self, client: &HubClient) {
+        let Some(headless) = &self.headless else { return };
+        let runner_id = self.settings().runner_id;
+        let waiting = lock(&headless.interrupted).clone();
+        let settled = |thread_id: i64| lock(&headless.interrupted).retain(|id| *id != thread_id);
+
+        for thread_id in waiting {
+            let run_id = self.store.thread(thread_id).ok().and_then(|thread| thread.run_id);
+            let detail = match run_id.map(|run_id| self.seen(client.run(run_id))) {
+                Some(Err(error)) if error.is_offline() => continue,
+                Some(Ok(detail)) => Some(detail),
+                _ => None,
+            };
+            let still_ours = detail.as_ref().is_some_and(|detail| {
+                detail.run.runner_id.as_deref() == Some(runner_id.as_str()) && !detail.run.state.is_finished() && detail.run.state != RunState::Queued
+            });
+
+            match detail {
+                Some(detail) if still_ours && !detail.run.cancel_requested => {
+                    let _ = self.runtime().resume(thread_id, None, true);
+                }
+                Some(_) if still_ours => {}
+                _ => {
+                    let _ = self.store.set_run(thread_id, None);
+                    let _ = self.store.add_event(
+                        thread_id,
+                        EventKind::Status,
+                        "The run of this thread went on without this runner while it was stopped; the thread stays stopped.",
+                        &Value::Null,
+                        true,
+                    );
+                }
+            }
+
+            settled(thread_id);
+        }
+
+        if !headless.orphans_adopted.load(Ordering::SeqCst) {
+            let Ok(runs) = self.seen(client.runs(false, 100)) else { return };
+
+            headless.orphans_adopted.store(true, Ordering::SeqCst);
+
+            for run in runs.iter().filter(|run| run.runner_id.as_deref() == Some(runner_id.as_str()) && run.state == RunState::Claimed) {
+                let known = self.store.thread_of_run(run.id).ok().flatten().is_some() || lock(&headless.preparing).contains(&run.id);
+
+                if let (false, Ok(detail)) = (known, client.run(run.id)) {
+                    if let Err(error) = self.adopt(client, &detail) {
+                        self.refuse_run(client, run.id, &error);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1772,10 +2185,23 @@ impl Desktop {
         options.paths.create()?;
 
         let store = Arc::new(Store::open(&options.paths.database())?);
-        let settings = config::load_settings(&options.paths)?;
+        let saved = config::load_settings(&options.paths)?;
+        let settings = match &options.headless {
+            Some(headless) => {
+                let settings = headless.settings(saved);
+
+                headless.folders.create()?;
+                config::private_to_owner(&options.paths.worktrees);
+                config::save_settings(&options.paths, &settings)?;
+                settings
+            }
+            None => saved,
+        };
         let cache_key = CacheKey::load_or_create(options.keychain.as_ref())?;
         let (events, _) = broadcast::channel(1024);
-        let sandbox = options.sandbox.unwrap_or_else(policy::sandbox_state);
+        // Where nobody is there to notice a shell that fails to start, the sandbox is tried, not assumed.
+        let detect = if options.headless.is_some() { policy::sandbox_probe } else { policy::sandbox_state };
+        let sandbox = options.sandbox.unwrap_or_else(detect);
         let from_env = std::env::var(config::SIDECAR_VARIABLE)
             .ok()
             .map(|line| line.split_whitespace().map(String::from).collect::<Vec<_>>())
@@ -1785,6 +2211,18 @@ impl Desktop {
             (None, Some(parts)) => (parts[0].clone(), parts[1..].to_vec()),
             (None, None) => default_helper(&settings.node_command, options.sidecar_script.as_deref()),
         };
+        let mut private_paths = policy::private_paths(&options.paths.state);
+        let unattended = options.headless.as_ref().map(|headless| {
+            let folders = &headless.folders;
+
+            private_paths.extend([folders.jobs.clone(), folders.browsers.clone(), folders.helper_home.clone()]);
+
+            Unattended {
+                helper_home: folders.helper_home.clone(),
+                model_key: headless.model_key.clone(),
+                shared_roots: vec![(folders.repos.clone(), 2), (options.paths.worktrees.clone(), 2)],
+            }
+        });
         let runtime_config = RuntimeConfig {
             program,
             arguments,
@@ -1792,12 +2230,28 @@ impl Desktop {
             max_turns: settings.max_turns,
             stop_grace: options.stop_grace,
             worktrees_root: options.paths.worktrees.clone(),
-            private_paths: policy::private_paths(&options.paths.state),
+            private_paths,
             sandbox,
             allow_unsandboxed_shell: settings.allow_unsandboxed_shell,
             env: BTreeMap::new(),
+            unattended,
         };
-        let core = Arc::new(Core {
+        let is_headless = options.headless.is_some();
+        let headless = options.headless.map(|headless| HeadlessState {
+            kinds: headless.kinds,
+            projects: headless.projects,
+            repos: Repos::new(headless.folders.repos, &headless.git_base, headless.github_token),
+            preparing: Mutex::new(HashSet::new()),
+            changes_sent: Mutex::new(HashMap::new()),
+            unreported: Mutex::new(Vec::new()),
+            interrupted: Mutex::new(Vec::new()),
+            orphans_adopted: AtomicBool::new(false),
+            suspended: AtomicBool::new(false),
+        });
+        let core = Arc::new_cyclic(|this| Core {
+            this: this.clone(),
+            headless,
+            jobs_wake: Arc::new(Notify::new()),
             paths: options.paths,
             store: Arc::clone(&store),
             keychain: options.keychain,
@@ -1809,14 +2263,27 @@ impl Desktop {
             events: events.clone(),
             runtime: OnceLock::new(),
             sandbox,
-            github_cli: options.github_cli.unwrap_or_else(Core::gh_installed),
+            // A headless runner opens pull requests through the server and never with `gh`.
+            github_cli: !is_headless && options.github_cli.unwrap_or_else(Core::gh_installed),
             seen_notification: AtomicI64::new(-1),
             wake: Arc::new(Notify::new()),
             closing: Arc::new(AtomicBool::new(false)),
         });
-        let runtime = Runtime::new(store, runtime_config, Arc::new(Bridge(Arc::downgrade(&core))), events);
+        let runtime = Runtime::new(Arc::clone(&store), runtime_config, Arc::new(Bridge(Arc::downgrade(&core))), events);
 
         runtime.recover()?;
+
+        if let Some(headless) = &core.headless {
+            // Stopped without the server having been told: the runner stopped under them.
+            let told = |thread: &Thread| {
+                let sent = store.thread_private(thread.id).map(|private| private.run_sent).unwrap_or_default();
+
+                serde_json::from_value::<RunPatch>(sent).is_ok_and(|sent| sent.state.is_some_and(RunState::is_finished))
+            };
+            let interrupted = store.threads_in(ThreadState::Stopped)?.into_iter().filter(|thread| thread.run_id.is_some() && !told(thread));
+
+            *lock(&headless.interrupted) = interrupted.map(|thread| thread.id).collect();
+        }
 
         let _ = core.runtime.set(runtime);
 
@@ -1923,6 +2390,30 @@ impl Desktop {
     pub fn close(&self) {
         self.core.closing.store(true, Ordering::SeqCst);
         self.core.wake.notify_one();
+    }
+
+    /// For a headless runner that is told to stop (a redeploy, a restart): every helper ends
+    /// at once, and the server is told nothing, so the runs stay this runner's. When it comes
+    /// back it continues them (`continue_interrupted`); if it never does, the server gives
+    /// them to another runner by itself.
+    pub async fn suspend(&self) {
+        if let Some(headless) = &self.core.headless {
+            headless.suspended.store(true, Ordering::SeqCst);
+        }
+
+        self.close();
+
+        let mut stops = tokio::task::JoinSet::new();
+
+        for state in [ThreadState::Queued, ThreadState::Running] {
+            for thread in self.core.store.threads_in(state).unwrap_or_default() {
+                let runtime = self.core.runtime().clone();
+
+                stops.spawn(async move { runtime.stop(thread.id).await.map(|_| ()) });
+            }
+        }
+
+        while stops.join_next().await.is_some() {}
     }
 
     /// For when the app quits: stops every working thread, so no agent runs on unseen, and

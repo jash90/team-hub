@@ -543,6 +543,39 @@
   gap: 4px 8px;
 }
 
+.agents-runner-kind {
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.agents-where {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.agents-where:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.agents-where > input {
+  margin-top: 3px;
+}
+
+.agents-where > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .agents-dot {
   flex: none;
   width: 8px;

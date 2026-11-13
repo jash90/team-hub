@@ -4,6 +4,7 @@ import type { Bootstrap } from './bindings/Bootstrap.ts';
 import type { Issue } from './bindings/Issue.ts';
 import type { IssueRow } from './bindings/IssueRow.ts';
 import type { Project } from './bindings/Project.ts';
+import type { RunnerWork } from './bindings/RunnerWork.ts';
 import type { IconName } from './components/icon.tsx';
 import { addTranslations } from './i18n/index.ts';
 import type { Params } from './router.tsx';
@@ -34,6 +35,8 @@ export type WebModule = {
   projectSettings?: { id: string; label: () => string; render: (project: Project) => ReactNode }[];
   /** Tabs in the instance settings. */
   settings?: { id: string; label: () => string; adminOnly?: boolean; render: () => ReactNode }[];
+  /** What a runner does for this module, in a few words, for the list of runners. */
+  runnerWork?: (work: RunnerWork) => string;
   /** Polish for the module's phrases. */
   polish?: Record<string, string>;
 };

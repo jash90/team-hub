@@ -23,6 +23,7 @@ import {
   ProjectSettingsView,
   ProjectsView,
   ReleasesView,
+  RunnersView,
   SearchView,
   SettingsView,
   preloadViews,
@@ -152,6 +153,7 @@ const CORE: (Route & { view: { preload: () => Promise<void> } })[] = [
   { pattern: '/projects', view: ProjectsView, render: () => <ProjectsView /> },
   { pattern: '/search', view: SearchView, render: () => <SearchView /> },
   { pattern: '/issue/:key', view: IssueView, render: (found) => <IssueView issueKey={found.key.toUpperCase()} mode="page" /> },
+  { pattern: '/runners', view: RunnersView, render: () => <RunnersView /> },
   { pattern: '/settings/:tab?', view: SettingsView, render: (found) => <SettingsView tab={found.tab} /> },
   { pattern: '/p/:key/board', view: BoardView, render: inProject(<BoardView />) },
   { pattern: '/p/:key/backlog', view: BacklogView, render: inProject(<BacklogView />) },
@@ -340,6 +342,7 @@ function Shell() {
           </>
         )}
         <div className="nav-foot">
+          <NavLink entry={{ id: 'runners', label: () => t('Runners'), icon: 'layers', path: '/runners' }} path={path} />
           <NavLink entry={{ id: 'settings', label: () => t('Settings'), icon: 'puzzle', path: '/settings' }} path={path} />
         </div>
       </aside>

@@ -142,6 +142,7 @@ function statusText(text: string): string {
     [/^A proposal was refused: (.+)$/, (found) => t('A proposal was refused: {why}', { why: translateServer(found[1]) })],
     [/^Cancelled$/, () => t('Cancelled')],
     [/^Asked to stop$/, () => t('Asked to stop')],
+    [/^Sent to (.+)$/, (found) => t('Sent to {name}', { name: found[1] })],
     [/^The runner stopped answering; the run is queued again$/, () => t('The runner stopped answering; the run is queued again')],
     [/^The server restarted; the run is queued again$/, () => t('The server restarted; the run is queued again')],
   ];
@@ -210,6 +211,10 @@ function QueueNote({ run, settings }: { run: AgentRun; settings: AgentSettings |
 
   if (!settings) {
     return null;
+  }
+
+  if (run.onRunner) {
+    return <SentToNote run={run} />;
   }
 
   if (!forServer || !settings.serverKinds.includes(run.kind)) {
@@ -834,6 +839,24 @@ export function RunCard({ run: listed, canDecide, settings, open = false, showIs
   );
 }
 
+/** A queued run that was sent to one runner: for whom it waits, and whether that one is connected. */
+function SentToNote({ run }: { run: AgentRun }) {
+  const runners = useRemote(() => api.get<AgentRunner[]>(`${BASE}/runners`), [run.id], (event) => event.kind === 'agent.run');
+  const target = runners.data?.find((runner) => runner.id === run.onRunner);
+  const name = target?.name ?? run.onRunnerName ?? run.onRunner ?? '';
+
+  if (runners.data && !target?.online) {
+    return (
+      <p className="agents-hold">
+        <Icon name="alert" size={14} />
+        {t('Waiting for {name}, which is not connected right now. The run starts when it is; nobody else takes it.', { name })}
+      </p>
+    );
+  }
+
+  return <p className="muted">{t('Waiting for {name} to take it.', { name })}</p>;
+}
+
 export type StartPreset = { kind: AgentRunKind; title: string; instructions?: string; hint: string };
 
 /** Starting a run: what to tell the agent, and with which model or runner. */
@@ -846,14 +869,27 @@ export function StartDialog({ issueKey, projectKey, preset, repo, onClose, onSta
   const [model, setModel] = useState<string | null>(null);
   const [repository, setRepository] = useState(repo);
   const [shared, setShared] = useState(false);
+  // A runner's id when the run is sent to that one; null leaves it to the queue.
+  const [onRunner, setOnRunner] = useState<string | null>(null);
   const [busy, run] = useBusy();
-  const able = (runners.data ?? []).filter((runner) => runner.online && runner.kinds.includes(preset.kind) && (runner.projects === null || runner.projects.some((key) => key.toUpperCase() === projectKey)));
-  const usable = able.filter((runner) => shared || runner.userId === user.id);
+  const fits = (runners.data ?? []).filter((runner) => runner.kinds.includes(preset.kind) && (runner.projects === null || runner.projects.some((key) => key.toUpperCase() === projectKey)));
+  const able = fits.filter((runner) => runner.online);
+  const usable = able.filter((runner) => !runner.pinnedOnly && (shared || runner.userId === user.id));
+  // Who can be named: one's own (connected or not: the run waits), and services that are there.
+  const nameable = fits.filter((runner) => runner.userId === user.id || (!runner.interactive && runner.online));
+  const chosen = nameable.find((runner) => runner.id === onRunner) ?? null;
   const needsInstructions = preset.kind === 'custom' && !instructions.trim();
 
   function start(): void {
     void run(async () => {
-      await api.post(`${BASE}/issues/${issueKey}/runs`, { kind: preset.kind, instructions, model: inCode ? null : model, repo: inCode ? repository : null, shared: inCode && shared });
+      await api.post(`${BASE}/issues/${issueKey}/runs`, {
+        kind: preset.kind,
+        instructions,
+        model: inCode ? null : model,
+        repo: inCode ? repository : null,
+        shared: inCode && shared && !chosen,
+        onRunner: inCode ? (chosen?.id ?? null) : null,
+      });
       onStarted();
       onClose();
     }, t('Handed to the agent'));
@@ -882,24 +918,44 @@ export function StartDialog({ issueKey, projectKey, preset, repo, onClose, onSta
             <Field label={t('Repository')} hint={t('owner/name, as the runner knows it. Leave blank to let the runner choose.')}>
               <input className="input input-mono" value={repository} placeholder="owner/repository" onChange={(event) => setRepository(event.target.value)} />
             </Field>
-            <label className="check">
-              <input type="checkbox" checked={shared} onChange={(event) => setShared(event.target.checked)} />
-              <span>{t('Let anyone’s runner take it, not only mine')}</span>
-            </label>
             <div className="agents-runner-pick">
-              <strong>{t('Runners online for this project')}</strong>
+              <strong>{t('Where it is carried out')}</strong>
               {!runners.data && <Spinner />}
-              {runners.data && usable.length === 0 && (
-                <p className="agents-hold">
-                  <Icon name="alert" size={14} />
-                  {able.length > 0 ? t('Only other people’s runners are online. Tick the box above to let one of them take it.') : t('None right now. The run waits in the queue until one connects.')}{' '}
-                  <Link href="/settings/agents">{t('How to connect a runner')}</Link>
-                </p>
-              )}
-              {usable.map((runner) => (
-                <RunnerLine key={runner.id} runner={runner} owner={userById(runner.userId)?.name} />
+              <label className="agents-where">
+                <input type="radio" name="agents-where" checked={!chosen} onChange={() => setOnRunner(null)} />
+                <span>
+                  <strong>{t('Any runner that fits')}</strong>
+                  <span className="muted">{t('The first connected runner that works on this project takes it.')}</span>
+                </span>
+              </label>
+              {nameable.map((runner) => (
+                <label key={runner.id} className="agents-where">
+                  <input type="radio" name="agents-where" checked={chosen?.id === runner.id} onChange={() => setOnRunner(runner.id)} />
+                  <RunnerLine runner={runner} owner={userById(runner.userId)?.name} />
+                </label>
               ))}
             </div>
+            {!chosen && (
+              <>
+                <label className="check">
+                  <input type="checkbox" checked={shared} onChange={(event) => setShared(event.target.checked)} />
+                  <span>{t('Let anyone’s runner take it, not only mine')}</span>
+                </label>
+                {runners.data && usable.length === 0 && (
+                  <p className="agents-hold">
+                    <Icon name="alert" size={14} />
+                    {able.some((runner) => !runner.pinnedOnly) ? t('Only other people’s runners are online. Tick the box above to let one of them take it.') : t('None right now. The run waits in the queue until one connects.')}{' '}
+                    <Link href="/settings/agents">{t('How to connect a runner')}</Link>
+                  </p>
+                )}
+              </>
+            )}
+            {chosen && !chosen.online && (
+              <p className="agents-hold">
+                <Icon name="alert" size={14} />
+                {t('{name} is not connected right now. The run waits for it.', { name: chosen.name })}
+              </p>
+            )}
           </>
         ) : (
           <>
@@ -932,8 +988,10 @@ export function RunnerLine({ runner, owner }: { runner: AgentRunner; owner: stri
     <div className="agents-runner">
       <span className={runner.online ? 'agents-dot agents-dot-on' : 'agents-dot'} title={runner.online ? t('online') : t('offline')} />
       <strong>{runner.name}</strong>
+      <span className="agents-runner-kind">{runner.interactive ? t('computer') : t('service')}</span>
       <span className="muted">
-        {owner} · {runner.kinds.join(', ')} · {runner.projects === null ? t('any project') : runner.projects.join(', ')}
+        {owner} · {runner.kinds.map((kind) => t(kind)).join(', ')} · {runner.projects === null ? t('any project') : runner.projects.join(', ')}
+        {runner.pinnedOnly && ` · ${t('only what is sent to it')}`}
         {!runner.online && ` · ${t('last seen {when}', { when: timeAgo(runner.lastSeenAt) })}`}
       </span>
     </div>

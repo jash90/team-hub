@@ -487,6 +487,10 @@ pub struct E2eJob {
     pub video: String,
     pub trace: String,
     pub requested_by: Id,
+    /// The runner the job was sent to by name (`docs/runners.md`), and the name it had then;
+    /// none for a job any runner that fits may take.
+    pub on_runner: Option<String>,
+    pub on_runner_name: Option<String>,
     pub runner_name: Option<String>,
     /// The stored run, once the report has arrived.
     pub run_id: Option<Id>,

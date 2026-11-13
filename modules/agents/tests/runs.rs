@@ -964,6 +964,72 @@ async fn a_runner_with_nobody_at_it_has_its_pushes_decided_on_the_web_from_the_c
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_run_sent_to_one_runner_by_name_waits_for_it_and_a_computer_takes_such_work_from_its_owner_only() {
+    let world = world();
+    let (_, other_token) = person(&world.app, "Piotr Runner", "piotr@example.com", Role::Member);
+    let beat = |runner: &str, name: &str, more: Value| {
+        let mut beat = json!({ "runnerId": runner, "name": name, "kinds": ["implement"], "version": "1" });
+        beat.as_object_mut().unwrap().extend(more.as_object().unwrap().clone());
+        beat
+    };
+    let start = |token: &str, body: Value| {
+        let token = token.to_string();
+        let world = &world;
+        async move { world.send(&token, Method::POST, "/issues/WEB-1/runs", Some(body)).await }
+    };
+
+    world.post("/runners/heartbeat", beat("laptop", "Bartek's MacBook", json!({ "pinnedOnly": true }))).await;
+    world.post("/runners/heartbeat", beat("cloud", "Cloud runner", json!({ "interactive": false, "projects": ["WEB"] }))).await;
+    assert_eq!(world.send(&other_token, Method::POST, "/runners/heartbeat", Some(beat("thinkpad", "Piotr's ThinkPad", json!({})))).await.0, StatusCode::OK);
+
+    let listed = world.get("/runners").await;
+    let laptop = listed.as_array().unwrap().iter().find(|runner| runner["id"] == "laptop").unwrap();
+    assert_eq!(laptop["pinnedOnly"], true);
+
+    // Who may be named, and for what.
+    let refused = |body: Value| start(&world.token, body);
+    assert_eq!(refused(json!({ "kind": "implement", "onRunner": "nobody" })).await.0, StatusCode::BAD_REQUEST, "an unknown runner");
+    assert_eq!(refused(json!({ "kind": "review", "onRunner": "cloud" })).await.0, StatusCode::BAD_REQUEST, "a kind it does not take");
+    assert_eq!(refused(json!({ "kind": "implement", "onRunner": "cloud", "runnerId": "cloud" })).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(refused(json!({ "kind": "implement", "onRunner": "thinkpad" })).await.0, StatusCode::FORBIDDEN, "somebody else's computer");
+    assert_eq!(world.count("SELECT count(*) FROM agent_run"), 0, "a refused run is not left behind");
+
+    // A run nobody was named for: the computer that takes only named work is not offered it.
+    let loose = world.post("/issues/WEB-2/runs", json!({ "kind": "implement" })).await;
+    assert_eq!((&loose["onRunner"], &loose["onRunnerName"]), (&Value::Null, &Value::Null));
+    assert_eq!(claim(&world, &world.token, "laptop", json!(["implement"])).await, Value::Null);
+
+    // Sent to the computer: it waits for it, and the other runner of the same person passes it by.
+    let (status, here) = start(&world.token, json!({ "kind": "implement", "onRunner": "laptop" })).await;
+    assert_eq!(status, StatusCode::OK, "{here}");
+    assert_eq!((&here["state"], &here["onRunner"], &here["onRunnerName"], &here["runnerId"]), (&json!("queued"), &json!("laptop"), &json!("Bartek's MacBook"), &Value::Null));
+    assert_eq!(texts(&world.run(here["id"].as_i64().unwrap()).await["events"]), ["Sent to Bartek's MacBook"]);
+
+    let by_cloud = claim(&world, &world.token, "cloud", json!(["implement"])).await;
+    assert_eq!(by_cloud["run"]["id"], loose["id"], "the cloud runner takes the one sent to nobody");
+    assert_eq!(claim(&world, &world.token, "cloud", json!(["implement"])).await, Value::Null, "and not the one sent to the computer");
+
+    let by_laptop = claim(&world, &world.token, "laptop", json!(["implement"])).await;
+    assert_eq!((&by_laptop["run"]["id"], &by_laptop["run"]["runnerId"], &by_laptop["run"]["onRunner"]), (&here["id"], &json!("laptop"), &json!("laptop")));
+
+    // A service takes named work from anyone who may start it, shared or not; and what is
+    // sent to it comes before the older run in the queue.
+    let older = world.post("/issues/WEB-2/runs", json!({ "kind": "implement" })).await;
+    let (status, theirs) = start(&other_token, json!({ "kind": "implement", "onRunner": "cloud" })).await;
+    assert_eq!((status, &theirs["shared"]), (StatusCode::OK, &json!(false)), "{theirs}");
+    assert_eq!(claim(&world, &other_token, "thinkpad", json!(["implement"])).await, Value::Null, "Piotr's own computer is not offered what he sent elsewhere");
+    assert_eq!(claim(&world, &world.token, "cloud", json!(["implement"])).await["run"]["id"], theirs["id"]);
+    assert_eq!(claim(&world, &world.token, "cloud", json!(["implement"])).await["run"]["id"], older["id"]);
+
+    // Queued again after the runner went silent, it still waits for the same one.
+    let id = here["id"].as_i64().unwrap();
+    let later = Utc::now() + Duration::minutes(11);
+    world.app.write(Actor::system("test"), |tx| runs::requeue_stale(tx, later)).unwrap();
+    let again = world.run(id).await;
+    assert_eq!((&again["run"]["state"], &again["run"]["onRunner"], &again["run"]["runnerId"]), (&json!("queued"), &json!("laptop"), &Value::Null));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn a_claimed_run_whose_runner_went_silent_for_ten_minutes_returns_to_the_queue() {
     let world = world();
     world.post("/runners/heartbeat", json!({ "runnerId": "desk-1", "name": "Desktop", "kinds": ["implement"], "version": "1" })).await;

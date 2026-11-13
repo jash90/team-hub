@@ -18,6 +18,7 @@ use crate::git;
 use crate::model::{AppEvent, EventKind, SandboxState, Thread, ThreadEvent, ThreadState};
 use crate::policy;
 use crate::protocol::{AgentEvent, FromSidecar, HubTool, SandboxPolicy, StartThread, ToSidecar};
+use crate::secrets::Secret;
 use crate::store::{Store, ThreadSeed};
 
 const INTERRUPTED: &str = "Interrupted: the app was closed while this thread was working. Resume it to continue.";
@@ -49,6 +50,21 @@ pub struct RuntimeConfig {
     pub allow_unsandboxed_shell: bool,
     /// Added to the helper's environment.
     pub env: BTreeMap<String, String>,
+    /// Set for a runner nobody sits at.
+    pub unattended: Option<Unattended>,
+}
+
+/// How threads are held where nobody watches them (docs/cloud-runner.md § Safety): their
+/// file tools read and write only the working tree, and the helper's environment is made
+/// from nothing, so it holds the model provider's key and none of the runner's own.
+#[derive(Debug, Clone)]
+pub struct Unattended {
+    /// The helper's home: where the agent keeps its sessions between turns.
+    pub helper_home: PathBuf,
+    pub model_key: Option<Secret>,
+    /// Folders shared by all work, with how deep one piece of work sits in them: the clones
+    /// and the working trees. A confined shell is shown its own and none of the others.
+    pub shared_roots: Vec<(PathBuf, usize)>,
 }
 
 struct Running {
@@ -76,7 +92,7 @@ pub struct Runtime {
 }
 
 #[cfg(unix)]
-fn kill_group(pid: u32) {
+pub(crate) fn kill_group(pid: u32) {
     // The helper leads its own process group, so this reaches the agent process and
     // whatever its shell commands started.
     unsafe {
@@ -85,7 +101,7 @@ fn kill_group(pid: u32) {
 }
 
 #[cfg(not(unix))]
-fn kill_group(pid: u32) {
+pub(crate) fn kill_group(pid: u32) {
     let _ = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).output();
 }
 
@@ -211,7 +227,13 @@ impl Inner {
         let cwd = std::fs::canonicalize(&worktree)?.to_string_lossy().into_owned();
         let sandboxed = self.config.sandbox == SandboxState::Available;
         let shell = sandboxed || self.config.allow_unsandboxed_shell;
-        let unreadable: Vec<String> = self.config.private_paths.iter().map(|path| path.to_string_lossy().into_owned()).collect();
+        let excludes_file = policy::sandbox_excludes_file(&self.config.worktrees_root);
+        let own = [repo.as_path(), worktree.as_path(), excludes_file.as_path()];
+        let of_others = self.config.unattended.iter().flat_map(|unattended| {
+            unattended.shared_roots.iter().flat_map(|(root, depth)| policy::others_under(root, *depth, &own)).collect::<Vec<_>>()
+        });
+        let unreadable: Vec<String> =
+            self.config.private_paths.iter().cloned().chain(of_others).map(|path| path.to_string_lossy().into_owned()).collect();
         let mut denied: Vec<String> = policy::DENIED_TOOLS.iter().map(|tool| (*tool).to_string()).collect();
 
         denied.extend(policy::read_denials(&unreadable));
@@ -258,7 +280,10 @@ impl Inner {
             resume: thread.session_id.clone(),
             max_turns: self.config.max_turns,
             rules,
-            allowed_tools: policy::allowed_tools(thread.kind, &cwd, shell),
+            allowed_tools: match self.config.unattended {
+                Some(_) => policy::confined_tools(thread.kind, &cwd, shell),
+                None => policy::allowed_tools(thread.kind, &cwd, shell),
+            },
             denied_tools: denied,
             sandbox: sandboxed.then_some(SandboxPolicy { writable: access.writable, protected: access.protected, unreadable }),
             hub_tools: self.host.hub_tools(&thread),
@@ -272,18 +297,37 @@ impl Inner {
         let start = tokio::task::spawn_blocking(move || inner.prepare(thread_id)).await??;
         let mut command = Command::new(&self.config.program);
 
-        command
-            .args(&self.config.arguments)
-            .envs(&self.config.env)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
+        command.args(&self.config.arguments).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
 
-        // The agent and its shell inherit the helper's environment: the app's own token and
-        // the usual tokens of code hosts and clouds are not part of it.
-        for name in policy::WITHHELD_VARIABLES {
-            command.env_remove(name);
+        // The agent and its shell inherit the helper's environment. Beside a person, that is
+        // theirs without the app's own token and the usual tokens of code hosts and clouds.
+        // Where nobody watches, it is made from nothing: a short list of names, the helper's
+        // own home and the model provider's key.
+        match &self.config.unattended {
+            Some(unattended) => {
+                command.env_clear();
+
+                for name in policy::PASSED_TO_A_HEADLESS_HELPER {
+                    if let Some(value) = std::env::var_os(name) {
+                        command.env(name, value);
+                    }
+                }
+
+                command.env("HOME", &unattended.helper_home);
+
+                if let Some(key) = &unattended.model_key {
+                    command.env(policy::MODEL_KEY_VARIABLE, key.expose());
+                }
+
+                command.envs(&self.config.env);
+            }
+            None => {
+                command.envs(&self.config.env);
+
+                for name in policy::WITHHELD_VARIABLES {
+                    command.env_remove(name);
+                }
+            }
         }
 
         #[cfg(unix)]

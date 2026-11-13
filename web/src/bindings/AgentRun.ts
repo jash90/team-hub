@@ -31,4 +31,8 @@ runnerInteractive: boolean,
 /**
  * Whether the runner has uploaded what the thread committed (`GET /runs/{id}/changes`).
  */
-hasChanges: boolean, createdAt: string, startedAt: string | null, finishedAt: string | null, };
+hasChanges: boolean, 
+/**
+ * The runner this run was sent to by name and waits for; null: any runner that fits.
+ */
+onRunner: string | null, onRunnerName: string | null, createdAt: string, startedAt: string | null, finishedAt: string | null, };

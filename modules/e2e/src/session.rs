@@ -145,12 +145,15 @@ fn error_of(error: &DocError) -> E2eSessionError {
 fn step_of(step: &DocStep, position: usize) -> E2eSessionStep {
     // What a person reads under a step: what the engine did, where the app went, what an
     // assertion saw while it waited. Model turns and policy checks stay in the report.
-    let told: Vec<_> = step
+    let mut told: Vec<_> = step
         .events
         .iter()
         .filter(|event| matches!(event.kind.as_deref(), Some("engine" | "navigation" | "poll")))
         .filter(|event| event.detail.as_deref().is_some_and(|detail| !detail.trim().is_empty()))
         .collect();
+    // The report lists events as they were recorded, an action after the navigation it
+    // caused; by when each began, they read in the order things happened.
+    told.sort_by(|a, b| a.started_at.cmp(&b.started_at));
     let source = step.source.as_ref();
     let screen = step.screen.as_ref();
     let changes = screen.map(|screen| screen.changes.as_slice()).unwrap_or(&[]);

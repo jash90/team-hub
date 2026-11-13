@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::git::Committed;
 use crate::model::{EventKind, ThreadKind, ThreadState};
 
 macro_rules! open_enum {
@@ -276,6 +277,74 @@ impl RunPatch {
     }
 }
 
+/// The contract's limit on the diff sent with a run's changes.
+pub const MAX_PATCH_BYTES: usize = 2 * 1024 * 1024;
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChangedCommit {
+    pub sha: String,
+    pub subject: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChangedFile {
+    pub path: String,
+    /// `added`, `modified`, `deleted` or `renamed`.
+    pub status: String,
+    pub additions: u32,
+    pub deletions: u32,
+}
+
+/// `PUT /runs/{id}/changes`: what a headless runner's thread has committed, for a person to
+/// look at on the web before anything is pushed.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct RunChanges {
+    pub base: String,
+    pub head: String,
+    pub commits: Vec<ChangedCommit>,
+    pub files: Vec<ChangedFile>,
+    pub patch: String,
+    pub truncated: bool,
+}
+
+impl RunChanges {
+    /// The commits and the diff between `base` and `head`. A diff past the limit is cut at
+    /// the end of a line; the list of files stays whole.
+    pub fn of(base: &str, head: &str, committed: Committed) -> Self {
+        let truncated = committed.patch.len() > MAX_PATCH_BYTES;
+        let mut patch = committed.patch;
+
+        if truncated {
+            let mut end = MAX_PATCH_BYTES;
+
+            while !patch.is_char_boundary(end) {
+                end -= 1;
+            }
+
+            patch.truncate(patch[..end].rfind('\n').map_or(end, |line_end| line_end + 1));
+        }
+
+        Self {
+            base: base.to_string(),
+            head: head.to_string(),
+            commits: committed
+                .commits
+                .into_iter()
+                .map(|commit| ChangedCommit { sha: commit.sha, subject: commit.subject, author: Some(commit.author).filter(|author| !author.is_empty()) })
+                .collect(),
+            files: committed
+                .files
+                .into_iter()
+                .map(|file| ChangedFile { path: file.path, status: file.status, additions: file.additions, deletions: file.deletions })
+                .collect(),
+            patch,
+            truncated,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -309,5 +378,20 @@ mod tests {
 
         assert_eq!(serde_json::to_value(&patch).unwrap(), serde_json::json!({ "state": "succeeded", "summary": "Done" }));
         assert!(now.changed_since(&now).is_empty());
+    }
+
+    #[test]
+    fn a_long_diff_is_cut_at_a_line_and_says_so() {
+        let line = "+żółw ".repeat(100) + "\n";
+        let patch = line.repeat(MAX_PATCH_BYTES / line.len() + 10);
+        let changes = RunChanges::of("a", "b", Committed { commits: Vec::new(), files: Vec::new(), patch: patch.clone() });
+
+        assert!(changes.truncated);
+        assert!(changes.patch.len() <= MAX_PATCH_BYTES && changes.patch.ends_with('\n'));
+        assert!(patch.starts_with(&changes.patch));
+
+        let short = RunChanges::of("a", "b", Committed { commits: Vec::new(), files: Vec::new(), patch: "diff\n".into() });
+
+        assert_eq!((short.truncated, short.patch.as_str()), (false, "diff\n"));
     }
 }

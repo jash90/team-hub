@@ -406,6 +406,23 @@ export const pl: Record<string, string> = {
   'A module switched off here keeps its data, but its navigation, its panel on issues and its marks on cards disappear from this project. Other projects are not affected.':
     'Moduł wyłączony tutaj zachowuje dane, ale jego nawigacja, panel w zadaniach i oznaczenia na kartach znikają z tego projektu. Inne projekty pozostają bez zmian.',
   'No modules are switched on for this instance.': 'W tej instancji nie włączono żadnych modułów.',
+  Runners: 'Runnery',
+  'Agent runs and test suites need a repository on disk. A runner has one and carries them out: the desktop app on somebody’s computer, using that computer, or a service in a container, using the container.':
+    'Zadania agentów i testy potrzebują repozytorium na dysku. Runner je ma i wykonuje tę pracę: aplikacja desktopowa na czyimś komputerze korzysta z tego komputera, a usługa w kontenerze z zasobów kontenera.',
+  'No runner has connected yet': 'Żaden runner jeszcze się nie połączył',
+  'Open the desktop app and connect it to this server with an API token, or deploy the cloud runner next to the server. Either shows up here as soon as it has said hello.':
+    'Otwórz aplikację desktopową i połącz ją z tym serwerem tokenem API albo uruchom runner chmurowy obok serwera. Każdy z nich pojawi się tutaj, gdy tylko się zgłosi.',
+  Yours: 'Twoje',
+  'Other people’s, connected now': 'Innych osób, teraz połączone',
+  connected: 'połączony',
+  'not connected': 'niepołączony',
+  'The desktop app on a person’s computer; it uses that computer.': 'Aplikacja desktopowa na czyimś komputerze; korzysta z zasobów tego komputera.',
+  'A service with nobody at it; what it wants to push is decided here.': 'Usługa, przy której nikt nie siedzi; o tym, co chce wypchnąć, decyduje się tutaj.',
+  computer: 'komputer',
+  service: 'usługa',
+  'last heard from {when}': 'ostatni sygnał {when}',
+  'any project': 'dowolny projekt',
+  'only what is sent to it by name': 'tylko to, co wysłano do niego imiennie',
 };
 
 /** Polish plural forms (one, few, many), keyed by the English singular. */

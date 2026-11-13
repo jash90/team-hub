@@ -13,4 +13,12 @@ line: number | null,
 /**
  * The target (browser, device) or agent, when the run had several.
  */
-variant: string, status: E2eStatus, durationMs: number, attempts: number, message: string | null, errorCode: string | null, agentSteps: number, modelCalls: number, modelTokens: number, costUsd: number | null, issues: Array<E2eIssueRef>, };
+variant: string, status: E2eStatus, durationMs: number, attempts: number, message: string | null, errorCode: string | null, agentSteps: number, modelCalls: number, modelTokens: number, costUsd: number | null, 
+/**
+ * Recordings and screenshots the report names for this result.
+ */
+videos: number, screenshots: number, 
+/**
+ * The report told the steps of this result, so it has a session to open.
+ */
+hasSession: boolean, issues: Array<E2eIssueRef>, };

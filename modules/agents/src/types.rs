@@ -125,6 +125,9 @@ pub struct AgentRun {
     pub runner_interactive: bool,
     /// Whether the runner has uploaded what the thread committed (`GET /runs/{id}/changes`).
     pub has_changes: bool,
+    /// The runner this run was sent to by name and waits for; null: any runner that fits.
+    pub on_runner: Option<String>,
+    pub on_runner_name: Option<String>,
     pub created_at: String,
     pub started_at: Option<String>,
     pub finished_at: Option<String>,
@@ -283,6 +286,8 @@ pub struct AgentRunner {
     pub online: bool,
     /// False for a runner with nobody at it (a container): see `AgentRun::runner_interactive`.
     pub interactive: bool,
+    /// Takes only runs sent to it by name.
+    pub pinned_only: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]

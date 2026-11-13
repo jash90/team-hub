@@ -152,7 +152,8 @@ CREATE TABLE e2e_job_log (
 -- A file a run's report names, uploaded after the report. `path` is the report's own; the
 -- bytes are on disk under <data>/e2e-artifacts/<run id>/<stored>, a name made here.
 CREATE TABLE e2e_artifact (
-    id INTEGER PRIMARY KEY,
+    -- Never given twice: a browser may still hold the bytes of an artifact that was replaced.
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id INTEGER NOT NULL REFERENCES e2e_run (id) ON DELETE CASCADE,
     path TEXT NOT NULL,
     kind TEXT NOT NULL,
@@ -167,5 +168,24 @@ CREATE TABLE e2e_artifact (
 ALTER TABLE e2e_result ADD COLUMN session TEXT;
 ALTER TABLE e2e_result ADD COLUMN videos INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE e2e_result ADD COLUMN screenshots INTEGER NOT NULL DEFAULT 0;
+"#,
+// Runners (`docs/runners.md`): who takes test jobs, and jobs sent to one of them by name.
+r#"
+-- A runner that has asked for a test job, as it last described itself.
+CREATE TABLE e2e_runner (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES user (id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    -- Project keys it works for, as a JSON list; NULL: any its person can edit.
+    projects TEXT,
+    interactive INTEGER NOT NULL DEFAULT 1,
+    pinned_only INTEGER NOT NULL DEFAULT 0,
+    version TEXT NOT NULL DEFAULT '',
+    last_seen_at TEXT NOT NULL
+);
+
+-- The runner a job waits for, when it was sent to one by name, and that runner's name then.
+ALTER TABLE e2e_job ADD COLUMN on_runner TEXT;
+ALTER TABLE e2e_job ADD COLUMN on_runner_name TEXT;
 "#,
 ];

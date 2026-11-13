@@ -82,4 +82,12 @@ CREATE TABLE agent_run_changes (
     body TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+"#, r#"
+-- A run sent to one runner by name waits for it and is offered to nobody else
+-- (docs/runners.md). The name is the one the runner had then, for pages to show.
+ALTER TABLE agent_run ADD COLUMN on_runner TEXT;
+ALTER TABLE agent_run ADD COLUMN on_runner_name TEXT;
+
+-- A runner that takes only what is sent to it by name.
+ALTER TABLE agent_runner ADD COLUMN pinned_only INTEGER NOT NULL DEFAULT 0;
 "#];

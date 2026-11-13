@@ -58,6 +58,10 @@ required-features = ["github", "wiki"]
 name = "all_modules"
 required-features = ["github", "wiki", "confluence", "timeline", "reports", "agents"]
 
+[[test]]
+name = "schedule_agents"
+required-features = ["agents"]
+
 [dev-dependencies]
 hmac.workspace = true
 sha2.workspace = true
