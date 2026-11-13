@@ -13,15 +13,16 @@ use rayon::prelude::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
-use tokio::sync::{broadcast, Notify};
+use tokio::sync::{broadcast, watch, Notify};
 
 use crate::api::{HubClient, LiveEvent, RunnerIdentity};
 use crate::config::{self, Paths};
 use crate::error::{CoreError, CoreResult};
 use crate::git;
 use crate::headless::Headless;
+use crate::jobs::{JobOptions, JobRunner};
 use crate::model::{
-    AppEvent, CacheMode, ConnectionStatus, DashboardView, EventKind, IssueView, NewThread, Proposal, ProposalKind, ProposalState, PullRequestPreview,
+    AppEvent, CacheMode, ConnectionStatus, DashboardView, Delegation, EventKind, IssueView, NewTestJob, NewThread, Proposal, ProposalKind, ProposalState, PullRequestPreview,
     PullRequestResult, PushPreview, PushResult, RepoCheck, RepoMapping, RepoStatus, RunnerStatus, SandboxState, SearchView, Settings, Thread,
     ThreadDetail, ThreadDiff, ThreadKind, ThreadOrigin, ThreadState, WorkspaceView, WorktreeInfo,
 };
@@ -128,6 +129,8 @@ pub struct Core {
     headless: Option<HeadlessState>,
     /// Poked when the server announces something about a test job.
     jobs_wake: Arc<Notify>,
+    /// The desktop app's own clones, for test jobs of repositories it has no mapped clone of.
+    job_clones: Repos,
     paths: Paths,
     store: Arc<Store>,
     keychain: Arc<dyn Keychain>,
@@ -1953,15 +1956,146 @@ impl Core {
         self.headless.is_some()
     }
 
-    /// The clones a headless runner keeps by itself.
+    /// The clones this runner keeps by itself: a headless runner's for all its work, the
+    /// desktop app's for test jobs of repositories no local clone is mapped for.
     pub fn clones(&self) -> CoreResult<&Repos> {
-        self.headless.as_ref().map(|headless| &headless.repos).ok_or_else(|| CoreError::not_possible("Only a headless runner clones repositories by itself"))
+        Ok(self.headless.as_ref().map_or(&self.job_clones, |headless| &headless.repos))
+    }
+
+    /// The repository a test job runs from, up to date with its origin. A headless runner
+    /// clones or fetches it with the token the job came with. The desktop app uses the
+    /// clone mapped to the project when there is one, fetched with the person's own git
+    /// sign-in (their checkout is not touched: the job gets a copy of one commit), and
+    /// otherwise a clone of its own.
+    pub fn clone_for_job(&self, project_key: &str, repo: &str, token: Option<&Secret>) -> CoreResult<PathBuf> {
+        if self.headless.is_some() {
+            return self.clones()?.ensure(repo, token);
+        }
+
+        match self.repo_for(project_key, None, Some(repo)) {
+            Ok(mapped) => {
+                // A clone that cannot be fetched right now still has what it had.
+                let _ = git::fetch(Path::new(&mapped.path), Some(&git::RemoteAuth::PersonsOwn));
+
+                Ok(PathBuf::from(mapped.path))
+            }
+            Err(_) => self.job_clones.ensure(repo, None),
+        }
+    }
+
+    /// Whether this runner takes test jobs now. The desktop app can be told not to.
+    pub fn takes_test_jobs(&self) -> bool {
+        self.headless.is_some() || self.settings().test_jobs
     }
 
     /// How this runner announces itself when it asks for a test job: the same id and name
     /// as for agent runs (docs/runners.md).
     pub fn job_identity(&self) -> CoreResult<RunnerIdentity> {
-        self.identity()
+        let identity = self.identity()?;
+
+        if self.headless.is_some() {
+            return Ok(identity);
+        }
+
+        // On a person's computer a suite runs when it was sent there by name, unless the
+        // person chose to take the team's queue too. Any project's: the repository is
+        // cloned when no local clone is mapped.
+        Ok(RunnerIdentity { projects: None, pinned_only: !self.settings().test_jobs_from_queue, ..identity })
+    }
+
+    // ---------- the same runners and work as the web shows: docs/runners.md ----------
+
+    /// `GET /api/runners`: every runner the person may see, with what each takes and carries out.
+    pub fn runners(&self) -> CoreResult<Value> {
+        self.seen(self.client()?.get("/api/runners"))
+    }
+
+    /// Hands work on an issue to a runner by name, or to whichever fits. Nothing is started
+    /// here: the run is carried out there, and this app follows it like the web does.
+    pub fn delegate(&self, new: &Delegation) -> CoreResult<AgentRun> {
+        let key = new.issue_key.trim().to_uppercase();
+        let (project_key, _) =
+            hub_core::keys::parse_issue_key(&key).ok_or_else(|| CoreError::not_possible(format!("\"{key}\" is not an issue key")))?;
+        let named = new.repo.clone().filter(|repo| !repo.trim().is_empty());
+        let mapped = || self.repo_for(&project_key, None, None).ok().map(|repo| Self::repo_name(&repo));
+        let run = NewRun {
+            kind: RunKind::of_thread(new.kind),
+            instructions: new.instructions.trim().to_string(),
+            model: new.model.clone().filter(|model| !model.trim().is_empty()),
+            repo: named.or_else(mapped),
+            shared: false,
+            runner_id: None,
+            on_runner: new.on_runner.clone().filter(|runner| !runner.trim().is_empty()),
+        };
+        let created = self.seen(self.client()?.create_run(&key, &run))?;
+
+        self.data_changed("runs", Some(&key));
+
+        Ok(created)
+    }
+
+    /// A run wherever it is carried out: its events and proposals, to follow it.
+    pub fn run_detail(&self, id: i64) -> CoreResult<AgentRunDetail> {
+        self.seen(self.client()?.run(id))
+    }
+
+    /// The person's decision on a proposal of a run another runner carries out: a change to
+    /// the issue, or the push or pull request of a runner nobody sits at.
+    pub fn decide_on_run(&self, proposal_id: i64, approve: bool, note: Option<&str>) -> CoreResult<AgentRunDetail> {
+        let detail = self.seen(self.client()?.decide_proposal(proposal_id, approve, note.map(str::trim).filter(|note| !note.is_empty())))?;
+
+        self.data_changed("runs", Some(&detail.run.issue_key));
+
+        Ok(detail)
+    }
+
+    pub fn cancel_run(&self, id: i64) -> CoreResult<AgentRun> {
+        self.seen(self.client()?.cancel_run(id))
+    }
+
+    fn e2e(project_key: &str, rest: &str) -> String {
+        format!("/api/m/e2e/projects/{}{rest}", project_key.trim().to_uppercase())
+    }
+
+    /// The project's test settings (which repository, which ref by default); null when the
+    /// server has no tests module.
+    pub fn test_settings(&self, project_key: &str) -> CoreResult<Value> {
+        match self.seen(self.client()?.get(&Self::e2e(project_key, "/settings"))) {
+            Err(error) if error.is_not_found() => Ok(Value::Null),
+            other => other,
+        }
+    }
+
+    /// The project's test jobs, newest first.
+    pub fn test_jobs(&self, project_key: &str) -> CoreResult<Value> {
+        self.seen(self.client()?.get(&Self::e2e(project_key, "/jobs?limit=30")))
+    }
+
+    /// Starts a test job: on the runner named, or on whichever fits.
+    pub fn start_test_job(&self, new: &NewTestJob) -> CoreResult<Value> {
+        let text = |value: &Option<String>| value.as_deref().map(str::trim).filter(|text| !text.is_empty()).map(String::from);
+        let mut body = json!({});
+
+        for (name, value) in [("ref", text(&new.reference)), ("filter", text(&new.filter)), ("onRunner", text(&new.on_runner))] {
+            if let Some(value) = value {
+                body[name] = json!(value);
+            }
+        }
+
+        let job = self.seen(self.client()?.post(&Self::e2e(&new.project_key, "/jobs"), &body))?;
+
+        self.jobs_wake.notify_one();
+
+        Ok(job)
+    }
+
+    /// A job with the log lines after `after`.
+    pub fn test_job(&self, id: i64, after: i64) -> CoreResult<Value> {
+        self.seen(self.client()?.get(&format!("/api/m/e2e/jobs/{id}?after={after}")))
+    }
+
+    pub fn cancel_test_job(&self, id: i64) -> CoreResult<Value> {
+        self.seen(self.client()?.post(&format!("/api/m/e2e/jobs/{id}/cancel"), &json!({})))
     }
 
     /// Poked when the server announces a change to a test job.
@@ -2265,6 +2399,8 @@ fn url_encode(text: &str) -> String {
 pub struct Desktop {
     core: Arc<Core>,
     poll_every: Duration,
+    job_options: Arc<JobOptions>,
+    jobs_stop: Arc<watch::Sender<bool>>,
 }
 
 impl Desktop {
@@ -2325,6 +2461,7 @@ impl Desktop {
             unattended,
         };
         let is_headless = options.headless.is_some();
+        let job_options = JobOptions::for_desktop(&options.paths, sandbox);
         let headless = options.headless.map(|headless| HeadlessState {
             shared: headless.shared,
             keys: Mutex::new(HashMap::new()),
@@ -2342,6 +2479,7 @@ impl Desktop {
             this: this.clone(),
             headless,
             jobs_wake: Arc::new(Notify::new()),
+            job_clones: Repos::of_the_person(options.paths.root().join("repos")),
             paths: options.paths,
             store: Arc::clone(&store),
             keychain: options.keychain,
@@ -2377,7 +2515,15 @@ impl Desktop {
 
         let _ = core.runtime.set(runtime);
 
-        Ok(Self { core, poll_every: options.poll_every })
+        let (jobs_stop, _) = watch::channel(false);
+
+        Ok(Self { core, poll_every: options.poll_every, job_options: Arc::new(job_options), jobs_stop: Arc::new(jobs_stop) })
+    }
+
+    /// What carries out test jobs on this computer (docs/runners.md): the executor of the
+    /// headless runner, as the person's own user, confined where the system can do that.
+    pub fn job_runner(&self) -> JobRunner {
+        JobRunner::new(Arc::clone(&self.core), (*self.job_options).clone())
     }
 
     pub fn core(&self) -> &Arc<Core> {
@@ -2442,6 +2588,14 @@ impl Desktop {
         let desktop = self.clone();
         let activity = self.core.runtime().activity();
 
+        // The desktop app is a runner for test jobs too; a headless runner starts its own
+        // loop, with the user and the folders its environment names.
+        if !self.core.is_headless() {
+            let (runner, stopped) = (self.job_runner(), self.jobs_stop.subscribe());
+
+            tokio::spawn(async move { runner.run(stopped).await });
+        }
+
         tokio::spawn(async move {
             let mut last_full = Instant::now() - desktop.poll_every;
 
@@ -2480,6 +2634,7 @@ impl Desktop {
     pub fn close(&self) {
         self.core.closing.store(true, Ordering::SeqCst);
         self.core.wake.notify_one();
+        self.jobs_stop.send_replace(true);
     }
 
     /// For a headless runner that is told to stop (a redeploy, a restart): every helper ends

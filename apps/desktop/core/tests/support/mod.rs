@@ -630,7 +630,8 @@ async fn create_run(State(state): Shared, headers: HeaderMap, UrlPath(key): UrlP
         "id": id, "issueKey": key, "issueSummary": issue.row.summary, "projectKey": issue.row.project_key, "kind": body["kind"],
         "instructions": body["instructions"].as_str().unwrap_or_default(), "state": if runner.is_some() { "claimed" } else { "queued" },
         "requestedBy": 1, "shared": body["shared"].as_bool().unwrap_or(false),
-        "runnerId": runner, "runnerName": name, "model": body["model"], "repo": body["repo"], "branch": null, "pullRequestUrl": null, "summary": null,
+        "runnerId": runner, "runnerName": name, "onRunner": body["onRunner"], "onRunnerName": null,
+        "model": body["model"], "repo": body["repo"], "branch": null, "pullRequestUrl": null, "summary": null,
         "inputTokens": null, "outputTokens": null, "costUsd": null, "cancelRequested": false, "pendingProposals": 0, "pendingQuestion": false,
         "createdAt": NOW, "startedAt": null, "finishedAt": null,
     });
@@ -647,7 +648,10 @@ async fn claim(State(state): Shared, headers: HeaderMap, Json(body): Json<Value>
     let kinds = body["kinds"].as_array().cloned().unwrap_or_default();
     let projects = body["projects"].as_array().cloned();
     let found = state.runs.iter().position(|run| {
-        run["state"] == "queued" && kinds.contains(&run["kind"]) && projects.as_ref().is_none_or(|projects| projects.contains(&run["projectKey"]))
+        // A run sent to one runner by name waits for that runner and is offered to no other.
+        let for_caller = run["onRunner"].is_null() || run["onRunner"] == body["runnerId"];
+
+        run["state"] == "queued" && for_caller && kinds.contains(&run["kind"]) && projects.as_ref().is_none_or(|projects| projects.contains(&run["projectKey"]))
     });
     let Some(index) = found else { return Json(Value::Null).into_response() };
     let name = state.runners.iter().find(|runner| runner["runnerId"] == body["runnerId"]).map(|runner| runner["name"].clone()).unwrap_or(Value::Null);
@@ -963,6 +967,7 @@ impl FakeHub {
             .route("/notifications", get(notifications))
             .route("/stream", get(stream))
             .route("/m/github/issues/{key}/pull-request", post(open_pull_request))
+            .route("/runners", get(cloud::list_runners))
             .nest("/m/e2e", cloud::e2e_routes())
             .nest("/m/agents", agents);
         let app = Router::new().nest("/api", api).with_state(Arc::clone(&state));

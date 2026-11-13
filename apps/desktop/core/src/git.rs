@@ -595,14 +595,16 @@ const CREDENTIAL_HELPER: &str = "!f() { test \"$1\" = get && printf 'username=x-
 /// is offered only to addresses under `base`; it is never written to a config or put in a
 /// remote's address.
 #[derive(Debug, Clone)]
-pub struct RemoteAuth {
-    base: String,
-    token: Secret,
+pub enum RemoteAuth {
+    Token { base: String, token: Secret },
+    /// However the person at this computer has signed git in (a credential helper, the
+    /// GitHub CLI): the desktop app has no token of its own and leaves that as it is.
+    PersonsOwn,
 }
 
 impl RemoteAuth {
     pub fn new(base: &str, token: Secret) -> Self {
-        Self { base: base.trim_end_matches('/').to_string(), token }
+        Self::Token { base: base.trim_end_matches('/').to_string(), token }
     }
 }
 
@@ -611,10 +613,18 @@ impl RemoteAuth {
 fn remote_git(auth: Option<&RemoteAuth>) -> Command {
     let mut command = hardened_git();
 
-    command.args(["-c", "credential.helper="]).env_remove("GIT_OPTIONAL_LOCKS");
+    command.env_remove("GIT_OPTIONAL_LOCKS");
 
-    if let Some(auth) = auth {
-        command.args(["-c", &format!("credential.{}.helper={CREDENTIAL_HELPER}", auth.base)]).env(REMOTE_PASSWORD_VARIABLE, auth.token.expose());
+    match auth {
+        Some(RemoteAuth::PersonsOwn) => {}
+        Some(RemoteAuth::Token { base, token }) => {
+            command
+                .args(["-c", "credential.helper=", "-c", &format!("credential.{base}.helper={CREDENTIAL_HELPER}")])
+                .env(REMOTE_PASSWORD_VARIABLE, token.expose());
+        }
+        None => {
+            command.args(["-c", "credential.helper="]);
+        }
     }
 
     command

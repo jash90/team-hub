@@ -102,6 +102,49 @@ shared!(
         pub node_command: String,
         /// Where there is no OS sandbox a thread gets no shell at all, unless this is set.
         pub allow_unsandboxed_shell: bool,
+        /// Whether this computer runs test jobs at all (docs/runners.md).
+        #[serde(default = "yes")]
+        pub test_jobs: bool,
+        /// Also take the team's queued test jobs. Off: only the ones sent to this computer
+        /// by name, because running a suite is running a repository's code here.
+        #[serde(default)]
+        pub test_jobs_from_queue: bool,
+    }
+);
+
+fn yes() -> bool {
+    true
+}
+
+shared!(
+    /// Work on an issue handed to a runner, this computer or another (docs/runners.md).
+    pub struct Delegation {
+        pub issue_key: String,
+        pub kind: ThreadKind,
+        #[serde(default)]
+        pub instructions: String,
+        #[serde(default)]
+        pub model: Option<String>,
+        /// "owner/name"; the project's mapped repository when left out.
+        #[serde(default)]
+        pub repo: Option<String>,
+        /// The runner to send it to; none: any runner that fits.
+        #[serde(default)]
+        pub on_runner: Option<String>,
+    }
+);
+
+shared!(
+    /// A test job to start for a project (docs/e2e-jobs.md).
+    pub struct NewTestJob {
+        pub project_key: String,
+        #[serde(default)]
+        pub reference: Option<String>,
+        #[serde(default)]
+        pub filter: Option<String>,
+        /// The runner to send it to; none: any runner that fits.
+        #[serde(default)]
+        pub on_runner: Option<String>,
     }
 );
 

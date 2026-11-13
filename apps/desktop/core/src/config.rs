@@ -38,6 +38,11 @@ impl Paths {
         Ok(Self::under(&base.join("team-hub-desktop")))
     }
 
+    /// The folder both live in: where the desktop app keeps what test jobs need beside them.
+    pub fn root(&self) -> PathBuf {
+        self.state.parent().map(Path::to_path_buf).unwrap_or_else(|| self.state.clone())
+    }
+
     pub fn database(&self) -> PathBuf {
         self.state.join(DATABASE_FILE)
     }
@@ -106,6 +111,8 @@ pub fn default_settings() -> Settings {
         default_model: DEFAULT_MODEL.to_string(),
         node_command: "node".to_string(),
         allow_unsandboxed_shell: false,
+        test_jobs: true,
+        test_jobs_from_queue: false,
     }
 }
 

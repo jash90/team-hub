@@ -67,6 +67,12 @@ impl Repos {
         }
     }
 
+    /// The desktop app's clones for test jobs of projects it has no mapped clone for: made
+    /// with whatever the person has signed git in with.
+    pub fn of_the_person(root: PathBuf) -> Self {
+        Self { auth: Some(RemoteAuth::PersonsOwn), shared: false, root, base: GITHUB.to_string(), busy: Mutex::new(HashMap::new()) }
+    }
+
     pub fn root(&self) -> &Path {
         &self.root
     }

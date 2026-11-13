@@ -57,6 +57,13 @@ enum Command {
         #[arg(long)]
         once: bool,
     },
+    /// Every runner I may see: whose it is, what it takes, what it is carrying out.
+    Runners,
+    /// A project's test jobs.
+    Tests {
+        #[command(subcommand)]
+        command: TestsCommand,
+    },
     /// Proposals waiting for a decision.
     Proposals,
     /// Decide a proposal of a thread.
@@ -93,6 +100,28 @@ enum RepoCommand {
     },
     Remove {
         id: i64,
+    },
+}
+
+#[derive(Subcommand)]
+enum TestsCommand {
+    /// The project's jobs, newest first.
+    List { project: String },
+    /// Start the project's suite and follow it. Without --here or --on, any runner that fits takes it.
+    Run {
+        project: String,
+        /// Run it on this computer, in this process.
+        #[arg(long, conflicts_with = "on")]
+        here: bool,
+        /// Send it to the runner with this id (see `hub runners`).
+        #[arg(long)]
+        on: Option<String>,
+        /// The branch, tag or commit; the project's default when left out.
+        #[arg(long = "ref")]
+        reference: Option<String>,
+        /// Test files or a --grep pattern, as for `e2e run`.
+        #[arg(long)]
+        filter: Option<String>,
     },
 }
 
@@ -522,6 +551,104 @@ async fn run(cli: Cli, desktop: &Desktop) -> CoreResult<ExitCode> {
             }
         }
         Command::Runner { once } => runner::attended(desktop, once).await?,
+        Command::Runners => {
+            let runners = desktop.run(|core| core.runners()).await?;
+            let here = desktop.core().settings().runner_id;
+
+            if json {
+                print_json(&runners);
+
+                return Ok(ExitCode::SUCCESS);
+            }
+
+            for runner in runners.as_array().cloned().unwrap_or_default() {
+                let words = |value: &serde_json::Value| value.as_array().map(|items| items.iter().filter_map(|item| item.as_str()).collect::<Vec<_>>().join(", "));
+                let kind = if runner["interactive"] == true { "computer" } else if runner["shared"] == true { "shared service" } else { "service" };
+                let mark = if runner["id"] == here.as_str() { "  (this computer)" } else { "" };
+
+                println!("{} · {} · {kind} · {}{mark}", runner["id"].as_str().unwrap_or_default(), runner["name"].as_str().unwrap_or_default(), if runner["online"] == true { "online" } else { "offline" });
+
+                for work in runner["work"].as_array().cloned().unwrap_or_default() {
+                    let active: Vec<String> = work["active"].as_array().map(|items| items.iter().filter_map(|item| item["title"].as_str().map(String::from)).collect()).unwrap_or_default();
+
+                    println!(
+                        "    {:<7} {}{}{}",
+                        work["module"].as_str().unwrap_or_default(),
+                        words(&work["what"]).unwrap_or_default(),
+                        if work["pinnedOnly"] == true { " · only what is sent to it by name" } else { "" },
+                        if active.is_empty() { String::new() } else { format!(" · now: {}", active.join("; ")) }
+                    );
+                }
+            }
+        }
+        Command::Tests { command } => match command {
+            TestsCommand::List { project } => {
+                let jobs = desktop.run(move |core| core.test_jobs(&project)).await?;
+
+                if json {
+                    print_json(&jobs);
+                } else {
+                    for job in jobs.as_array().cloned().unwrap_or_default() {
+                        println!(
+                            "{:<5} {:<10} {:<24} {:<20} {}",
+                            job["id"],
+                            job["state"].as_str().unwrap_or_default(),
+                            job["ref"].as_str().unwrap_or_default(),
+                            job["runnerName"].as_str().or(job["onRunnerName"].as_str()).unwrap_or("-"),
+                            job["error"].as_str().unwrap_or_default()
+                        );
+                    }
+                }
+            }
+            TestsCommand::Run { project, here, on, reference, filter } => {
+                let runner = desktop.job_runner();
+                let (stop, mut stopped) = tokio::sync::watch::channel(false);
+                let on_runner = if here { Some(desktop.core().settings().runner_id) } else { on };
+
+                // A job can be sent here by name only once the server has heard of this runner.
+                if here {
+                    runner.run_next(&mut stopped).await?;
+                }
+
+                let new = hub_desktop_core::model::NewTestJob { project_key: project, reference, filter, on_runner };
+                let job = desktop.run(move |core| core.start_test_job(&new)).await?;
+                let id = job["id"].as_i64().unwrap_or_default();
+                let working = here.then(|| tokio::spawn(async move { runner.run(stopped).await }));
+                let mut seen = 0;
+
+                println!("Test job {id} for {} at {}", job["repo"].as_str().unwrap_or_default(), job["ref"].as_str().unwrap_or_default());
+
+                let ended = loop {
+                    let detail = desktop.run(move |core| core.test_job(id, seen)).await?;
+
+                    for line in detail["log"].as_array().cloned().unwrap_or_default() {
+                        seen = seen.max(line["seq"].as_i64().unwrap_or(seen));
+                        println!("{}", line["text"].as_str().unwrap_or_default());
+                    }
+
+                    if matches!(detail["job"]["state"].as_str(), Some("succeeded" | "failed" | "cancelled")) {
+                        break detail["job"].clone();
+                    }
+
+                    tokio::select! {
+                        () = tokio::time::sleep(Duration::from_secs(1)) => {}
+                        () = runner::asked_to_stop() => {
+                            desktop.run(move |core| core.cancel_test_job(id)).await?;
+                        }
+                    }
+                };
+
+                let _ = stop.send(true);
+
+                if let Some(working) = working {
+                    let _ = tokio::time::timeout(Duration::from_secs(5), working).await;
+                }
+
+                println!("Job {id} {}{}", ended["state"].as_str().unwrap_or_default(), ended["error"].as_str().map(|error| format!(": {error}")).unwrap_or_default());
+
+                return Ok(if ended["state"] == "succeeded" { ExitCode::SUCCESS } else { ExitCode::FAILURE });
+            }
+        },
         Command::Proposals => {
             let pending = desktop.run(|core| core.pending_proposals()).await?;
 

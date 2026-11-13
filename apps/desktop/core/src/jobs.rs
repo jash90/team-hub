@@ -24,7 +24,9 @@ use crate::api::HubClient;
 use crate::app::Core;
 use crate::error::{CoreError, CoreResult};
 use crate::git;
+use crate::config::Paths;
 use crate::headless::Folders;
+use crate::model::SandboxState;
 use crate::runner::say;
 use crate::runs::WorkKeys;
 use crate::secrets::Secret;
@@ -193,6 +195,7 @@ impl JobUser {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct JobOptions {
     pub folders: Folders,
     pub user: JobUser,
@@ -204,6 +207,10 @@ pub struct JobOptions {
     pub idle_every: Duration,
     /// How long one of a job's `timeoutMinutes` lasts. A minute; a test makes it shorter.
     pub minute: Duration,
+    /// Set on a person's computer where the system has a sandbox: the job's processes see
+    /// the disk read-only, write only in the job's own folder and the browsers' folder, and
+    /// are shown nothing of these folders (credentials, the app's own state).
+    pub hidden: Option<Vec<PathBuf>>,
 }
 
 impl JobOptions {
@@ -215,7 +222,16 @@ impl JobOptions {
             look_every: Duration::from_secs(3),
             idle_every: Duration::from_secs(10),
             minute: Duration::from_secs(60),
+            hidden: None,
         }
+    }
+
+    /// For the desktop app: beside its other data, as the person's own user (there is no
+    /// other to switch to), inside the same kind of sandbox as agent shells where there is one.
+    pub fn for_desktop(paths: &Paths, sandbox: SandboxState) -> Self {
+        let hidden = (cfg!(target_os = "linux") && sandbox == SandboxState::Available).then(|| crate::policy::private_paths(&paths.state));
+
+        Self { hidden, ..Self::new(Folders::under(&paths.root()), JobUser::Same) }
     }
 }
 
@@ -466,6 +482,9 @@ pub struct JobRunner {
 impl JobRunner {
     /// Folders of jobs an earlier run of the runner left are removed: no job survives it.
     pub fn new(core: Arc<Core>, options: JobOptions) -> Self {
+        let _ = std::fs::create_dir_all(&options.folders.jobs);
+        let _ = std::fs::create_dir_all(&options.folders.browsers);
+
         for entry in std::fs::read_dir(&options.folders.jobs).into_iter().flatten().flatten() {
             let _ = std::fs::remove_dir_all(entry.path());
         }
@@ -485,7 +504,8 @@ impl JobRunner {
         let mut last_problem = String::new();
 
         while !*stop.borrow() {
-            let pause = match self.run_next(&mut stop).await {
+            let outcome = if self.core.takes_test_jobs() { self.run_next(&mut stop).await } else { Ok(false) };
+            let pause = match outcome {
                 Ok(true) => continue,
                 Ok(false) => self.options.idle_every,
                 // A server without test jobs (an older one, or the module is off) is asked rarely.
@@ -759,10 +779,15 @@ impl JobRunner {
     ) -> Result<Option<i32>, Failure> {
         session.push(&format!("$ {program} {}", arguments.join(" ")));
 
-        let mut command = tokio::process::Command::new(program);
+        let job_folder = self.options.folders.jobs.join(session.id.to_string());
+        let (program, arguments) = match &self.options.hidden {
+            Some(hidden) => ("bwrap".to_string(), confined(&job_folder, &self.options.folders.browsers, hidden, program, arguments)),
+            None => (program.to_string(), arguments.to_vec()),
+        };
+        let mut command = tokio::process::Command::new(&program);
 
         command
-            .args(arguments)
+            .args(&arguments)
             .current_dir(folder)
             .env_clear()
             .envs(&session.env)
@@ -788,6 +813,7 @@ impl JobRunner {
             }
         }
 
+        let program = program.as_str();
         let mut child = command.spawn().map_err(|error| {
             // The usual reason beside a missing program: the job's user cannot get to its folder.
             let hint = match (&self.options.user, error.kind()) {
@@ -852,6 +878,29 @@ impl JobRunner {
     }
 }
 
+/// The command inside bubblewrap: the whole disk read-only, a `/tmp` of its own, the job's
+/// folder and the browsers' folder writable, and the hidden folders empty. The network
+/// stays: a suite has to reach the application it tests.
+fn confined(job_folder: &Path, browsers: &Path, hidden: &[PathBuf], program: &str, arguments: &[String]) -> Vec<String> {
+    let text = |path: &Path| path.to_string_lossy().into_owned();
+    let mut wrapped = owned(&["--die-with-parent", "--unshare-pid", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp"]);
+
+    for folder in [job_folder, browsers] {
+        wrapped.extend(["--bind".to_string(), text(folder), text(folder)]);
+    }
+
+    for path in hidden.iter().filter(|path| path.exists() && !job_folder.starts_with(path)) {
+        match path.is_dir() {
+            true => wrapped.extend(["--tmpfs".to_string(), text(path)]),
+            false => wrapped.extend(["--ro-bind".to_string(), "/dev/null".to_string(), text(path)]),
+        }
+    }
+
+    wrapped.extend(["--".to_string(), program.to_string()]);
+    wrapped.extend(arguments.iter().cloned());
+    wrapped
+}
+
 fn owned(words: &[&str]) -> Vec<String> {
     words.iter().map(|word| (*word).to_string()).collect()
 }
@@ -889,7 +938,7 @@ async fn forward(output: impl AsyncRead + Unpin, lines: mpsc::UnboundedSender<St
 /// Clones or fetches the job's repository and checks its ref out under `folder/src`. The
 /// commit that was checked out.
 fn check_out(core: &Core, job: &TestJob, token: Option<&Secret>, folder: &Path) -> CoreResult<String> {
-    let clone = core.clones()?.ensure(&job.repo, token)?;
+    let clone = core.clone_for_job(&job.project_key, &job.repo, token)?;
     let commit = git::resolve_commit(&clone, &job.reference)?;
     let asked_by_name = !commit.starts_with(job.reference.trim());
 

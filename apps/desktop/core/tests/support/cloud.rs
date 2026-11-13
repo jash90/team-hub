@@ -320,10 +320,129 @@ async fn finish_job(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPa
     Json(state.e2e.jobs[index].clone()).into_response()
 }
 
+/// `GET /api/runners`: what the modules know of each runner, merged by its id.
+pub async fn list_runners(State(state): Shared, headers: HeaderMap) -> Response {
+    let state = guard!(state, headers);
+    let mut runners: BTreeMap<String, Value> = BTreeMap::new();
+    let mut add = |id: &Value, name: &Value, interactive: &Value, shared: &Value, version: &Value, work: Value| {
+        let entry = runners.entry(id.as_str().unwrap_or_default().to_string()).or_insert_with(|| {
+            json!({
+                "id": id, "name": name, "userId": 1, "interactive": interactive.as_bool().unwrap_or(true), "shared": shared.as_bool().unwrap_or(false),
+                "online": true, "lastSeenAt": NOW, "version": version, "work": [],
+            })
+        });
+
+        entry["work"].as_array_mut().unwrap().push(work);
+    };
+
+    for runner in &state.runners {
+        let active: Vec<Value> = state
+            .runs
+            .iter()
+            .filter(|run| run["runnerId"] == runner["runnerId"] && matches!(run["state"].as_str(), Some("claimed" | "running" | "waiting")))
+            .map(|run| json!({ "title": format!("{} {}", run["issueKey"].as_str().unwrap(), run["kind"].as_str().unwrap()), "href": format!("/issues/{}", run["issueKey"].as_str().unwrap()) }))
+            .collect();
+        let work = json!({
+            "module": "agents", "what": runner["kinds"], "projects": runner["projects"], "pinnedOnly": runner["pinnedOnly"].as_bool().unwrap_or(false),
+            "online": true, "lastSeenAt": NOW, "active": active,
+        });
+
+        add(&runner["runnerId"], &runner["name"], &runner["interactive"], &runner["shared"], &runner["version"], work);
+    }
+
+    let mut claimed_by: Vec<&Value> = Vec::new();
+
+    for claim in state.e2e.claims.iter().rev() {
+        if !claimed_by.iter().any(|known| known["runnerId"] == claim["runnerId"]) {
+            claimed_by.push(claim);
+        }
+    }
+
+    for claim in claimed_by {
+        let work = json!({
+            "module": "e2e", "what": ["tests"], "projects": claim["projects"], "pinnedOnly": claim["pinnedOnly"].as_bool().unwrap_or(false),
+            "online": true, "lastSeenAt": NOW, "active": [],
+        });
+
+        add(&claim["runnerId"], &claim["runnerName"], &claim["interactive"], &claim["shared"], &claim["version"], work);
+    }
+
+    Json(runners.into_values().collect::<Vec<_>>()).into_response()
+}
+
+async fn list_jobs(State(state): Shared, headers: HeaderMap, UrlPath(key): UrlPath<String>) -> Response {
+    let state = guard!(state, headers);
+
+    Json(state.e2e.jobs.iter().rev().filter(|job| job["projectKey"] == key.as_str()).cloned().collect::<Vec<_>>()).into_response()
+}
+
+/// What a person starting a job on the web (or in the desktop app) does.
+async fn start_job(State(state): Shared, headers: HeaderMap, UrlPath(key): UrlPath<String>, Json(body): Json<Value>) -> Response {
+    let known = {
+        let state = guard!(state, headers);
+
+        if state.e2e.settings["repo"].is_null() {
+            return error(StatusCode::CONFLICT, "This project has no repository for its tests");
+        }
+
+        body["onRunner"].is_null() || state.e2e.claims.iter().any(|claim| claim["runnerId"] == body["onRunner"])
+    };
+
+    if !known {
+        return error(StatusCode::BAD_REQUEST, "That runner does not take test jobs for this project");
+    }
+
+    let hub = FakeHub { url: String::new(), state };
+    let id = hub.queue_job(body["ref"].as_str(), body["filter"].as_str(), body["video"].as_str().unwrap_or("on"), body["onRunner"].as_str());
+    let mut job = hub.job(id);
+
+    job["projectKey"] = json!(key);
+
+    Json(job).into_response()
+}
+
+async fn get_job(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i64>, Query(query): Query<BTreeMap<String, String>>) -> Response {
+    let state = guard!(state, headers);
+    let Some(index) = job_index(&state, id) else { return error(StatusCode::NOT_FOUND, "No such job") };
+    let after = query.get("after").and_then(|after| after.parse::<usize>().ok()).unwrap_or(0);
+    let lines = state.e2e.logs.get(&id).cloned().unwrap_or_default();
+    let log: Vec<Value> = lines.iter().enumerate().skip(after).map(|(index, text)| json!({ "seq": index + 1, "text": text })).collect();
+
+    Json(json!({ "job": state.e2e.jobs[index], "log": log, "logTruncated": false })).into_response()
+}
+
+async fn cancel_job_route(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i64>) -> Response {
+    {
+        let state = guard!(state, headers);
+
+        if job_index(&state, id).is_none() {
+            return error(StatusCode::NOT_FOUND, "No such job");
+        }
+    }
+
+    let hub = FakeHub { url: String::new(), state };
+
+    hub.cancel_job(id);
+
+    Json(hub.job(id)).into_response()
+}
+
+async fn get_settings(State(state): Shared, headers: HeaderMap) -> Response {
+    let state = guard!(state, headers);
+    let mut settings = state.e2e.settings.clone();
+
+    settings["secretNames"] = json!(state.e2e.secrets.keys().collect::<Vec<_>>());
+
+    Json(settings).into_response()
+}
+
 pub fn e2e_routes() -> Router<Arc<Mutex<HubState>>> {
     Router::new()
+        .route("/projects/{key}/jobs", axum::routing::get(list_jobs).post(start_job))
+        .route("/projects/{key}/settings", axum::routing::get(get_settings))
+        .route("/jobs/{id}/cancel", post(cancel_job_route))
         .route("/jobs/claim", post(claim_job))
-        .route("/jobs/{id}", patch(patch_job))
+        .route("/jobs/{id}", patch(patch_job).get(get_job))
         .route("/jobs/{id}/log", post(job_log))
         .route("/jobs/{id}/finish", post(finish_job))
         .route("/projects/{key}/runs", post(post_report))

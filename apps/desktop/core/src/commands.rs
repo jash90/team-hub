@@ -9,7 +9,7 @@ use serde_json::Value;
 use crate::app::Desktop;
 use crate::config::MODELS;
 use crate::error::{CoreError, CoreResult};
-use crate::model::{NewThread, Settings};
+use crate::model::{Delegation, NewTestJob, NewThread, Settings};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -89,6 +89,14 @@ struct Say {
     id: i64,
     #[serde(default)]
     text: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JobLog {
+    id: i64,
+    #[serde(default)]
+    after: i64,
 }
 
 #[derive(Deserialize)]
@@ -334,6 +342,53 @@ async fn dispatch(desktop: &Desktop, command: &str, args: Value) -> CoreResult<V
             let Runs { mine } = arguments(command, args)?;
 
             desktop.run(move |core| answer(core.runs(mine))).await
+        }
+        // The same runners and work as the web shows: docs/runners.md.
+        "runners" => desktop.run(|core| answer(core.runners())).await,
+        "delegate" => {
+            let new: Delegation = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.delegate(&new))).await
+        }
+        "run_detail" => {
+            let ById { id } = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.run_detail(id))).await
+        }
+        "decide_on_run" => {
+            let Decide { id, approve, note } = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.decide_on_run(id, approve, note.as_deref()))).await
+        }
+        "cancel_run" => {
+            let ById { id } = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.cancel_run(id))).await
+        }
+        "test_settings" => {
+            let ByKey { key } = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.test_settings(&key))).await
+        }
+        "test_jobs" => {
+            let ByKey { key } = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.test_jobs(&key))).await
+        }
+        "start_test_job" => {
+            let new: NewTestJob = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.start_test_job(&new))).await
+        }
+        "test_job" => {
+            let JobLog { id, after } = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.test_job(id, after))).await
+        }
+        "cancel_test_job" => {
+            let ById { id } = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.cancel_test_job(id))).await
         }
         other => Err(CoreError::not_possible(format!("There is no command called {other}"))),
     }
