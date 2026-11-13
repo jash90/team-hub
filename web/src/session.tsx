@@ -108,6 +108,15 @@ export function useLive(handler: (event: LiveEvent) => void): void {
   }, []);
 }
 
+/**
+ * True for a change that can alter what an issue looks like in a list: its own fields, its
+ * sprint, or anything a module attached to it. Modules announce such changes with the issue
+ * they concern, so lists need not know the modules' event names.
+ */
+export function changesIssues(event: LiveEvent): boolean {
+  return event.issueId !== null || event.kind.startsWith('issue.') || event.kind.startsWith('sprint.');
+}
+
 // ---------- remote data ----------
 
 export type Remote<T> = {

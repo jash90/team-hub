@@ -46,9 +46,6 @@ macro_rules! shared {
     };
 }
 
-pub(crate) use shared;
-pub(crate) use text_enum;
-
 text_enum!(
     /// What a thread is asked to do. `analyse` reads and reports; it is a `custom` run on the server.
     ThreadKind { Implement => "implement", Review => "review", Analyse => "analyse", Custom => "custom" }

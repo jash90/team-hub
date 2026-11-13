@@ -11,7 +11,7 @@ import { DueDate, IssueKey, ModuleBadges, PRIORITIES, PriorityIcon, StatusPill, 
 import { Avatar, Button, Dialog, Empty, ErrorNote, Field, Menu, Picker, Popover, Spinner, attempt, toast, useBusy } from '../components/ui.tsx';
 import { countOf, t, timeAgo } from '../i18n/index.ts';
 import { navigate, setParam, usePath, useSearchParams } from '../router.tsx';
-import { useRemote, useSession } from '../session.tsx';
+import { changesIssues, useRemote, useSession } from '../session.tsx';
 
 const PAGE = 50;
 const FUNCTIONS = ['currentUser()', 'openSprints()', 'now()', 'startOfDay()', 'startOfWeek()', 'startOfMonth()'];
@@ -74,7 +74,7 @@ export function SearchView({ scoped }: { scoped?: boolean }) {
   const [bulk, setBulk] = useState(false);
   const [hints, setHints] = useState<HTMLElement | null>(null);
 
-  const result = useRemote(() => api.get<SearchResult>(`/api/search${toQuery({ q: ran, limit })}`), [ran, limit], (event) => event.kind.startsWith('issue.'));
+  const result = useRemote(() => api.get<SearchResult>(`/api/search${toQuery({ q: ran, limit })}`), [ran, limit], changesIssues);
   const fields = useRemote(() => api.get<QueryFieldInfo[]>('/api/search/fields'), []);
   const filters = useRemote(() => api.get<SavedFilter[]>('/api/filters'), []);
   const issues = result.data?.issues ?? [];

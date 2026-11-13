@@ -571,18 +571,21 @@ async fn the_demo_has_a_done_issue_with_a_failing_test() {
 
     // The one failing test verifies an issue that is done.
     let failing = &tests[0];
-    assert_eq!(failing["title"], "Koszyk > WEB-11 pusty koszyk pokazuje komunikat zamiast błędu 500");
+    assert_eq!(failing["title"], "Konto klienta > WEB-14 reset hasła wysyła link i ustawia nowe hasło");
     assert_eq!(
         (failing["status"].as_str(), failing["issues"][0]["key"].as_str(), failing["issues"][0]["done"].clone()),
-        (Some("failed"), Some("WEB-11"), json!(true))
+        (Some("failed"), Some("WEB-14"), json!(true))
     );
-    assert_eq!(found(&app, &owner, "category = done AND tests = failing"), vec!["WEB-11"]);
-    assert_eq!(found(&app, &owner, "tests = flaky"), vec!["WEB-14"]);
+    assert_eq!(found(&app, &owner, "category = done AND tests = failing"), vec!["WEB-14"]);
+    assert_eq!(found(&app, &owner, "tests = flaky"), vec!["WEB-11"]);
+    // Whoever set the demo up is assigned to that issue, so "My work" shows it.
+    let mine = app.read(|connection| E2eModule.dashboard(connection, &owner.user)).unwrap().expect("a dashboard section");
+    assert_eq!((mine["issues"][0]["key"].as_str(), mine["issues"][0]["done"].clone()), (Some("WEB-14"), json!(true)));
 
     let flaky = &tests[1];
     assert_eq!(
         (flaky["status"].as_str(), flaky["unstable"].clone(), flaky["issues"][0]["key"].as_str()),
-        (Some("flaky"), json!(true), Some("WEB-14"))
+        (Some("flaky"), json!(true), Some("WEB-11"))
     );
     assert_eq!(
         tests.iter().filter(|test| test["issues"].as_array().unwrap().is_empty()).map(|test| test["title"].as_str().unwrap()).collect::<Vec<_>>(),
@@ -595,6 +598,6 @@ async fn the_demo_has_a_done_issue_with_a_failing_test() {
     // The drill-down into the newest run shows the failure.
     let detail = owner.get(&format!("/runs/{}", page["latestRun"]["id"])).await;
     let first = &detail["results"][0];
-    assert_eq!((first["status"].as_str(), first["line"].clone(), first["attempts"].clone()), (Some("failed"), json!(53), json!(2)));
-    assert!(first["message"].as_str().unwrap().contains("Twój koszyk jest pusty"));
+    assert_eq!((first["status"].as_str(), first["line"].clone(), first["attempts"].clone()), (Some("failed"), json!(44), json!(2)));
+    assert!(first["message"].as_str().unwrap().contains("Link wygasł lub jest nieprawidłowy"));
 }

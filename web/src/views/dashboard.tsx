@@ -10,7 +10,7 @@ import { Avatar, Empty, ErrorNote, ProgressBar, Spinner } from '../components/ui
 import { countOf, formatDate, t, timeAgo } from '../i18n/index.ts';
 import { useModules } from '../modules.ts';
 import { Link } from '../router.tsx';
-import { useRemote, useSession } from '../session.tsx';
+import { changesIssues, useRemote, useSession } from '../session.tsx';
 
 /** The configurations of the projects whose issues are on screen. */
 function useProjectsOf(issues: IssueRow[]): Map<number, Project> {
@@ -105,7 +105,7 @@ export function DashboardView() {
   const dashboard = useRemote(
     () => api.get<Dashboard>('/api/dashboard'),
     [],
-    (event) => event.kind.startsWith('issue.') || event.kind.startsWith('sprint.') || event.kind.startsWith('github.'),
+    changesIssues,
   );
   const activity = useRemote(
     () => api.get<ActivityItem[]>('/api/activity?limit=40'),

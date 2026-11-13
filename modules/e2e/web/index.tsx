@@ -152,8 +152,10 @@ function Badges({ issue }: { issue: IssueRow }) {
     badge.passing > 0 ? t('{count} passing', { count: badge.passing }) : '',
   ].filter(Boolean);
 
+  const text = `${t(STATE_TEXT[badge.state])}${parts.length > 0 ? `: ${parts.join(', ')}` : ''}`;
+
   return (
-    <span className={`e2e-chip e2e-chip-${badge.state}`} title={`${t(STATE_TEXT[badge.state])}${parts.length > 0 ? `: ${parts.join(', ')}` : ''}`}>
+    <span className={`e2e-chip e2e-chip-${badge.state}`} role="img" title={text} aria-label={text}>
       <Icon name={icon} size={11} />
       {badge.state === 'failing' ? `${badge.failing}/${badge.total}` : badge.total}
     </span>

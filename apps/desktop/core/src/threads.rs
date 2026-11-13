@@ -409,7 +409,15 @@ impl Inner {
         }
     }
 
-    async fn pump(self: &Arc<Self>) {
+    /// Boxed on purpose: a thread that ends starts the next one, and starting one spawns the
+    /// task that will run this again, so the future's type has to be closed somewhere.
+    fn pump(self: &Arc<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        let inner = Arc::clone(self);
+
+        Box::pin(async move { inner.pump_now().await })
+    }
+
+    async fn pump_now(self: &Arc<Self>) {
         let _turn = self.pump_lock.lock().await;
 
         loop {
@@ -490,6 +498,12 @@ impl Runtime {
         Ok(thread)
     }
 
+    /// The process id of the thread's helper while it works. The helper leads a process group
+    /// of its own, so this is also the group's id.
+    pub fn helper_pid(&self, thread_id: i64) -> Option<u32> {
+        self.inner.running().get(&thread_id).and_then(|running| running.pid)
+    }
+
     pub fn is_working(&self, thread_id: i64) -> bool {
         self.inner.running().contains_key(&thread_id)
     }
@@ -530,8 +544,6 @@ impl Runtime {
     /// what the person says to it; `mirrored` tells whether the server already has that text.
     pub fn resume(&self, thread_id: i64, message: Option<&str>, mirrored: bool) -> CoreResult<Thread> {
         let inner = &self.inner;
-        let thread = inner.store.thread(thread_id)?;
-
         let message = message.map(str::trim).filter(|message| !message.is_empty());
 
         if let Some(message) = message {
@@ -543,7 +555,7 @@ impl Runtime {
         }
 
         // A working thread hears it when its turn ends; a queued one when it starts.
-        if thread.state.is_active() {
+        if inner.store.thread(thread_id)?.state.is_active() {
             return inner.store.thread(thread_id);
         }
 

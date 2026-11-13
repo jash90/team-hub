@@ -11,13 +11,12 @@ import { DueDate, ModuleBadges, PriorityIcon, TypeIcon, canEdit, openIssue } fro
 import { Avatar, Button, Dialog, Empty, ErrorNote, Field, Picker, ProgressBar, Spinner, attempt, useBusy } from '../components/ui.tsx';
 import { countOf, formatDate, t } from '../i18n/index.ts';
 import { Link } from '../router.tsx';
-import { useProject, useRemote, useSession, useStored } from '../session.tsx';
+import { changesIssues, useProject, useRemote, useSession, useStored } from '../session.tsx';
 import { CreateIssueDialog, type CreateDefaults } from './create-issue.tsx';
 
 type Grouping = 'none' | 'epic' | 'assignee';
 type Lane = { id: string; title: string; assigneeId?: number | null; matches: (issue: IssueRow) => boolean };
 
-const BOARD_EVENTS = ['issue.', 'sprint.', 'comment.', 'github.'];
 
 export type IssueFilter = { text: string; assignees: number[]; unassigned: boolean };
 
@@ -130,7 +129,7 @@ export function BoardView() {
   const board = useRemote(
     () => api.get<Board>(`/api/projects/${project.key}/board`),
     [project.key],
-    (event) => event.projectId === project.id && BOARD_EVENTS.some((prefix) => event.kind.startsWith(prefix)),
+    (event) => event.projectId === project.id && changesIssues(event),
   );
   const [filter, setFilter] = useState<IssueFilter>({ text: '', assignees: [], unassigned: false });
   const [grouping, setGrouping] = useStored<Grouping>(`board-group:${project.key}`, 'none');

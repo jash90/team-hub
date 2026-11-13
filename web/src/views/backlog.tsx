@@ -10,10 +10,9 @@ import { Icon } from '../components/icon.tsx';
 import { IssueLine, canEdit } from '../components/issue-bits.tsx';
 import { Button, ConfirmDialog, Dialog, Empty, ErrorNote, Field, Menu, Spinner, Tag, attempt, toast, useBusy } from '../components/ui.tsx';
 import { countOf, formatDate, t } from '../i18n/index.ts';
-import { useProject, useRemote, useStored } from '../session.tsx';
+import { changesIssues, useProject, useRemote, useStored } from '../session.tsx';
 import { CompleteSprintDialog, FilterBar, matchesFilter, type IssueFilter } from './board.tsx';
 
-const BACKLOG_EVENTS = ['issue.', 'sprint.', 'github.'];
 
 function points(issues: IssueRow[]): number {
   return issues.reduce((sum, issue) => sum + (issue.points ?? 0), 0);
@@ -51,7 +50,7 @@ export function BacklogView() {
   const backlog = useRemote(
     () => api.get<Backlog>(`/api/projects/${project.key}/backlog`),
     [project.key],
-    (event) => event.projectId === project.id && BACKLOG_EVENTS.some((prefix) => event.kind.startsWith(prefix)),
+    (event) => event.projectId === project.id && changesIssues(event),
   );
   const [filter, setFilter] = useState<IssueFilter>({ text: '', assignees: [], unassigned: false });
   const [folded, setFolded] = useStored<number[]>(`backlog-folded:${project.key}`, []);

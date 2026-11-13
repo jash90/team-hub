@@ -6,6 +6,10 @@ needs no repository, the desktop app (or any other client with an API token) for
 code. This file is the contract between the three; the `agents` module implements the server
 side under `/api/m/agents`.
 
+The `agents` module implements this; where it had to decide something this file leaves
+open (state changes around proposals, who counts as a runner, what cancel does), its
+[README](../modules/agents/README.md) is the reference.
+
 The rule that holds everywhere: **an agent proposes, a person decides.** A run can read
 whatever its requester can read, but changes to issues are *proposals* that take effect when
 a person approves them (or at once, for the kinds a project has chosen to trust).

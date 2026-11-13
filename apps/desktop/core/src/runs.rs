@@ -210,10 +210,10 @@ pub struct AgentRunDetail {
 }
 
 /// `POST /issues/{key}/runs`.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NewRun {
-    pub kind: Option<RunKind>,
+    pub kind: RunKind,
     pub instructions: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,

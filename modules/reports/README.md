@@ -148,3 +148,12 @@ when there is one, comes last.
 - `load.rs`: the SQL that fills the structs.
 - `routes.rs`: thin handlers.
 - `tests/demo.rs`: the reports on the demo data, with numbers derived from `hub_app::seed`.
+
+## Web
+
+`web/index.tsx` adds the project page `/p/:key/reports` (navigation entry "Reports"): one tab
+per report (`reports.tsx`), drawn with the hand-made SVG charts in `charts.tsx` (lines and
+stacked bands over days, grouped columns, a scatter; crosshair or per-mark tooltips, keyboard
+arrows, a table of the numbers under each chart). A kanban project gets no burndown or
+velocity tab and a line saying why. Series colours are the module's own variables in
+`styles.css`, checked for colour-blind separation on the light and dark surfaces.

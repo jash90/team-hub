@@ -1,8 +1,22 @@
-use serde::Serialize;
-use ts_rs::TS;
+//! The team-hub desktop app without its window. Connection and offline copy, repositories,
+//! agent threads in git working trees, the runner side of `docs/agent-runs.md`, and the rule
+//! that nothing leaves the machine without a person's click.
 
-#[derive(Serialize, TS)]
-#[ts(export, export_to = "../../../apps/desktop/ui/src/bindings/")]
-pub struct Probe {
-    pub row: Option<hub_core::IssueRow>,
-}
+pub mod api;
+pub mod app;
+pub mod commands;
+pub mod config;
+pub mod diff;
+pub mod error;
+pub mod git;
+pub mod model;
+pub mod policy;
+pub mod protocol;
+pub mod push_guard;
+pub mod runs;
+pub mod secrets;
+pub mod store;
+pub mod threads;
+
+pub use app::{Core, Desktop, OpenOptions};
+pub use error::{CoreError, CoreResult};

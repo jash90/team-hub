@@ -1593,8 +1593,8 @@ td > .picker-field {
 }
 
 .issue-line-summary {
-  flex: 1;
-  min-width: 80px;
+  flex: 1 0 30%;
+  min-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1603,8 +1603,11 @@ td > .picker-field {
 .issue-line-meta {
   display: flex;
   align-items: center;
-  gap: 7px;
-  flex: none;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 /* ---------- board ---------- */

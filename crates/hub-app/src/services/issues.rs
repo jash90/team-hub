@@ -422,7 +422,14 @@ pub fn create_issue(tx: &Tx, new: &NewIssue) -> ApiResult<Id> {
     let category = status_category(tx, status_id, project_id)?;
     let assignee_id = fields.assignee_id.flatten();
     let reporter_id = fields.reporter_id.flatten().or(tx.actor.user_id);
-    let sprint_id = fields.sprint_id.flatten();
+    // A subtask lives in its parent's sprint unless it is given one of its own.
+    let sprint_id = match (fields.sprint_id, parent_id) {
+        (Some(sprint_id), _) => sprint_id,
+        (None, Some(parent_id)) if level == TypeLevel::Subtask => {
+            tx.query_row("SELECT sprint_id FROM issue WHERE id = ?1", [parent_id], |row| row.get(0))?
+        }
+        _ => None,
+    };
     let version_id = fields.version_id.flatten();
 
     if let Some(assignee_id) = assignee_id {
@@ -1249,8 +1256,8 @@ fn owned_by_project(connection: &Connection, table: &str, id: Option<Id>, projec
 /// importer announces its own progress. Returns the issue's id.
 pub fn import_issue(tx: &Tx, issue: &ImportedIssue) -> ApiResult<Id> {
     let project_id = issue.project_id;
-    let project_key: String = query_one(tx, "SELECT key FROM project WHERE id = ?1", [project_id], |row| row.get(0))?
-        .ok_or_else(|| ApiError::not_found("Project"))?;
+    let project_key: String =
+        query_one(tx, "SELECT key FROM project WHERE id = ?1", [project_id], |row| row.get(0))?.ok_or_else(|| ApiError::not_found("Project"))?;
 
     if !(1..=9_999_999).contains(&issue.number) {
         return Err(ApiError::bad_request("An issue number goes from 1 to 9999999"));

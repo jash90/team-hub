@@ -13,10 +13,11 @@ use axum::{Json, Router};
 use chrono::{Duration, Utc};
 use http_body_util::BodyExt;
 use hub_app::access::project_access;
-use hub_app::services::issues::{create_issue, issue_detail};
+use hub_app::services::issues::{create_issue, issue_access, issue_detail, update_issue};
 use hub_app::services::overview::dashboard;
 use hub_app::services::projects::{create_project, set_member, NewProject};
 use hub_app::services::search::search;
+use hub_app::services::sprints::{create_sprint, SprintInput};
 use hub_app::services::users::{create_token, create_user, update_user, NewUser, UserPatch};
 use hub_app::{Actor, App, AuthUser, Config, Module};
 use hub_core::{IssuePatch, NewIssue, ProjectRole, Role};
@@ -372,6 +373,16 @@ async fn breakdown_proposes_subtasks_that_the_person_may_edit_before_they_are_cr
     let (_fake, address) = fake_model().await;
     world.configure(&address).await;
 
+    world
+        .app
+        .write(world.admin.actor(), |tx| {
+            let sprint = create_sprint(tx, &project_access(tx, &world.admin, "WEB")?, &SprintInput::default())?;
+            let (issue_id, _) = issue_access(tx, &world.admin, "WEB-1")?;
+
+            update_issue(tx, issue_id, &IssuePatch { sprint_id: Some(Some(sprint.id)), ..Default::default() })
+        })
+        .expect("WEB-1 in a sprint");
+
     let id = world.start("WEB-1", "breakdown", "").await;
     assert!(world.work().await);
     let detail = world.run(id).await;
@@ -387,7 +398,11 @@ async fn breakdown_proposes_subtasks_that_the_person_may_edit_before_they_are_cr
     assert_eq!(approved["proposals"][0]["payload"], edited);
     assert_eq!(approved["run"]["state"], "succeeded");
     assert_eq!(world.text("SELECT summary FROM issue WHERE key = 'WEB-3'").as_deref(), Some("Reproduce on Safari 18 and 17"));
-    assert_eq!(world.count("SELECT count(*) FROM issue c JOIN issue p ON p.id = c.parent_id WHERE p.key = 'WEB-1'"), 2);
+    assert_eq!(
+        world.count("SELECT count(*) FROM issue c JOIN issue p ON p.id = c.parent_id WHERE p.key = 'WEB-1' AND c.sprint_id = p.sprint_id"),
+        2,
+        "in their parent's sprint"
+    );
     assert_eq!(world.count("SELECT count(*) FROM event WHERE kind = 'issue.created' AND actor_label = 'AI agent'"), 2);
 }
 

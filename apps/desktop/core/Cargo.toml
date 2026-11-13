@@ -38,7 +38,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["process", "io-util"] }
 tracing.workspace = true
 ts-rs.workspace = true
-ureq.workspace = true
+ureq = { workspace = true, features = ["platform-verifier"] }
 axum = { workspace = true, optional = true }
 chacha20poly1305 = "0.10"
 getrandom = "0.3"
@@ -59,3 +59,4 @@ keyring = { version = "3", features = ["async-secret-service", "tokio", "crypto-
 
 [dev-dependencies]
 axum.workspace = true
+tokio-stream = { version = "0.1", features = ["sync"] }

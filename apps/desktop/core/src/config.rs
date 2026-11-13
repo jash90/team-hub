@@ -8,8 +8,8 @@ use crate::model::Settings;
 pub const DATA_DIR_VARIABLE: &str = "TEAM_HUB_DESKTOP_DIR";
 /// Replaces the helper process, e.g. with the fake agent: the program, then its arguments.
 pub const SIDECAR_VARIABLE: &str = "TEAM_HUB_SIDECAR";
-pub const DEFAULT_MODEL: &str = "claude-sonnet-4-5";
-pub const MODELS: [&str; 3] = ["claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-4-5"];
+pub const DEFAULT_MODEL: &str = "claude-opus-5-5";
+pub const MODELS: [&str; 4] = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-2"];
 
 const SETTINGS_FILE: &str = "settings.json";
 const DATABASE_FILE: &str = "desktop.db";

@@ -7,7 +7,7 @@ import { IssueLine, canEdit } from '../components/issue-bits.tsx';
 import { Markdown } from '../components/markdown.tsx';
 import { Button, ConfirmDialog, Dialog, Empty, Field, Menu, Picker, ProgressBar, Spinner, Tag, attempt, copyText, useBusy } from '../components/ui.tsx';
 import { countOf, formatDate, t } from '../i18n/index.ts';
-import { useProject, useProjectReload, useRemote, useStored } from '../session.tsx';
+import { changesIssues, useProject, useProjectReload, useRemote, useStored } from '../session.tsx';
 
 type Open = { kind: 'new' } | { kind: 'edit' | 'release' | 'notes' | 'delete'; version: Version };
 
@@ -114,7 +114,7 @@ function VersionIssues({ version }: { version: Version }) {
   const issues = useRemote(
     () => api.get<{ issues: IssueRow[] }>(`/api/search?limit=200&q=${encodeURIComponent(`project = ${project.key} AND version = "${version.name}" ORDER BY status, rank`)}`).then((result) => result.issues),
     [version.id],
-    (event) => event.projectId === project.id && event.kind.startsWith('issue.'),
+    (event) => event.projectId === project.id && changesIssues(event),
   );
 
   if (!issues.data) {

@@ -109,3 +109,543 @@
     border-bottom: 1px solid var(--line);
   }
 }
+
+/* ---------- agent runs ---------- */
+
+.agents-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agents-run {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.agents-run-waiting {
+  border-color: var(--amber);
+}
+
+.agents-run-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  min-width: 0;
+}
+
+.agents-run-toggle {
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agents-run-toggle:hover {
+  background: var(--sunk);
+}
+
+.agents-run-toggle strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agents-run-toggle .tag,
+.agents-run-toggle .icon {
+  flex: none;
+}
+
+.agents-run-issue {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.agents-run-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agents-run-meta {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 8px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.agents-run-meta span:first-child {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agents-run-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 14px 14px;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.agents-run-body > :first-child {
+  margin-top: 10px;
+}
+
+.agents-instructions {
+  padding-left: 10px;
+  border-left: 3px solid var(--line-strong);
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agents-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentcolor;
+  animation: agents-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes agents-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agents-pulse {
+    animation: none;
+  }
+}
+
+.agents-hold {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--amber-soft);
+  color: var(--ink);
+}
+
+.agents-hold .icon {
+  flex: none;
+  margin-top: 3px;
+  color: var(--amber);
+}
+
+.agents-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.agents-status,
+.agents-tools {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.agents-tools summary {
+  cursor: pointer;
+}
+
+.agents-tools > div,
+.agents-tools pre {
+  margin: 2px 0 0 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agents-message {
+  overflow-wrap: anywhere;
+}
+
+.agents-question,
+.agents-answer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.agents-question {
+  background: var(--amber-soft);
+}
+
+.agents-question .icon {
+  flex: none;
+  margin-top: 3px;
+  color: var(--amber);
+}
+
+.agents-answer {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--accent-soft);
+}
+
+.agents-decide {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agents-decide .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.agents-proposals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agents-proposals-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.agents-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+
+.agents-proposal-pending {
+  border-left-color: var(--amber);
+}
+
+.agents-proposal-approved {
+  border-left-color: var(--green);
+}
+
+.agents-proposal-failed {
+  border-left-color: var(--red);
+}
+
+.agents-proposal header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agents-quote {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--sunk);
+  overflow-wrap: anywhere;
+}
+
+.agents-list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.agents-changes th {
+  width: 130px;
+  padding-left: 0;
+  color: var(--muted);
+  font-weight: 500;
+  text-align: left;
+  vertical-align: top;
+}
+
+.agents-changes td {
+  overflow-wrap: anywhere;
+}
+
+.agents-changes tr:last-child td,
+.agents-changes tr:last-child th {
+  border-bottom: 0;
+}
+
+.agents-before {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.agents-arrow {
+  margin: 0 8px;
+  color: var(--muted);
+}
+
+/* The description before and after: signs and strike-through carry the meaning, colour only helps. */
+.agents-diff {
+  max-height: 420px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.agents-diff-line {
+  display: flex;
+  gap: 8px;
+  padding: 0 10px 0 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agents-diff-sign {
+  flex: none;
+  width: 10px;
+  color: var(--muted);
+  user-select: none;
+}
+
+.agents-diff-added {
+  background: var(--green-soft);
+}
+
+.agents-diff-added .agents-diff-sign {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.agents-diff-removed {
+  background: var(--red-soft);
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.agents-diff-removed .agents-diff-sign {
+  color: var(--red);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.agents-subtasks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agents-subtask {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.agents-subtask-number {
+  flex: none;
+  width: 18px;
+  padding-top: 6px;
+  color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.agents-subtask-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.agents-decision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 12.5px;
+}
+
+.agents-failure {
+  color: var(--red);
+}
+
+.agents-keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.agents-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.agents-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  font-size: 12.5px;
+}
+
+.agents-facts span,
+.agents-facts a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agents-runner-pick,
+.agents-runner-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agents-runner-list {
+  padding: 12px 14px;
+}
+
+.agents-runner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.agents-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.agents-dot-on {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.agents-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agents-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.agents-badge-waiting {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.agents-waiting-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.agents-waiting-row:last-child {
+  border-bottom: 0;
+}
+
+.agents-waiting-row > .icon {
+  flex: none;
+  color: var(--amber);
+}
+
+.agents-waiting-row .muted {
+  white-space: nowrap;
+}
+
+.agents-group-panel > .agents-run {
+  margin: 10px 12px;
+}
+
+.agents-switch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--sunk);
+}
+
+.agents-switch button {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.agents-switch .agents-switch-on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(16 24 40 / 14%);
+}
+
+@media (max-width: 760px) {
+  .agents-run-head {
+    flex-wrap: wrap;
+  }
+
+  .agents-run-meta span:first-child {
+    display: none;
+  }
+
+  .agents-decide {
+    flex-wrap: wrap;
+  }
+
+  .agents-decide .input {
+    flex-basis: 100%;
+  }
+}

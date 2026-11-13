@@ -359,6 +359,13 @@ fn apply(tx: &Tx, approver: &AuthUser, row: &RunRow, kind: AgentProposalKind, pa
         }
         AgentProposalKind::CreateSubtasks => {
             let subtasks: SubtasksPayload = parse(payload)?;
+            // Subtasks belong to their parent's sprint, as long as that sprint can still take issues.
+            let sprint: Option<Id> = query_one(
+                tx,
+                "SELECT s.id FROM issue i JOIN sprint s ON s.id = i.sprint_id WHERE i.id = ?1 AND s.state != 'closed'",
+                [issue_id],
+                |row| row.get(0),
+            )?;
             let mut keys = Vec::new();
 
             for item in subtasks.items {
@@ -366,6 +373,7 @@ fn apply(tx: &Tx, approver: &AuthUser, row: &RunRow, kind: AgentProposalKind, pa
                     summary: Some(item.summary),
                     description: item.description,
                     parent_key: Some(Some(row.run.issue_key.clone())),
+                    sprint_id: sprint.map(Some),
                     ..Default::default()
                 };
                 let id = issues::create_issue(tx, &NewIssue { project_key: row.run.project_key.clone(), fields })?;
