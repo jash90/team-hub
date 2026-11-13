@@ -15,7 +15,8 @@ pl/index.html     the Polish page
 robots.txt
 assets/site.css   the only stylesheet, shared by all three pages
 assets/site.js    the lightbox for screenshots and the copy buttons; an enhancement only
-assets/img/       screenshots: WebP, most in a 1600 px and an 800 px width
+assets/img/       screenshots: WebP, most in a 1600 px and an 800 px width; en-* for the
+                  English page, pl-* for the Polish one
 assets/fonts/     Newsreader (headings), two subsets, with its licence (OFL.txt)
 assets/og-*.png   link-preview images, 1200 x 630
 assets/favicon.*  the tracker's own mark
@@ -115,10 +116,11 @@ those change, this page should follow, in particular:
   code) instead.
 - **The licence** is MIT (`LICENSE` at the top of the repository): named in "How it is
   built" and in the footer.
-- **Captures that are not the real thing say so in their caption**: the desktop thread and
-  the push preview come from the app's end-to-end check with a scripted test agent; the
-  test session's recording was made by hand in the framework's format. The desktop
-  Runners and Tests views are real captures.
+- **Captures that are not the real thing say so in their caption**: in the desktop thread
+  and its push preview a scripted stand-in for the model wrote the agent's lines and the
+  commit (the app's core and the server are real); the test session was posted by a script
+  that plays the runner, with a recording put together from screenshots; the test job in
+  the desktop Tests view was carried out by the same script.
 
 Polish: the words are the interface's own (`zadanie`, `tablica`, `backlog`, `baza wiedzy`,
 `wydanie`, `oś czasu`, `przebieg` for a test run, `uruchomienie testów` for a test job,
@@ -135,15 +137,32 @@ run `tools/og-image.js`.
 Screenshots are real captures of the running product, cropped to the part that matters.
 Nothing is mocked up.
 
+**Each page shows its own language, interface and data.** The English page uses only
+`en-*` files, captured from an instance set up with the English example data; the Polish
+page only `pl-*` files, from one with the Polish data. A capture in the other language is
+never used with a caption that explains it: when a state cannot be captured in a language,
+the figure is left out of that page. `tools/verify.js` fails when a page references a
+screenshot without its prefix or when the two pages share one.
+
+To get the two instances: start the server twice with a data directory each, and set each
+up with `POST /api/setup` `{ "name", "email", "password", "demo": true, "demoLanguage":
+"en" | "pl" }` (the same projects, keys and statuses in either language). Capture with
+the browser in the matching language (`locale: 'en-US'` / `'pl-PL'` in Playwright; for
+Polish also start the browser with `LANG=pl_PL.UTF-8`, or a date field shows a US date).
+For the English instance set the schedule's time zone to something other than the
+default Europe/Warsaw first (`PUT /api/admin/schedule`). The desktop app's interface runs
+in a browser against its real core (`apps/desktop/README.md`, "Checking it without a model
+or a window") and has its own language switch.
+
 1. Capture at 2x. Crop to the panel you are showing (a full window is illegible once it
    is scaled to the column), then write two widths:
 
    ```bash
-   ffmpeg -i shot.png -vf "crop=2364:648:490:486,scale=1600:-1" -quality 82 assets/img/name-1600.webp
+   ffmpeg -i shot.png -vf "crop=2364:648:490:486,scale=1600:-1" -quality 82 assets/img/en-name-1600.webp
    ```
 
    ```bash
-   ffmpeg -i shot.png -vf "crop=2364:648:490:486,scale=800:-1" -quality 82 assets/img/name-800.webp
+   ffmpeg -i shot.png -vf "crop=2364:648:490:486,scale=800:-1" -quality 82 assets/img/en-name-800.webp
    ```
 
    (`crop=width:height:x:y`, in pixels of the capture. A capture narrower than 1600 px
@@ -161,7 +180,7 @@ Nothing is mocked up.
    example). When only a light capture exists, give the `<img>` `class="light-only"`: the
    stylesheet dims it a little on a dark page. The hero has two more sources, for
    phones: one column of the board instead of the whole of it, which would be too small
-   to read (`board-*-phone.webp`). When the files of one `<picture>` differ in shape, each
+   to read (`en-board-phone.webp`, `en-board-phone-dark.webp`). When the files of one `<picture>` differ in shape, each
    `<source>` carries its own `width` and `height`.
 
    Two more classes: `shot small` for a dialog captured at twice its size, so that it is
@@ -171,12 +190,12 @@ Nothing is mocked up.
 4. Captions are numbered by the stylesheet ("Fig. 3", "Rys. 3"); do not number by hand.
    The lightbox picks up every `.shot a.frame` by itself.
 
-5. Do it in both pages. Where the interface was captured in one language only, say so in
-   the caption of the other.
+5. Do it in both pages, with a capture in each page's language (`en-name-…`, `pl-name-…`)
+   of the same state, and write the alt text and the caption for what that capture shows.
 
-6. Crop the application's own sidebar out. It lists the modules of the build the capture
-   was made with, and an older capture then contradicts the text beside it. For the same
-   reason the Modules screenshot shows the top of the list only.
+6. Crop the application's own sidebar out: capture the view or the panel, not the window.
+   The sidebar lists the modules of the build the capture was made with, and an older
+   capture then contradicts the text beside it.
 
 7. `tools/verify.js` knows how many figures each chapter has (`FIGURES` at its top): change
    the number there with the page.
@@ -192,8 +211,8 @@ download block (the release's files, all of one version; `/releases/latest`; wha
 first start needs), the licence, the lightbox from the keyboard (opens, arrows, Escape,
 focus returns), tab order, 360 / 768 / 1280 / 1600 px in light and dark for horizontal
 overflow and for pictures whose declared size does not match the file shown, the page
-with JavaScript off, the 404 page, and that both languages have the same chapters,
-figures and anchors.
+with JavaScript off, the 404 page, that both languages have the same chapters, figures
+and anchors, and that each page references only screenshots of its own language.
 
 ```bash
 node tools/verify.js http://127.0.0.1:8198/

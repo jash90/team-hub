@@ -14,7 +14,8 @@
 // lightbox from the keyboard, tab order, 360/768/1280/1600 px in light and
 // dark for horizontal overflow and for pictures whose declared size does not
 // match the file shown, the page with JavaScript off, the 404 page, and that
-// the two languages have the same chapters, figures and anchors.
+// the two languages have the same chapters, figures and anchors, and that the
+// two pages share no screenshot file (each page shows captures in its own language).
 const { chromium } = require('playwright');
 const BASE = process.argv[2] || 'http://127.0.0.1:8198/';
 let failures = 0;
@@ -469,7 +470,7 @@ const shapes = {};
             hero: document.querySelector('.hero-shot img').currentSrc.split('/').pop(),
           };
         });
-        const expectHero = scheme === 'dark' ? /board-dark/ : /board-light/;
+        const expectHero = scheme === 'dark' ? /-board(-phone)?-dark/ : /-board(-phone|-\d+)\.webp$/;
         ok(
           r.sw <= r.vw &&
             r.wide.length === 0 &&
@@ -481,6 +482,43 @@ const shapes = {};
         );
         await ctx.close();
       }
+
+  // every screenshot is in the page's own language: the two pages share no screenshot file
+  {
+    // Figures that are language-neutral by nature and may be shared. There are none today.
+    const NEUTRAL = [];
+    const files = {};
+    for (const [name, path, prefix] of [
+      ['en', '', 'en-'],
+      ['pl/', 'pl/', 'pl-'],
+    ]) {
+      const { ctx, page } = await open(browser, path);
+      files[name] = await page.evaluate(() => {
+        const found = new Set();
+        const take = (url) => {
+          const m = new URL(url, location.href).pathname.match(/assets\/img\/([^/]+)$/);
+          if (m) found.add(m[1]);
+        };
+        for (const e of document.querySelectorAll('img[src]')) take(e.getAttribute('src'));
+        for (const e of document.querySelectorAll('img[srcset],source[srcset]'))
+          for (const c of e.srcset.split(',')) take(c.trim().split(/\s+/)[0]);
+        for (const a of document.querySelectorAll('a.frame')) {
+          take(a.getAttribute('href'));
+          if (a.dataset.dark) take(a.dataset.dark);
+        }
+        return [...found];
+      });
+      const foreign = files[name].filter((f) => !NEUTRAL.includes(f) && !f.startsWith(prefix));
+      ok(
+        foreign.length === 0,
+        `[${name}] every screenshot file is a capture in this page's language (${files[name].length} files, all ${prefix}*)`,
+        foreign.join(' '),
+      );
+      await ctx.close();
+    }
+    const shared = files.en.filter((f) => files['pl/'].includes(f) && !NEUTRAL.includes(f));
+    ok(shared.length === 0, '[en ∩ pl] the two pages share no screenshot file', shared.join(' '));
+  }
 
   // the two languages hold the same things
   {

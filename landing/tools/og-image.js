@@ -1,7 +1,7 @@
 // Renders the two link-preview images, assets/og-en.png and assets/og-pl.png
 // (1200 x 630), from a small HTML card that uses the page's own stylesheet,
 // font and hero screenshot. Not part of serving the page; run it by hand when
-// the headline or the hero screenshot changes.
+// the headline or the hero screenshot changes. Each card uses the board capture of its own language.
 //
 //   python3 -m http.server 8198          (in landing/; not Caddy: its policy
 //                                          forbids the card's inline style)
@@ -36,7 +36,7 @@ const card = (lang, [kicker, claim, fact]) => `<!doctype html>
   .shot { position: absolute; left: 64px; top: 366px; width: 1300px; height: 400px; overflow: hidden;
     border: 1px solid #d9d6cc; border-radius: 14px; box-shadow: 0 24px 60px -24px rgb(23 24 28 / .35); }
   /* The offsets put the board's filter row and first cards in the window. */
-  .shot img { width: 1376px; max-width: none; margin: -138px 0 0 -8px; }
+  .shot img { width: 1376px; max-width: none; margin: -142px 0 0 -12px; }
 </style>
 </head>
 <body>
@@ -47,7 +47,7 @@ const card = (lang, [kicker, claim, fact]) => `<!doctype html>
   </div>
   <h1><span class="claim">${claim}</span><span>${fact}</span></h1>
 </div>
-<div class="shot"><img src="${assets}img/sprint-board-light-1600.webp" alt=""></div>
+<div class="shot"><img src="${assets}img/${lang}-board-1600.webp" alt=""></div>
 </body>
 </html>`;
 

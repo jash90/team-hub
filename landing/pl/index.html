@@ -136,55 +136,45 @@
           </div>
 
           <figure class="shot hero-shot">
-            <a
-              class="frame"
-              href="../assets/img/sprint-board-light-1600.webp"
-              data-dark="../assets/img/sprint-board-dark-1600.webp"
-            >
+            <a class="frame" href="../assets/img/pl-board-1600.webp" data-dark="../assets/img/pl-board-dark-1600.webp">
               <picture>
                 <!-- On a phone the whole board is too small to read: show one column. -->
                 <source
                   media="(max-width: 40em) and (prefers-color-scheme: dark)"
-                  srcset="../assets/img/board-dark-phone.webp"
-                  width="600"
-                  height="664"
+                  srcset="../assets/img/pl-board-phone-dark.webp"
+                  width="596"
+                  height="670"
                 />
                 <source
                   media="(max-width: 40em)"
-                  srcset="../assets/img/board-light-phone.webp"
-                  width="600"
-                  height="664"
+                  srcset="../assets/img/pl-board-phone.webp"
+                  width="596"
+                  height="670"
                 />
                 <source
                   media="(prefers-color-scheme: dark)"
-                  srcset="
-                    ../assets/img/sprint-board-dark-800.webp   800w,
-                    ../assets/img/sprint-board-dark-1600.webp 1600w
-                  "
+                  srcset="../assets/img/pl-board-dark-800.webp 800w, ../assets/img/pl-board-dark-1600.webp 1600w"
                   sizes="(min-width: 87em) 1280px, 92vw"
                   width="1600"
-                  height="954"
+                  height="931"
                 />
                 <img
-                  src="../assets/img/sprint-board-light-1600.webp"
-                  srcset="
-                    ../assets/img/sprint-board-light-800.webp   800w,
-                    ../assets/img/sprint-board-light-1600.webp 1600w
-                  "
+                  src="../assets/img/pl-board-1600.webp"
+                  srcset="../assets/img/pl-board-800.webp 800w, ../assets/img/pl-board-1600.webp 1600w"
                   sizes="(min-width: 87em) 1280px, 92vw"
                   width="1600"
-                  height="954"
-                  alt="Tablica sprintu w&nbsp;przykładowym projekcie sklepu internetowego: karty zadań w&nbsp;kolumnach według statusu. Na części kart obok klucza zadania widać numer pull requesta z&nbsp;ptaszkiem albo krzyżykiem, liczbę zaliczonych testów i&nbsp;pomarańczowy trójkąt ostrzegawczy. Na wąskim ekranie widać tylko kolumnę In Review."
+                  height="931"
+                  alt="Tablica sprintu w&nbsp;przykładowym projekcie sklepu internetowego: cztery kolumny, To Do, In Progress, In Review i&nbsp;Done, a&nbsp;w&nbsp;nich dwanaście kart zadań. Na części kart obok klucza zadania widać numer pull requesta z&nbsp;ptaszkiem albo krzyżykiem, liczbę zaliczonych testów i&nbsp;pomarańczowy trójkąt ostrzegawczy. Na wąskim ekranie widać tylko kolumnę In Review."
                   fetchpriority="high"
                   decoding="async"
                 />
               </picture>
             </a>
             <figcaption>
-              Tablica sprintu. Obok klucza zadania widać jego pull request ze stanem testów w&nbsp;CI,
-              liczbę zaliczonych testów e2e oraz trójkąt tam, gdzie status nie zgadza się z&nbsp;kodem.
-              Interfejs jest po polsku i&nbsp;po angielsku; zrzuty na tej stronie pokazują projekt
-              przykładowy.
+              Tablica sprintu. Obok klucza zadania widać jego pull request ze stanem testów
+              w&nbsp;CI, liczbę zaliczonych testów e2e oraz trójkąt tam, gdzie status nie zgadza się
+              z&nbsp;kodem. Zrzuty na tej stronie pokazują projekt przykładowy; interfejs jest po
+              polsku i&nbsp;po angielsku.
             </figcaption>
           </figure>
 
@@ -214,14 +204,14 @@
           </div>
 
           <figure class="shot plate">
-            <a class="frame" href="../assets/img/drift-1600.webp">
+            <a class="frame" href="../assets/img/pl-drift-1600.webp">
               <img
                 class="light-only"
-                src="../assets/img/drift-1600.webp"
-                srcset="../assets/img/drift-800.webp 800w, ../assets/img/drift-1600.webp 1600w"
+                src="../assets/img/pl-drift-1600.webp"
+                srcset="../assets/img/pl-drift-800.webp 800w, ../assets/img/pl-drift-1600.webp 1600w"
                 sizes="(min-width: 87em) 1280px, 92vw"
                 width="1600"
-                height="439"
+                height="442"
                 alt="Panel „Status nie zgadza się z&nbsp;kodem” z&nbsp;czterema zadaniami. Pod każdym pomarańczowy wiersz z&nbsp;powodem: w&nbsp;review poproszono o&nbsp;poprawki; kod już jest, a&nbsp;zadanie nie zostało rozpoczęte; testy nie przechodzą; od kilku dni w&nbsp;toku, bez gałęzi i&nbsp;commitów."
                 loading="lazy"
                 decoding="async"
@@ -253,22 +243,23 @@
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/issue-1600.webp">
+              <a class="frame" href="../assets/img/pl-issue-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/issue-1600.webp"
-                  srcset="../assets/img/issue-800.webp 800w, ../assets/img/issue-1600.webp 1600w"
+                  src="../assets/img/pl-issue-1600.webp"
+                  srcset="../assets/img/pl-issue-800.webp 800w, ../assets/img/pl-issue-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="1470"
-                  alt="Zadanie „Płatność kartą przez bramkę” w&nbsp;statusie In Review: opis z&nbsp;kryteriami akceptacji, trzy podzadania, dwa powiązane zadania oraz sekcja Kod z&nbsp;ostrzeżeniem „W&nbsp;review poproszono o&nbsp;poprawki”, otwartym pull requestem z&nbsp;oznaczeniami „do poprawy” i&nbsp;„testy przechodzą”, jego gałęzią i&nbsp;trzema commitami."
+                  height="1411"
+                  alt="Zadanie „Płatność kartą przez bramkę” w&nbsp;statusie In Review: opis z&nbsp;kryteriami akceptacji, trzy podzadania, dwa powiązane zadania, sekcja Kod z&nbsp;ostrzeżeniem „W&nbsp;review poproszono o&nbsp;poprawki”, otwartym pull requestem z&nbsp;oznaczeniami „do poprawy” i&nbsp;„testy przechodzą”, jego gałęzią i&nbsp;trzema commitami oraz sekcja Baza wiedzy z&nbsp;czterema stronami, które wspominają o&nbsp;zadaniu."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Zadanie otwarte z&nbsp;tablicy: podzadania, powiązane zadania, a&nbsp;w&nbsp;sekcji Kod pull
-                request, gałąź i&nbsp;trzy commity, nad nimi ostrzeżenie o&nbsp;rozjeździe.
+                Strona zadania: podzadania, powiązane zadania, w&nbsp;sekcji Kod pull request, gałąź
+                i&nbsp;trzy commity, nad nimi ostrzeżenie o&nbsp;rozjeździe, a&nbsp;niżej strony
+                bazy wiedzy, które o&nbsp;zadaniu wspominają.
               </figcaption>
             </figure>
           </div>
@@ -292,22 +283,22 @@
               </div>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/rules-1600.webp">
+              <a class="frame" href="../assets/img/pl-rules-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/rules-1600.webp"
-                  srcset="../assets/img/rules-800.webp 800w, ../assets/img/rules-1600.webp 1600w"
+                  src="../assets/img/pl-rules-1600.webp"
+                  srcset="../assets/img/pl-rules-800.webp 800w, ../assets/img/pl-rules-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="644"
+                  height="819"
                   alt="Panel ustawień „Reguły workflow” z&nbsp;pięcioma wierszami: powstaje gałąź, zadanie przechodzi do In Progress; pull request zostaje otwarty, do In Review; review prosi o&nbsp;poprawki, nic nie rób; review zatwierdza, nic nie rób; ostatni otwarty pull request zostaje zmergowany, do Done."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Ustawienia projektu → GitHub: co dzieje się z&nbsp;zadaniem, gdy coś dzieje się z&nbsp;jego
-                kodem.
+                Ustawienia projektu → GitHub: co dzieje się z&nbsp;zadaniem, gdy coś dzieje się
+                z&nbsp;jego kodem.
               </figcaption>
             </figure>
           </div>
@@ -337,22 +328,23 @@
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/wiki-1600.webp">
+              <a class="frame" href="../assets/img/pl-wiki-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/wiki-1600.webp"
-                  srcset="../assets/img/wiki-800.webp 800w, ../assets/img/wiki-1600.webp 1600w"
+                  src="../assets/img/pl-wiki-1600.webp"
+                  srcset="../assets/img/pl-wiki-800.webp 800w, ../assets/img/pl-wiki-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="910"
-                  alt="Strona bazy wiedzy „BLIK — kanał powiadomień”. Po lewej drzewo stron przestrzeni: architektura, płatności, decyzje, spotkania. W&nbsp;tekście linki do zadania WEB-10 i&nbsp;do zapisu decyzji architektonicznej, po prawej spis treści."
+                  height="1438"
+                  alt="Strona bazy wiedzy „BLIK — kanał powiadomień”. Po lewej drzewo stron przestrzeni: architektura, płatności, decyzje, spotkania. W&nbsp;tekście linki do zadania WEB-10 i&nbsp;do zapisu decyzji architektonicznej, po prawej spis treści. Pod tekstem zadanie, o&nbsp;którym strona wspomina, i&nbsp;dwie strony, które do niej linkują."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Strona w&nbsp;przestrzeni projektu. Linkuje do zadania, które opisuje, i&nbsp;do decyzji,
-                z&nbsp;której wynika; oba powiązania widać też z&nbsp;drugiej strony.
+                Strona w&nbsp;przestrzeni projektu. Linkuje do zadania, które opisuje, i&nbsp;do
+                decyzji, z&nbsp;której wynika; pod tekstem widać zadanie, o&nbsp;którym wspomina,
+                i&nbsp;strony, które linkują tutaj.
               </figcaption>
             </figure>
           </div>
@@ -369,23 +361,23 @@
               <p>Niezaliczony test przy zadaniu oznaczonym jako Done też widać.</p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/tests-1600.webp">
+              <a class="frame" href="../assets/img/pl-tests-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/tests-1600.webp"
-                  srcset="../assets/img/tests-800.webp 800w, ../assets/img/tests-1600.webp 1600w"
+                  src="../assets/img/pl-tests-1600.webp"
+                  srcset="../assets/img/pl-tests-800.webp 800w, ../assets/img/pl-tests-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="759"
-                  alt="Strona Testy w&nbsp;projekcie. Ostatni przebieg, CI #236 na gałęzi main, jest niezaliczony: dziewięć testów zaliczonych, jeden niezaliczony, jeden niestabilny, jeden pominięty. Niżej tabela testów, każdy z&nbsp;zadaniem, które sprawdza, i&nbsp;paskami ostatnich przebiegów; niezaliczony test sprawdza zadanie WEB-14 oznaczone jako Done."
+                  height="946"
+                  alt="Strona Testy w&nbsp;projekcie. Ostatni przebieg jest niezaliczony: trzy testy zaliczone, jeden niezaliczony. Niżej tabela osiemnastu testów, każdy z&nbsp;zadaniem, które sprawdza, i&nbsp;paskami ostatnich przebiegów; pierwszy niezaliczony test sprawdza zadanie WEB-14 oznaczone jako Done."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Projekt → Testy: ostatni przebieg, a&nbsp;pod nim każdy test z&nbsp;zadaniem, które sprawdza,
-                i&nbsp;z&nbsp;wynikami ostatnich przebiegów. Tutaj niezaliczony test wskazuje na zadanie
-                oznaczone jako Done.
+                Projekt → Testy: ostatni przebieg, a&nbsp;pod nim każdy test z&nbsp;zadaniem, które
+                sprawdza, i&nbsp;z&nbsp;wynikami ostatnich przebiegów. Tutaj niezaliczony test
+                wskazuje na zadanie oznaczone jako Done.
               </figcaption>
             </figure>
           </div>
@@ -406,30 +398,32 @@
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/session-pl-light-1600.webp" data-dark="../assets/img/session-pl-dark-1600.webp">
+              <a class="frame" href="../assets/img/pl-session-1600.webp" data-dark="../assets/img/pl-session-dark-1600.webp">
                 <picture>
                   <source
                     media="(prefers-color-scheme: dark)"
-                    srcset="../assets/img/session-pl-dark-800.webp 800w, ../assets/img/session-pl-dark-1600.webp 1600w"
+                    srcset="../assets/img/pl-session-dark-800.webp 800w, ../assets/img/pl-session-dark-1600.webp 1600w"
                     sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                     width="1600"
-                    height="1460"
+                    height="1338"
                   />
                   <img
-                    src="../assets/img/session-pl-light-1600.webp"
-                    srcset="../assets/img/session-pl-light-800.webp 800w, ../assets/img/session-pl-light-1600.webp 1380w"
+                    src="../assets/img/pl-session-1600.webp"
+                    srcset="../assets/img/pl-session-800.webp 800w, ../assets/img/pl-session-1600.webp 1600w"
                     sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
-                    width="1380"
-                    height="2040"
-                    alt="Sesja niezaliczonego testu „the backlog lists the sprint and its issues”, który sprawdza zadanie WEB-4 oznaczone jako Done. U góry błąd asercji: oczekiwano tekstu „Finish the sprint now”, otrzymano „Complete sprint”. Niżej odtwarzacz z nagraniem, oś czasu ze znacznikiem każdego kroku i pasek obrazów z nagrania; w szerszym układzie obok widać listę sześciu kroków z czasami, z których ostatni jest niezaliczony."
+                    width="1600"
+                    height="1338"
+                    alt="Sesja niezaliczonego testu „tablica pozwala zakończyć trwający sprint”. U&nbsp;góry błąd asercji: oczekiwano tekstu „Zakończ sprint teraz”, otrzymano „Zakończ sprint”. Niżej odtwarzacz z&nbsp;nagraniem zatrzymanym na tablicy sprintu, oś czasu ze znacznikiem każdego kroku, lista sześciu kroków z&nbsp;czasami, z&nbsp;których ostatni jest niezaliczony, oraz pasek obrazów z&nbsp;nagrania."
                     loading="lazy"
                     decoding="async"
                   />
                 </picture>
               </a>
               <figcaption>
-                Niezaliczony test jako sesja: błąd, nagranie zatrzymane na jednym z&nbsp;kroków i&nbsp;obrazy
-                z&nbsp;nagrania krok po kroku. Test sprawdza zadanie WEB-4 oznaczone jako Done.
+                Niezaliczony test jako sesja: błąd, nagranie zatrzymane na jednym z&nbsp;kroków,
+                kroki z&nbsp;czasami i&nbsp;obrazy z&nbsp;nagrania krok po kroku. Przebieg wysłał
+                skrypt, który gra rolę runnera, a&nbsp;nagranie zostało złożone ze zrzutów ekranu
+                trackera.
               </figcaption>
             </figure>
           </div>
@@ -458,25 +452,23 @@
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/proposals-1600.webp">
+              <a class="frame" href="../assets/img/pl-proposals-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/proposals-1600.webp"
-                  srcset="
-                    ../assets/img/proposals-800.webp   800w,
-                    ../assets/img/proposals-1600.webp 1600w
-                  "
+                  src="../assets/img/pl-proposals-1600.webp"
+                  srcset="../assets/img/pl-proposals-800.webp 800w, ../assets/img/pl-proposals-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="870"
-                  alt="Koniec zlecenia dla agenta w&nbsp;zadaniu, z&nbsp;dwiema propozycjami oznaczonymi „do decyzji”: dodaj komentarz podsumowujący zmianę oraz zmień status z&nbsp;In Progress na In Review. Przy każdej pole na uwagę i&nbsp;przyciski Zatwierdź oraz Odrzuć. Wiersz niżej podaje gałąź, model oraz liczbę tokenów i&nbsp;koszt zlecenia."
+                  height="1641"
+                  alt="Sekcja „Agent AI” w&nbsp;zadaniu. Przyciski: dopracuj opis, kryteria akceptacji, rozbij na podzadania, podsumuj, wstępna ocena, zleć implementację, własne polecenie. Niżej zlecenie „Implementacja w&nbsp;kodzie” z&nbsp;oznaczeniem „czeka na Ciebie”, podjęte przez komputer „MacBook Bartka”: wypowiedź agenta i&nbsp;dwie propozycje do decyzji, komentarz opisujący zmianę oraz zmiana statusu z&nbsp;In Progress na In Review, każda z&nbsp;polem na uwagę i&nbsp;przyciskami Zatwierdź oraz Odrzuć. Ostatni wiersz podaje gałąź, model, liczbę tokenów i&nbsp;koszt."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Koniec zlecenia w&nbsp;zadaniu: komentarz i&nbsp;zmiana statusu, każde czeka na „Zatwierdź”
-                albo „Odrzuć”. Wiersz pod nimi mówi, ile zlecenie kosztowało.
+                Zlecenie w&nbsp;zadaniu kończy się dwiema propozycjami, komentarzem i&nbsp;zmianą
+                statusu; każda czeka na „Zatwierdź” albo „Odrzuć”. Wiersz na dole mówi, ile zlecenie
+                kosztowało.
               </figcaption>
             </figure>
           </div>
@@ -528,22 +520,23 @@
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/runners-pl-1600.webp">
+              <a class="frame" href="../assets/img/pl-runners-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/runners-pl-1600.webp"
-                  srcset="../assets/img/runners-pl-800.webp 800w, ../assets/img/runners-pl-1600.webp 1600w"
+                  src="../assets/img/pl-runners-1600.webp"
+                  srcset="../assets/img/pl-runners-800.webp 800w, ../assets/img/pl-runners-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="1099"
-                  alt="Strona Runnery w dwóch grupach. Zespołu: dwa runnery w chmurze, każdy z oznaczeniami „usługa” i „wspólny”, połączone, przyjmują testy i zlecenia dla agentów w dowolnym projekcie. Twoje: jeden komputer, połączony, który zlecenia dla agentów przyjmuje w dowolnym projekcie, a testy tylko wtedy, gdy wysłano je do niego imiennie."
+                  height="1186"
+                  alt="Strona Runnery w&nbsp;dwóch grupach. Zespołu: dwa runnery w&nbsp;chmurze, każdy z&nbsp;oznaczeniami „usługa” i&nbsp;„wspólny”, połączone, przyjmują testy i&nbsp;zlecenia dla agentów w&nbsp;dowolnym projekcie; jeden z&nbsp;nich właśnie wykonuje uruchomienie testów. Twoje: jeden komputer, połączony, który zlecenia dla agentów przyjmuje w&nbsp;dowolnym projekcie, a&nbsp;testy tylko wtedy, gdy wysłano je do niego imiennie."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Runnery: dwa wspólne runnery zespołu w&nbsp;chmurze i&nbsp;komputer jednej osoby, który
-                przyjmuje testy tylko wtedy, gdy wysłano je do niego imiennie.
+                Runnery: dwa wspólne runnery zespołu w&nbsp;chmurze, z&nbsp;których jeden właśnie
+                wykonuje testy, i&nbsp;komputer jednej osoby, który przyjmuje testy tylko wtedy, gdy
+                wysłano je do niego imiennie.
               </figcaption>
             </figure>
           </div>
@@ -558,20 +551,20 @@
               </p>
             </div>
             <figure class="shot small">
-              <a class="frame" href="../assets/img/where-pl-1600.webp">
+              <a class="frame" href="../assets/img/pl-where-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/where-pl-1600.webp"
-                  width="952"
-                  height="684"
-                  alt="Dolna część okna zlecania implementacji, z nagłówkiem „Gdzie ma być wykonane” i trzema możliwościami: dowolny pasujący runner, runner w chmurze z oznaczeniem „usługa” oraz komputer z oznaczeniem „komputer”, który jest wybrany. Pod nimi przyciski Anuluj i Rozpocznij."
+                  src="../assets/img/pl-where-1600.webp"
+                  width="960"
+                  height="1642"
+                  alt="Okno zlecania implementacji zadania: dodatkowe wskazówki, repozytorium i&nbsp;część „Gdzie ma być wykonane” z&nbsp;czterema możliwościami: dowolny pasujący runner, komputer z&nbsp;oznaczeniem „komputer”, który jest wybrany, oraz dwa runnery w&nbsp;chmurze z&nbsp;oznaczeniem „wspólna usługa”. Pod nimi przyciski Anuluj i&nbsp;Rozpocznij."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Zlecanie implementacji w&nbsp;przeglądarce: dowolny pasujący runner, runner w&nbsp;chmurze
-                albo własny komputer.
+                Zlecanie implementacji w&nbsp;przeglądarce: dowolny pasujący runner, własny komputer
+                albo jeden z&nbsp;runnerów w&nbsp;chmurze.
               </figcaption>
             </figure>
           </div>
@@ -592,14 +585,14 @@
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/keys-pl-1600.webp">
+              <a class="frame" href="../assets/img/pl-keys-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/keys-pl-1600.webp"
-                  srcset="../assets/img/keys-pl-800.webp 800w, ../assets/img/keys-pl-1600.webp 1600w"
+                  src="../assets/img/pl-keys-1600.webp"
+                  srcset="../assets/img/pl-keys-800.webp 800w, ../assets/img/pl-keys-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="840"
+                  height="846"
                   alt="Ustawienia, panel „Moje klucze”. Akapit wyjaśnia, że wspólny runner należy do zespołu i nie ma własnych kluczy. Niżej dwa klucze: token GitHuba, nieustawiony, z polem do wklejenia, oraz klucz API Anthropic, ustawiony, pokazany czterema ostatnimi znakami, z przyciskami Zastąp i Usuń."
                   loading="lazy"
                   decoding="async"
@@ -627,22 +620,31 @@
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/schedule-pl-1600.webp">
-                <img
-                  class="light-only"
-                  src="../assets/img/schedule-pl-1600.webp"
-                  srcset="../assets/img/schedule-pl-800.webp 800w, ../assets/img/schedule-pl-1600.webp 1600w"
-                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
-                  width="1600"
-                  height="1491"
-                  alt="Strona Harmonogram w projekcie, w trzech grupach: Rano z jedną czynnością, Po pracy z dwiema, Na żądanie z dwiema; każda grupa ma przycisk „Uruchom tę grupę teraz”. Czynność to karta z przełącznikiem, zapytaniem, na którego wynikach uruchamia agenta, ostatnim wynikiem i przyciskiem „Uruchom teraz”. Na jednej karcie pomarańczowa notatka mówi, że widać starszy wynik, bo ostatnia próba się nie powiodła."
-                  loading="lazy"
-                  decoding="async"
-                />
+              <a class="frame" href="../assets/img/pl-schedule-1600.webp" data-dark="../assets/img/pl-schedule-dark-1600.webp">
+                <picture>
+                  <source
+                    media="(prefers-color-scheme: dark)"
+                    srcset="../assets/img/pl-schedule-dark-800.webp 800w, ../assets/img/pl-schedule-dark-1600.webp 1600w"
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1600"
+                    height="1186"
+                  />
+                  <img
+                    src="../assets/img/pl-schedule-1600.webp"
+                    srcset="../assets/img/pl-schedule-800.webp 800w, ../assets/img/pl-schedule-1600.webp 1600w"
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1600"
+                    height="1186"
+                    alt="Strona Harmonogram w&nbsp;projekcie, w&nbsp;trzech grupach: Rano z&nbsp;jedną czynnością, Po pracy z&nbsp;dwiema, Na żądanie z&nbsp;jedną; każda grupa ma przycisk „Uruchom tę grupę teraz”. Czynność to karta z&nbsp;przełącznikiem, opisem tego, co uruchamia, ostatnim wynikiem i&nbsp;przyciskiem „Uruchom teraz”. Trzy czynności uruchamiają agenta na zadaniach, które znajdzie zapytanie. Jedna uruchamia testy i&nbsp;ma pomarańczową notatkę: widać wynik z&nbsp;13:41, bo próba o&nbsp;13:51 nie powiodła się, gdy runner przestał odpowiadać."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
               </a>
               <figcaption>
-                Harmonogram projektu: jedna czynność rano, dwie po pracy, dwie na żądanie. Karta
-                z&nbsp;pomarańczową notatką pokazuje starszy wynik, bo ostatnia próba się nie powiodła.
+                Harmonogram projektu: jedna czynność rano, dwie po pracy, jedna na żądanie, obu
+                rodzajów. Ostatnia próba uruchomienia testów nie powiodła się, bo runner przestał
+                odpowiadać, więc karta wciąż pokazuje wynik sprzed niej.
               </figcaption>
             </figure>
           </div>
@@ -697,33 +699,25 @@
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/desktop-pl-light-1600.webp" data-dark="../assets/img/desktop-pl-dark-1600.webp">
-                <picture>
-                  <source
-                    media="(prefers-color-scheme: dark)"
-                    srcset="../assets/img/desktop-pl-dark-800.webp 800w, ../assets/img/desktop-pl-dark-1600.webp 1296w"
-                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
-                    width="1296"
-                    height="950"
-                  />
-                  <img
-                    src="../assets/img/desktop-pl-light-1600.webp"
-                    srcset="../assets/img/desktop-pl-light-800.webp 800w, ../assets/img/desktop-pl-light-1600.webp 1280w"
-                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
-                    width="1280"
-                    height="900"
-                    alt="Aplikacja desktopowa. Po lewej lista rzeczy do decyzji i cztery wątki agentów. Pośrodku wątek zadania „Reset hasła”: agent zadaje pytanie, człowiek odpowiada, agent commituje i proponuje komentarz, wypchnięcie gałęzi oraz pull request; na końcu wiersze o wypchniętej gałęzi i adresie pull requesta."
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </picture>
+              <a class="frame" href="../assets/img/pl-desk-thread-1600.webp">
+                <img
+                  class="light-only"
+                  src="../assets/img/pl-desk-thread-1600.webp"
+                  srcset="../assets/img/pl-desk-thread-800.webp 800w, ../assets/img/pl-desk-thread-1600.webp 1600w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1600"
+                  height="1840"
+                  alt="Aplikacja desktopowa. Po lewej trzy rzeczy do decyzji i&nbsp;jeden wątek agenta. Pośrodku wątek zadania „Dokumentacja OpenAPI dla zamówień”: gałąź, model i&nbsp;koszt, potem trzy propozycje do decyzji, komentarz z&nbsp;przyciskami Zatwierdź i&nbsp;Odrzuć, wypchnięcie gałęzi z&nbsp;przyciskiem „Przejrzyj i&nbsp;wypchnij” oraz pull request z&nbsp;przyciskiem „Przejrzyj i&nbsp;otwórz”, a&nbsp;pod nimi rozmowa, w&nbsp;której agent pyta, czy opisać obie wersje API, a&nbsp;człowiek odpowiada „Tylko v2.”"
+                  loading="lazy"
+                  decoding="async"
+                />
               </a>
               <figcaption>
                 Wątek zadania. Agent zadał jedno pytanie, dostał odpowiedź, zacommitował na swojej
-                gałęzi i&nbsp;zaproponował komentarz, wypchnięcie gałęzi oraz pull request. Gałąź wyszła
-                z&nbsp;komputera dopiero po zatwierdzeniu. Ten zrzut i&nbsp;następny pochodzą z&nbsp;własnego
-                testu end-to-end aplikacji, w&nbsp;którym model zastępuje skryptowany agent testowy;
-                stąd angielskie wypowiedzi agenta.
+                gałęzi i&nbsp;zaproponował komentarz, wypchnięcie gałęzi oraz pull request. Nic
+                z&nbsp;tego jeszcze się nie stało. To prawdziwy rdzeń aplikacji połączony
+                z&nbsp;prawdziwym serwerem; wypowiedzi agenta i&nbsp;commit napisał skrypt, który
+                zastępuje model.
               </figcaption>
             </figure>
           </div>
@@ -743,21 +737,22 @@
               </p>
             </div>
             <figure class="shot narrow">
-              <a class="frame" href="../assets/img/desktop-push-800.webp">
+              <a class="frame" href="../assets/img/pl-desk-push-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/desktop-push-800.webp"
-                  width="800"
-                  height="528"
-                  alt="Okno dialogowe „Push the branch” w angielskiej wersji interfejsu: gałąź i adres repozytorium, do którego trafi, zdanie o tym, że wypychany jest dokładnie ten commit, a wszystko, co wątek zacommituje później, zostaje na komputerze, jeden commit, diff jednego dodanego pliku oraz przyciski Cancel i „Push 1 commits”."
+                  src="../assets/img/pl-desk-push-1600.webp"
+                  srcset="../assets/img/pl-desk-push-800.webp 800w, ../assets/img/pl-desk-push-1600.webp 1456w"
+                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                  width="1456"
+                  height="1466"
+                  alt="Okno „Wypchnij gałąź”: gałąź i&nbsp;adres repozytorium, do którego trafi, zdanie „Wypchnięty zostanie dokładnie ten commit. To, co wątek zacommituje po Twoim obejrzeniu, zostaje tutaj”, jeden commit, diff jednego dodanego pliku z&nbsp;siedemnastoma wierszami oraz przyciski Anuluj i&nbsp;„Wypchnij 1 commit”."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Podgląd przed wypchnięciem, tu w&nbsp;angielskiej wersji interfejsu: jeden commit, jego
-                diff i&nbsp;adres, pod który trafi. Autorem commita jest „Fake Agent”, bo zrobił go
-                skryptowany agent testowy.
+                Podgląd przed wypchnięciem w&nbsp;tym samym wątku: jeden commit, jego diff
+                i&nbsp;adres, pod który trafi.
               </figcaption>
             </figure>
           </div>
@@ -783,38 +778,43 @@
             </div>
             <div class="stack">
               <figure class="shot">
-                <a class="frame" href="../assets/img/desktop-runners-en-1600.webp">
+                <a class="frame" href="../assets/img/pl-desk-runners-1600.webp">
                   <img
                     class="light-only"
-                    src="../assets/img/desktop-runners-en-1600.webp"
-                    width="874"
-                    height="412"
-                    alt="Widok Runners aplikacji desktopowej w angielskiej wersji interfejsu, z dwoma runnerami. Pierwszy, z oznaczeniami „This computer”, „computer” i „online”, przyjmuje testy tylko imiennie, w każdym projekcie, który jego właściciel może edytować, oraz zlecenia dla agentów w projekcie WEB. Drugi, „Cloud runner 1” z oznaczeniami „shared service” i „online”, przyjmuje testy i zlecenia dla agentów w każdym projekcie."
+                    src="../assets/img/pl-desk-runners-1600.webp"
+                    srcset="../assets/img/pl-desk-runners-800.webp 800w, ../assets/img/pl-desk-runners-1600.webp 1600w"
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1600"
+                    height="1383"
+                    alt="Widok Runnery w&nbsp;aplikacji desktopowej, z&nbsp;czterema runnerami. Pierwszy, z&nbsp;oznaczeniami „Ten komputer”, „komputer” i&nbsp;„połączono”, przyjmuje testy tylko po nazwie oraz zlecenia dla agentów w&nbsp;projekcie API i&nbsp;właśnie wykonuje wątek zadania API-5. Dalej drugi komputer tej samej osoby i&nbsp;dwa runnery w&nbsp;chmurze z&nbsp;oznaczeniem „usługa wspólna”, które przyjmują testy i&nbsp;zlecenia dla agentów w&nbsp;każdym projekcie."
                     loading="lazy"
                     decoding="async"
                   />
                 </a>
                 <figcaption>
-                  Runnery w&nbsp;aplikacji desktopowej (interfejs angielski): ten komputer, który przyjmuje
-                  testy tylko imiennie, oraz wspólny runner w&nbsp;chmurze. To prawdziwy zrzut:
-                  prawdziwy rdzeń aplikacji połączony z&nbsp;prawdziwym serwerem.
+                  Runnery w&nbsp;aplikacji desktopowej: ten komputer, który przyjmuje testy tylko
+                  imiennie, drugi komputer i&nbsp;dwa wspólne runnery w&nbsp;chmurze.
                 </figcaption>
               </figure>
               <figure class="shot">
-                <a class="frame" href="../assets/img/desktop-tests-en-1600.webp">
+                <a class="frame" href="../assets/img/pl-desk-tests-1600.webp">
                   <img
                     class="light-only"
-                    src="../assets/img/desktop-tests-en-1600.webp"
-                    width="874"
-                    height="925"
-                    alt="Widok Tests aplikacji desktopowej w angielskiej wersji interfejsu. Formularz „Run the suite” z gałęzią, opcjonalnym filtrem i polem Where ustawionym na „This computer” oraz notatka, że testy działają na procesorze i pamięci tego komputera, a serwer tylko przechowuje to, co wróci. Niżej uruchomienie nr 6, zakończone na tym komputerze, z końcem logu: dwa testy zaliczone, raport wysłany. Przycisk otwiera sesję w przeglądarce."
+                    src="../assets/img/pl-desk-tests-1600.webp"
+                    srcset="../assets/img/pl-desk-tests-800.webp 800w, ../assets/img/pl-desk-tests-1600.webp 1600w"
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1600"
+                    height="1861"
+                    alt="Widok Testy w&nbsp;aplikacji desktopowej. Formularz „Uruchom zestaw” z&nbsp;gałęzią, opcjonalnym filtrem i&nbsp;polem „Gdzie” ustawionym na „Ten komputer” oraz notatka, że zestaw działa na procesorze i&nbsp;pamięci tego komputera, a&nbsp;serwer tylko przechowuje to, co wróci. Niżej zadanie nr 1, ukończone na runnerze w&nbsp;chmurze, z&nbsp;końcem logu: trzy testy zaliczone, jeden niezaliczony, raport wysłany. Przycisk otwiera sesję w&nbsp;przeglądarce. Na dole lista: nr 2 nieudane, nr 1 ukończono."
                     loading="lazy"
                     decoding="async"
                   />
                 </a>
                 <figcaption>
-                  Testy w&nbsp;aplikacji: testy wysłane na ten komputer, zakończone uruchomienie i&nbsp;koniec
-                  jego logu. Sesja otwiera się w&nbsp;przeglądarce, bo tam jest nagranie.
+                  Testy w&nbsp;aplikacji: formularz, który uruchamia zestaw, tu ustawiony na ten
+                  komputer, oraz uruchomienia testów projektu niezależnie od tego, gdzie się
+                  wykonały. Otwarte uruchomienie wykonał runner w&nbsp;chmurze (grał go skrypt);
+                  jego sesja otwiera się w&nbsp;przeglądarce, bo tam jest nagranie.
                 </figcaption>
               </figure>
             </div>
@@ -980,22 +980,22 @@ drift is not empty                        <span class="c">-- status nie zgadza s
           </div>
 
           <figure class="shot plate">
-            <a class="frame" href="../assets/img/query-1600.webp">
+            <a class="frame" href="../assets/img/pl-query-1600.webp">
               <img
                 class="light-only"
-                src="../assets/img/query-1600.webp"
-                srcset="../assets/img/query-800.webp 800w, ../assets/img/query-1600.webp 1600w"
+                src="../assets/img/pl-query-1600.webp"
+                srcset="../assets/img/pl-query-800.webp 800w, ../assets/img/pl-query-1600.webp 1600w"
                 sizes="(min-width: 87em) 1280px, 92vw"
                 width="1600"
-                height="516"
+                height="532"
                 alt="Strona Szukaj z&nbsp;zapytaniem „project = WEB AND drift is not empty ORDER BY priority DESC” i&nbsp;czterema wynikami w&nbsp;tabeli: klucz, tytuł, status, wykonawca, priorytet, punkty i&nbsp;czas ostatniej zmiany. Nad tabelą przyciski „Zapisz filtr” i&nbsp;„CSV”."
                 loading="lazy"
                 decoding="async"
               />
             </a>
             <figcaption>
-              Wyszukiwanie: zadania projektu WEB, w&nbsp;których status nie zgadza się z&nbsp;kodem, od
-              najwyższego priorytetu.
+              Wyszukiwanie: zadania projektu WEB, w&nbsp;których status nie zgadza się z&nbsp;kodem,
+              od najwyższego priorytetu.
             </figcaption>
           </figure>
 
@@ -1009,14 +1009,14 @@ drift is not empty                        <span class="c">-- status nie zgadza s
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/flow-1600.webp">
+              <a class="frame" href="../assets/img/pl-flow-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/flow-1600.webp"
-                  srcset="../assets/img/flow-800.webp 800w, ../assets/img/flow-1600.webp 1600w"
+                  src="../assets/img/pl-flow-1600.webp"
+                  srcset="../assets/img/pl-flow-800.webp 800w, ../assets/img/pl-flow-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="772"
+                  height="861"
                   alt="Strona Raporty na karcie „Przepływ skumulowany”: wykres warstwowy z&nbsp;trzydziestu dni z&nbsp;trzema pasami, do zrobienia, w&nbsp;toku i&nbsp;gotowe; wszystkie rosną, a&nbsp;ostatniego dnia mają dwanaście, sześć i&nbsp;osiem zadań."
                   loading="lazy"
                   decoding="async"
@@ -1038,24 +1038,30 @@ drift is not empty                        <span class="c">-- status nie zgadza s
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/timeline-pl-1600.webp">
-                <img
-                  class="light-only"
-                  src="../assets/img/timeline-pl-1600.webp"
-                  srcset="
-                    ../assets/img/timeline-pl-800.webp   800w,
-                    ../assets/img/timeline-pl-1600.webp 1600w
-                  "
-                  sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
-                  width="1600"
-                  height="596"
-                  alt="Strona „Oś czasu” w&nbsp;widoku miesięcy, od października do stycznia. Trzy epiki jako paski, wypełniona część oznacza zrobione zadania. W&nbsp;tle dwa sprinty, trzy znaczniki wydań i&nbsp;czerwona linia dzisiejszego dnia."
-                  loading="lazy"
-                  decoding="async"
-                />
+              <a class="frame" href="../assets/img/pl-timeline-1600.webp" data-dark="../assets/img/pl-timeline-dark-1600.webp">
+                <picture>
+                  <source
+                    media="(prefers-color-scheme: dark)"
+                    srcset="../assets/img/pl-timeline-dark-800.webp 800w, ../assets/img/pl-timeline-dark-1600.webp 1600w"
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1600"
+                    height="1066"
+                  />
+                  <img
+                    src="../assets/img/pl-timeline-1600.webp"
+                    srcset="../assets/img/pl-timeline-800.webp 800w, ../assets/img/pl-timeline-1600.webp 1600w"
+                    sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
+                    width="1600"
+                    height="1066"
+                    alt="Strona „Oś czasu” w&nbsp;widoku miesięcy, od października do stycznia. Trzy epiki jako paski, wypełniona część oznacza zrobione zadania; pierwszy epik jest rozwinięty do swoich dziesięciu zadań. W&nbsp;tle dwa sprinty, trzy znaczniki wydań i&nbsp;czerwona linia dzisiejszego dnia."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
               </a>
               <figcaption>
-                Oś czasu: trzy epiki, dwa sprinty, trzy wydania i&nbsp;linia dzisiejszego dnia.
+                Oś czasu z&nbsp;jednym rozwiniętym epikiem: jego zadania, dwa sprinty, trzy wydania
+                i&nbsp;linia dzisiejszego dnia.
               </figcaption>
             </figure>
           </div>
@@ -1094,26 +1100,23 @@ drift is not empty                        <span class="c">-- status nie zgadza s
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/modules-top-1600.webp">
+              <a class="frame" href="../assets/img/pl-modules-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/modules-top-1600.webp"
-                  srcset="
-                    ../assets/img/modules-top-800.webp   800w,
-                    ../assets/img/modules-top-1600.webp 1600w
-                  "
+                  src="../assets/img/pl-modules-1600.webp"
+                  srcset="../assets/img/pl-modules-800.webp 800w, ../assets/img/pl-modules-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="529"
-                  alt="Ustawienia projektu, karta Moduły, początek listy: GitHub, Knowledge base i&nbsp;Confluence import, każdy z&nbsp;jednozdaniowym opisem po angielsku i&nbsp;włączonym przełącznikiem."
+                  height="1169"
+                  alt="Ustawienia projektu, karta Moduły: osiem modułów, każdy z&nbsp;jednozdaniowym opisem i&nbsp;przełącznikiem, wszystkie włączone. GitHub, Baza wiedzy, Import z&nbsp;Confluence, Import z&nbsp;Jiry, Oś czasu, Raporty, Testy (e2e) i&nbsp;Agenci AI (MCP)."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Początek listy w&nbsp;Ustawienia projektu → Moduły. Moduł wyłączony tutaj zachowuje
-                dane, ale jego nawigacja, panel w&nbsp;zadaniach i&nbsp;oznaczenia na kartach znikają z&nbsp;tego
-                projektu. Opisy modułów przychodzą z&nbsp;serwera, a&nbsp;ten pisze po angielsku.
+                Ustawienia projektu → Moduły. Moduł wyłączony tutaj zachowuje dane, ale jego
+                nawigacja, panel w&nbsp;zadaniach i&nbsp;oznaczenia na kartach znikają z&nbsp;tego
+                projektu.
               </figcaption>
             </figure>
           </div>
@@ -1134,22 +1137,22 @@ drift is not empty                        <span class="c">-- status nie zgadza s
               </p>
             </div>
             <figure class="shot">
-              <a class="frame" href="../assets/img/jira-1600.webp">
+              <a class="frame" href="../assets/img/pl-jira-1600.webp">
                 <img
                   class="light-only"
-                  src="../assets/img/jira-1600.webp"
-                  srcset="../assets/img/jira-800.webp 800w, ../assets/img/jira-1600.webp 1600w"
+                  src="../assets/img/pl-jira-1600.webp"
+                  srcset="../assets/img/pl-jira-800.webp 800w, ../assets/img/pl-jira-1600.webp 1600w"
                   sizes="(min-width: 87em) 842px, (min-width: 56.26em) 62vw, 92vw"
                   width="1600"
-                  height="938"
+                  height="939"
                   alt="Ustawienia, karta „Import z&nbsp;Jiry”: formularz połączenia z&nbsp;adresem Jiry, e-mailem i&nbsp;tokenem, informacja, że token jest przechowywany zaszyfrowany, a&nbsp;import tylko czyta z&nbsp;Jiry, oraz drugi panel do importu pliku CSV."
                   loading="lazy"
                   decoding="async"
                 />
               </a>
               <figcaption>
-                Ustawienia → Import z&nbsp;Jiry: połączenie przez API albo plik CSV. Import tylko czyta
-                z&nbsp;Jiry.
+                Ustawienia → Import z&nbsp;Jiry: połączenie przez API albo plik CSV. Import tylko
+                czyta z&nbsp;Jiry.
               </figcaption>
             </figure>
           </div>
