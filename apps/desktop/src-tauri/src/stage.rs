@@ -12,10 +12,11 @@
 //! computer stays in files that came with the app.
 
 use serde_json::Value;
-use tauri::webview::NewWindowResponse;
+use tauri::webview::{Cookie, NewWindowResponse};
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, State, Url, Webview, WebviewBuilder, WebviewUrl, Window};
 use tauri_plugin_opener::OpenerExt;
 
+use hub_desktop_core::api::SESSION_COOKIE;
 use hub_desktop_core::commands;
 
 use crate::Shell;
@@ -288,6 +289,65 @@ pub async fn web_set(app: AppHandle, webview: Webview, stage: State<'_, Stage>, 
     }
 }
 
+/// How long the server keeps a session, which is how long the tracker stays signed in.
+const SESSION_SECONDS: u32 = 30 * 24 * 3600;
+
+/// The cookie that makes the tracker's pages those of a signed-in person, as the server
+/// itself would set it.
+fn session_cookie(server: &Url, value: &str) -> Option<Cookie<'static>> {
+    // What the server makes is hex; anything else is not a session of its making.
+    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+        return None;
+    }
+
+    let secure = if server.scheme() == "https" { "; Secure" } else { "" };
+    let text = format!("{SESSION_COOKIE}={value}; Domain={}; Path=/; HttpOnly; SameSite=Lax; Max-Age={SESSION_SECONDS}{secure}", server.host_str()?);
+
+    Cookie::parse(text).ok()
+}
+
+/// Signs in with the e-mail address and password of an account, once for both halves of
+/// the window: the core makes itself a token in the session the password opens, and the
+/// same session goes to the tracker, so that its pages are signed in too. The local
+/// interface gets the connection's status back and nothing else: not the session.
+#[tauri::command]
+pub async fn sign_in(
+    app: AppHandle,
+    webview: Webview,
+    shell: State<'_, Shell>,
+    stage: State<'_, Stage>,
+    url: String,
+    email: String,
+    password: String,
+) -> Result<Value, String> {
+    local_only(&webview)?;
+
+    let (status, session) = shell.desktop.run(move |core| core.sign_in(&url, &email, &password)).await.map_err(|error| error.to_string())?;
+    // Whatever goes wrong from here on, the app is connected: the tracker then asks for
+    // the password itself, as it did before there was this.
+    let handed = async {
+        let (view, _) = web(&app, &shell, &stage).await?;
+        let server = stage.server.lock().await.clone().ok_or("no server")?;
+        let cookie = session_cookie(&server, session.cookie.expose()).ok_or("no cookie")?;
+
+        view.set_cookie(cookie).map_err(|error| error.to_string())?;
+        view.navigate(server.join("/").map_err(|error| error.to_string())?).map_err(|error| error.to_string())
+    };
+
+    if handed.await.is_err() {
+        let _ = shell
+            .desktop
+            .run(move |_| {
+                session.end();
+
+                Ok(())
+            })
+            .await;
+    }
+
+    serde_json::to_value(status).map_err(|error| error.to_string())
+}
+
 /// Closes the web interface and forgets what its pages stored: the sign-in above all. For
 /// when the app is disconnected from its server.
 #[tauri::command]
@@ -449,6 +509,19 @@ mod tests {
         assert!(!same_origin(&url("https://hub.example.com.evil.test/"), &server));
         assert!(!same_origin(&url("https://hub.example.com:8443/"), &server));
         assert!(!same_origin(&url("https://evil.test/https://hub.example.com/"), &server));
+    }
+
+    #[test]
+    fn the_session_goes_to_the_tracker_as_the_servers_own_cookie() {
+        let cookie = session_cookie(&url("https://hub.example.com/"), "0a1b2c").unwrap();
+
+        assert_eq!((cookie.name(), cookie.value(), cookie.domain(), cookie.path()), ("th_session", "0a1b2c", Some("hub.example.com"), Some("/")));
+        assert_eq!((cookie.http_only(), cookie.secure()), (Some(true), Some(true)));
+        assert!(cookie.max_age().is_some(), "it outlives the app being closed");
+        assert_eq!(session_cookie(&url("http://127.0.0.1:8080/"), "0a1b2c").unwrap().secure(), None);
+        // A value that could add attributes of its own is not a session.
+        assert!(session_cookie(&url("https://hub.example.com/"), "x; Domain=evil.test").is_none());
+        assert!(session_cookie(&url("https://hub.example.com/"), "").is_none());
     }
 
     #[test]

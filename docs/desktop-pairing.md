@@ -5,6 +5,11 @@ computer, pushes in their name. For that it needs an API token of theirs. This i
 one without anybody creating a token by hand and pasting it, and without the app ever seeing
 a password.
 
+The app's first screen asks for an e-mail address and a password, which is the plain way
+(`apps/desktop/README.md`, "Connecting to a server"). This is the other way, under **Other
+ways to connect → Sign in at the tracker**: for whoever will not type a password into an app,
+and for a server that one day signs people in some other way than by password.
+
 It is the shape of the OAuth device flow (RFC 8628), cut down to what one server and its own
 app need.
 

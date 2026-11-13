@@ -15,7 +15,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use tokio::sync::{broadcast, watch, Notify};
 
-use crate::api::{HubClient, LiveEvent, PairingStarted, RunnerIdentity};
+use crate::api::{HubClient, LiveEvent, PairingStarted, RunnerIdentity, WebSession};
 use crate::config::{self, Paths};
 use crate::error::{CoreError, CoreResult};
 use crate::git;
@@ -404,6 +404,43 @@ impl Core {
         self.wake.notify_one();
 
         Ok(self.status())
+    }
+
+    /// Signs in with the e-mail address and password of an account, as the web interface
+    /// does, and connects with a token made for this app in that session. The password goes
+    /// to the server and nowhere else. The session comes back with the status: the window
+    /// hands it to the tracker it shows, and whoever has no use for it ends it.
+    pub fn sign_in(&self, url: &str, email: &str, password: &str) -> CoreResult<(ConnectionStatus, WebSession)> {
+        let url = config::normalise_server_url(url)?;
+
+        if email.trim().is_empty() || password.is_empty() {
+            return Err(CoreError::not_possible("Give the e-mail address and the password of your account"));
+        }
+
+        let session = HubClient::sign_in(&url, email.trim(), password)?;
+        let connected = session.create_token(&self.settings().runner_name).and_then(|grant| match self.connect(&url, grant.token.expose()) {
+            Ok(status) => {
+                // Without this the app still works; it only cannot take its token back itself.
+                let _ = self.keychain.set(secrets::TOKEN_ID_ENTRY, &Secret::new(grant.token_id.to_string()));
+
+                Ok(status)
+            }
+            Err(error) => {
+                // A token that could not be kept is not left behind on the server.
+                let _ = HubClient::new(&url, grant.token.clone()).revoke_token(grant.token_id);
+
+                Err(error)
+            }
+        });
+
+        match connected {
+            Ok(status) => Ok((status, session)),
+            Err(error) => {
+                session.end();
+
+                Err(error)
+            }
+        }
     }
 
     /// Asks the server at `url` to connect this app, and keeps the address. Nothing is

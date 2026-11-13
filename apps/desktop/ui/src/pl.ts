@@ -38,12 +38,14 @@ export const polish: Record<string, string> = {
 
   // connecting
   'Connect to your team-hub': 'Połącz ze swoim team-hubem',
-  'Sign in to your server here, in the window, with the account you use in the browser. The app gets a token of its own and keeps it in the keychain of this computer.':
-    'Zaloguj się na swoim serwerze tutaj, w oknie, kontem, którego używasz w przeglądarce. Aplikacja dostaje własny token i trzyma go w pęku kluczy tego komputera.',
-  'Sign in in the window': 'Zaloguj się w oknie',
-  'Advanced: connect with an API token': 'Zaawansowane: połącz tokenem API',
-  'For a computer where signing in is not possible. Create a token in team-hub under Settings → API tokens; it is kept in the keychain of this computer and nowhere else.':
-    'Dla komputera, na którym nie da się zalogować. Utwórz token w team-hubie w Ustawienia → Tokeny API; jest trzymany w pęku kluczy tego komputera i nigdzie indziej.',
+  'Sign in with the account you use in the browser. The password goes to your server and is kept nowhere; the app gets a token of its own, in the keychain of this computer.':
+    'Zaloguj się kontem, którego używasz w przeglądarce. Hasło trafia na Twój serwer i nie jest nigdzie zapisywane; aplikacja dostaje własny token, w pęku kluczy tego komputera.',
+  'Other ways to connect': 'Inne sposoby połączenia',
+  'Sign in at the tracker instead: the app shows a code, you sign in on the server’s own page and confirm it there, and the app never sees your password.':
+    'Zaloguj się w trackerze: aplikacja pokazuje kod, logujesz się na stronie samego serwera i tam go potwierdzasz, a aplikacja nie widzi Twojego hasła.',
+  'Sign in at the tracker': 'Zaloguj się w trackerze',
+  'Or paste an API token, for a computer where nobody can sign in. Create one in team-hub under Settings → API tokens; it is kept in the keychain of this computer and nowhere else.':
+    'Albo wklej token API, dla komputera, na którym nikt się nie zaloguje. Utwórz go w team-hubie w Ustawienia → Tokeny API; jest trzymany w pęku kluczy tego komputera i nigdzie indziej.',
   'Sign in and confirm': 'Zaloguj się i potwierdź',
   'Sign in to {server} on the right, then confirm that the page shows this code.': 'Zaloguj się na {server} po prawej, a potem potwierdź, że strona pokazuje ten kod.',
   'Sign in to {server} in the tab that opened, then confirm that the page shows this code.': 'Zaloguj się na {server} w karcie, która się otworzyła, a potem potwierdź, że strona pokazuje ten kod.',

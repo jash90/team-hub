@@ -466,7 +466,8 @@ fn main() {
             stage::web_location,
             stage::web_go,
             stage::web_set,
-            stage::web_forget
+            stage::web_forget,
+            stage::sign_in
         ])
         .run(context)
         .expect("the team-hub desktop app could not start");

@@ -196,20 +196,29 @@ than one webview in a window).
 
 ## Connecting to a server
 
-In the app: the server's address, then **Sign in in the window**. The tracker opens beside a
-code; you sign in there as in a browser, the page shows the same code, and you confirm. The
-server then hands the app an API token of its own, and from there on the app acts as you,
-with your permissions. Your password never passes through the app, and nobody copies a token
-by hand. How that works, and what it does and does not protect against, is in
-[`docs/desktop-pairing.md`](../../docs/desktop-pairing.md).
+In the app: the server's address and the e-mail address and password of your account, the
+same as in the browser. One sign-in connects both halves of the window:
 
-- **Disconnecting** (Settings) removes that token on the server too, when the server can be
-  reached; otherwise it stays listed in team-hub under **Settings → Profile and tokens**, by
-  the app's name, to delete there.
-- **Advanced: connect with an API token** on the same screen is for a computer where signing
-  in is not possible, and is what `hub connect` and `TEAM_HUB_TOKEN` do: create a token in
-  team-hub under **Settings → API tokens** and paste it. Such a token is yours; disconnecting
-  does not remove it on the server.
+- The core signs in as a browser would, makes itself an API token in that session (named
+  after this computer, listed in team-hub under **Settings → Profile and tokens**), and from
+  there on acts as you, with your permissions.
+- The window hands the same session to the tracker it shows, so its pages are signed in too.
+  That session lasts as long as any browser's (30 days); after that the tracker shows its
+  own sign-in form, and the app itself stays connected by its token.
+- The password goes from the form to the core and from the core to your server. It is kept
+  nowhere: not in a file, not in the keychain, not in a log.
+- **Disconnecting** (Settings) removes the app's token on the server too, when the server
+  can be reached, and forgets the tracker's sign-in.
+
+**Other ways to connect**, on the same screen:
+
+- **Sign in at the tracker**: the app shows a code, you sign in on the server's own page
+  beside it and confirm the code there. The app never sees the password; for accounts that
+  will not type one into an app. [`docs/desktop-pairing.md`](../../docs/desktop-pairing.md)
+  says how it works and what it does and does not protect against.
+- **An API token**, pasted: for a computer where nobody can sign in, and what `hub connect`
+  and `TEAM_HUB_TOKEN` do. Such a token is yours; disconnecting does not remove it on the
+  server.
 
 - The token is kept in the operating system's keychain (Keychain, Credential Manager, Secret
   Service) and nowhere else: not in the settings file, not in the database, not in a log, not
@@ -515,14 +524,16 @@ Actions. Its first run is its first test.
   page of the server trying every command of the app and being refused each one. On macOS
   and Windows the same code places the tracker with Tauri's own calls, which compile and
   have not been run by anybody.
-- **Signing in from the window, the thread link on a run's card, and the tracker's place
-  while the server is away have run on Linux only**, on a virtual screen with GNOME Keyring:
-  signing in beside the code and confirming, going straight to the question when the
-  tracker was signed in already, a keychain that refuses the token (the token is taken back
-  on the server), **Open the thread in the app**, the tracker leaving and returning with
-  the server, and disconnecting removing the token on the server. The **Try again** button
-  was not pressed there: the app noticed the server by itself first. On macOS and Windows
-  nobody has seen any of it.
+- **Signing in, the thread link on a run's card, and the tracker's place while the server
+  is away have run on Linux only**, on a virtual screen with GNOME Keyring: signing in with
+  e-mail and password on browser data wiped clean, with the tracker signed in by the same
+  sign-in and still signed in after a restart; a wrong password; signing in at the tracker
+  with a code; a keychain that refuses the token (the token is taken back on the server);
+  **Open the thread in the app**; the tracker leaving and returning with the server; and
+  disconnecting removing the token on the server. The **Try again** button was not pressed
+  there: the app noticed the server by itself first. On macOS and Windows nobody has seen
+  any of it; handing the session to the tracker uses each system's own cookie store, which
+  is the part most likely to differ.
 - Where the tracker's own pages and the panel show the same thing (runners, tests), they
   are still two lists.
 - What the core says in its own words (for example "Working tree ready…") is English in the
