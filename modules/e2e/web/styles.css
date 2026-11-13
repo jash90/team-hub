@@ -852,7 +852,7 @@
 
 .e2e-job-main {
   display: grid;
-  grid-template-columns: 150px minmax(120px, 1fr) minmax(0, 1.2fr) auto;
+  grid-template-columns: 150px minmax(180px, 1.4fr) minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px 14px;
   flex: 1;

@@ -307,4 +307,5 @@ export const polish: Record<string, string> = {
   'Save test settings': 'Zapisz ustawienia testów',
   'Test settings saved': 'Zapisano ustawienia testów',
   'Only a project administrator changes these settings.': 'Te ustawienia zmienia tylko administrator projektu.',
+  'Test suites (e2e)': 'Testy e2e',
 };

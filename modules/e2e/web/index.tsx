@@ -480,6 +480,7 @@ const e2eModule: WebModule = {
   issuePanel: IssuePanel,
   dashboard: DashboardPart,
   projectSettings: [{ id: 'e2e', label: () => t('Tests'), render: (project) => <ProjectSettings project={project} /> }],
+  runnerWork: () => t('Test suites (e2e)'),
   polish,
 };
 
