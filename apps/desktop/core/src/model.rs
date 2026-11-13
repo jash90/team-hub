@@ -176,6 +176,19 @@ shared!(
 );
 
 shared!(
+    /// A request to connect this app that waits for its person to say yes in the tracker
+    /// (docs/desktop-pairing.md). The secret that collects the token is not in it.
+    pub struct PairingView {
+        pub server_url: String,
+        /// What the tracker shows the person too, for them to compare.
+        pub code: String,
+        /// The page of the server where the person says yes.
+        pub path: String,
+        pub expires_at: String,
+    }
+);
+
+shared!(
     pub struct WorkspaceView {
         pub bootstrap: Bootstrap,
         pub fetched_at: String,

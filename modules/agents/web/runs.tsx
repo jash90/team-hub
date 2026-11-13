@@ -747,6 +747,13 @@ export function RunCard({ run: listed, canDecide, settings, open = false, showIs
           <span title={formatDateTime(run.createdAt)}>{timeAgo(run.createdAt)}</span>
           <Avatar user={userById(run.requestedBy)} size={18} label={t('Asked by {name}', { name: userById(run.requestedBy)?.name ?? '?' })} />
         </span>
+        {hereRunner() !== null && hereRunner() === run.runnerId && (
+          // Inside the desktop app whose runner has this run. A plain link, not the router's:
+          // the app notices a page being left, and shows the thread instead of leaving.
+          <a className="button button-ghost button-sm" href={`/desktop/thread/${run.id}`}>
+            {t('Open the thread in the app')}
+          </a>
+        )}
         {canDecide && !isFinished(run.state) && (
           <Button size="sm" variant="ghost" disabled={busy || run.cancelRequested} onClick={() => void work(() => act(`/runs/${run.id}/cancel`, {}))}>
             {run.cancelRequested ? t('Stopping…') : t('Cancel')}

@@ -139,8 +139,28 @@ pub struct HubState {
     pub changes: BTreeMap<i64, Value>,
     /// Test jobs and what runners sent for them (docs/e2e-jobs.md).
     pub e2e: cloud::E2eState,
+    /// Apps that asked to be connected (docs/desktop-pairing.md), by the id they were given.
+    pub pairings: BTreeMap<String, FakePairing>,
+    /// An older server: there is no signing in from the window.
+    pub no_pairing: bool,
+    /// The ids of the tokens that were removed through the API.
+    pub revoked_tokens: Vec<i64>,
     pub(crate) next_id: i64,
     pub(crate) live: broadcast::Sender<String>,
+}
+
+/// The id of the token the fake server hands an app its person said yes to.
+pub const PAIRED_TOKEN_ID: i64 = 77;
+
+#[derive(Debug, Clone)]
+pub struct FakePairing {
+    pub name: String,
+    pub runner_id: String,
+    pub code: String,
+    pub secret: String,
+    /// None: nobody has answered. Some(false): declined.
+    pub approved: Option<bool>,
+    pub asked: usize,
 }
 
 #[derive(Clone)]
@@ -423,6 +443,63 @@ async fn bootstrap(State(state): Shared, headers: HeaderMap) -> Response {
         unread_notifications: 0,
     })
     .into_response()
+}
+
+async fn start_pairing(State(state): Shared, Json(body): Json<Value>) -> Response {
+    let mut state = lock(&state);
+
+    if state.no_pairing {
+        return error(StatusCode::NOT_FOUND, "No such endpoint");
+    }
+
+    let number = state.id();
+    let pairing = FakePairing {
+        name: body["name"].as_str().unwrap_or_default().to_string(),
+        runner_id: body["runnerId"].as_str().unwrap_or_default().to_string(),
+        code: format!("CODE{number:04}"),
+        secret: format!("secret-{number}"),
+        approved: None,
+        asked: 0,
+    };
+    let answer = json!({ "id": format!("pairing-{number}"), "code": pairing.code, "secret": pairing.secret, "expiresAt": "2026-11-13T10:10:00.000Z" });
+
+    state.pairings.insert(format!("pairing-{number}"), pairing);
+
+    Json(answer).into_response()
+}
+
+async fn claim_pairing(State(state): Shared, UrlPath(id): UrlPath<String>, Json(body): Json<Value>) -> Response {
+    let mut state = lock(&state);
+    let token = state.token.clone();
+    let Some(pairing) = state.pairings.get_mut(&id) else { return error(StatusCode::GONE, "This request to connect has expired or was declined") };
+
+    pairing.asked += 1;
+
+    if body["secret"].as_str() != Some(pairing.secret.as_str()) {
+        return error(StatusCode::FORBIDDEN, "This is not the app that asked to be connected");
+    }
+
+    match pairing.approved {
+        None => (StatusCode::ACCEPTED, Json(json!({ "status": "pending" }))).into_response(),
+        Some(false) => {
+            state.pairings.remove(&id);
+
+            error(StatusCode::GONE, "This request to connect has expired or was declined")
+        }
+        Some(true) => {
+            state.pairings.remove(&id);
+
+            Json(json!({ "status": "approved", "token": token, "tokenId": PAIRED_TOKEN_ID })).into_response()
+        }
+    }
+}
+
+async fn revoke_token(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i64>) -> Response {
+    let mut state = guard!(state, headers);
+
+    state.revoked_tokens.push(id);
+
+    Json(Value::Null).into_response()
 }
 
 async fn dashboard(State(state): Shared, headers: HeaderMap) -> Response {
@@ -941,6 +1018,9 @@ impl FakeHub {
             person_keys: Value::Null,
             changes: BTreeMap::new(),
             e2e: cloud::E2eState::default(),
+            pairings: BTreeMap::new(),
+            no_pairing: false,
+            revoked_tokens: Vec::new(),
             next_id: 100,
             live,
         }));
@@ -961,6 +1041,9 @@ impl FakeHub {
             .route("/proposals/{id}/result", post(cloud::report_result));
         let api = Router::new()
             .route("/bootstrap", get(bootstrap))
+            .route("/desktop/pairings", post(start_pairing))
+            .route("/desktop/pairings/{id}/token", post(claim_pairing))
+            .route("/me/tokens/{id}", axum::routing::delete(revoke_token))
             .route("/dashboard", get(dashboard))
             .route("/projects/{key}", get(get_project))
             .route("/issues", post(create_issue))
@@ -987,6 +1070,13 @@ impl FakeHub {
 
     pub fn state(&self) -> MutexGuard<'_, HubState> {
         lock(&self.state)
+    }
+
+    /// The person answers, in the tracker, every app that waits to be connected.
+    pub fn answer_pairings(&self, approve: bool) {
+        for pairing in self.state().pairings.values_mut() {
+            pairing.approved = Some(approve);
+        }
     }
 
     /// What the web interface does when a person delegates an issue.

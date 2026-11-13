@@ -9,7 +9,7 @@ import { Button, ErrorNote, Spinner, Tag, Toaster, toast } from '@web/components
 import { currentLanguage, setLanguage, t } from '@web/i18n/index.ts';
 import { core } from './api.ts';
 import type { ConnectionStatus } from './bindings/ConnectionStatus.ts';
-import { inApp, web } from './bridge.ts';
+import { inApp, listenToStage, web } from './bridge.ts';
 import { issuePath } from './components/bits.tsx';
 import { useLive, useRemote, useStored } from './live.ts';
 import { SessionProvider, useSession, useView, type View } from './session.tsx';
@@ -166,6 +166,30 @@ export function App() {
       toast(`${event.title}: ${event.body}`);
     }
   });
+
+  // A run's card in the tracker has "Open the thread in the app". It is the one thing a
+  // page of the server can ask for, and all it does is change what is shown here: the
+  // thread this computer made for the run, or the run itself when there is no such thread.
+  useEffect(
+    () =>
+      listenToStage((event) => {
+        const runId = event.openRun;
+
+        if (typeof runId !== 'number' || !Number.isSafeInteger(runId) || runId <= 0) {
+          return;
+        }
+
+        core.threads().then(
+          (threads) => {
+            const thread = threads.find((candidate) => candidate.runId === runId);
+
+            go(thread ? { name: 'thread', id: thread.id } : { name: 'run', id: runId });
+          },
+          () => go({ name: 'run', id: runId }),
+        );
+      }),
+    [go],
+  );
 
   // The runner's state (last heartbeat, whether the server has runs) changes without an event.
   useEffect(() => {

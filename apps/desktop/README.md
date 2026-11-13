@@ -171,6 +171,8 @@ What joins the two:
   computer is offered first and named "this computer". That is the ordinary `onRunner` of
   [`docs/runners.md`](../../docs/runners.md): the run is pinned to the app's runner, the app
   claims it, and it appears as a thread in the panel.
+- A run's card in the tracker has **Open the thread in the app** when the run belongs to
+  this computer's runner; the thread's own header leads back to the issue.
 - Back, forward and reload for the tracker are in the bar at the top; the button beside the
   name hides the panel when the tracker should have the whole window.
 - The language and the theme are chosen in the app's bar, and the tracker follows.
@@ -179,7 +181,9 @@ The tracker **cannot call the app**. Tauri refuses a command that comes from a p
 not the app's own unless a capability names that page's address, and none does
 (`src-tauri/capabilities/default.json` names the local webview only); each command also
 checks which webview is calling. The one thing the app tells a page of its server is which
-runner the app is. So a mistake in the web interface, or a server somebody else got into,
+runner the app is, and the one thing such a page can ask of the app is to show the thread
+of a run: a link to `/desktop/thread/<number>` on the server itself, which the app does not
+follow and answers by switching the view. It starts nothing and changes nothing. So a mistake in the web interface, or a server somebody else got into,
 reaches what the server could already reach (it can queue work for this computer's runner,
 inside the sandbox below) and no further: pushes, pull requests, repository folders and the
 settings of the sandbox are decided in the files that came with the app. A link that leads
@@ -192,8 +196,20 @@ than one webview in a window).
 
 ## Connecting to a server
 
-In team-hub: **Settings → API tokens → Create token**. In the app: the server's address and
-that token. The app acts as you, with your permissions.
+In the app: the server's address, then **Sign in in the window**. The tracker opens beside a
+code; you sign in there as in a browser, the page shows the same code, and you confirm. The
+server then hands the app an API token of its own, and from there on the app acts as you,
+with your permissions. Your password never passes through the app, and nobody copies a token
+by hand. How that works, and what it does and does not protect against, is in
+[`docs/desktop-pairing.md`](../../docs/desktop-pairing.md).
+
+- **Disconnecting** (Settings) removes that token on the server too, when the server can be
+  reached; otherwise it stays listed in team-hub under **Settings → Profile and tokens**, by
+  the app's name, to delete there.
+- **Advanced: connect with an API token** on the same screen is for a computer where signing
+  in is not possible, and is what `hub connect` and `TEAM_HUB_TOKEN` do: create a token in
+  team-hub under **Settings → API tokens** and paste it. Such a token is yours; disconnecting
+  does not remove it on the server.
 
 - The token is kept in the operating system's keychain (Keychain, Credential Manager, Secret
   Service) and nowhere else: not in the settings file, not in the database, not in a log, not
@@ -499,12 +515,18 @@ Actions. Its first run is its first test.
   page of the server trying every command of the app and being refused each one. On macOS
   and Windows the same code places the tracker with Tauri's own calls, which compile and
   have not been run by anybody.
-- The app is connected twice: the core with an API token, and the tracker by signing in
-  with your password, once. The app does not make its own token from that sign-in yet.
-- The tracker needs the server: offline, the panel and the threads keep working and the
-  tracker shows the browser engine's own error page.
-- Where the tracker's own pages and the panel show the same thing (runs, runners, tests),
-  they are still two lists; a run's page in the tracker does not link to its thread here.
+- **Signing in from the window, the thread link on a run's card, and the tracker's place
+  while the server is away have run on Linux only**, on a virtual screen with GNOME Keyring:
+  signing in beside the code and confirming, going straight to the question when the
+  tracker was signed in already, a keychain that refuses the token (the token is taken back
+  on the server), **Open the thread in the app**, the tracker leaving and returning with
+  the server, and disconnecting removing the token on the server. The **Try again** button
+  was not pressed there: the app noticed the server by itself first. On macOS and Windows
+  nobody has seen any of it.
+- Where the tracker's own pages and the panel show the same thing (runners, tests), they
+  are still two lists.
+- What the core says in its own words (for example "Working tree ready…") is English in the
+  Polish interface too.
 
 - No installer was installed and tried by a person, on any system, and none is signed with a
   developer certificate. The release workflow has not run yet. Node and npm have to be

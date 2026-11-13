@@ -38,12 +38,22 @@ export const polish: Record<string, string> = {
 
   // connecting
   'Connect to your team-hub': 'Połącz ze swoim team-hubem',
-  'The token is kept in the keychain of this computer and nowhere else. Create one in team-hub under Settings → API tokens.':
-    'Token jest trzymany w pęku kluczy tego komputera i nigdzie indziej. Utworzysz go w team-hubie: Ustawienia → Tokeny API.',
+  'Sign in to your server here, in the window, with the account you use in the browser. The app gets a token of its own and keeps it in the keychain of this computer.':
+    'Zaloguj się na swoim serwerze tutaj, w oknie, kontem, którego używasz w przeglądarce. Aplikacja dostaje własny token i trzyma go w pęku kluczy tego komputera.',
+  'Sign in in the window': 'Zaloguj się w oknie',
+  'Advanced: connect with an API token': 'Zaawansowane: połącz tokenem API',
+  'For a computer where signing in is not possible. Create a token in team-hub under Settings → API tokens; it is kept in the keychain of this computer and nowhere else.':
+    'Dla komputera, na którym nie da się zalogować. Utwórz token w team-hubie w Ustawienia → Tokeny API; jest trzymany w pęku kluczy tego komputera i nigdzie indziej.',
+  'Sign in and confirm': 'Zaloguj się i potwierdź',
+  'Sign in to {server} on the right, then confirm that the page shows this code.': 'Zaloguj się na {server} po prawej, a potem potwierdź, że strona pokazuje ten kod.',
+  'Sign in to {server} in the tab that opened, then confirm that the page shows this code.': 'Zaloguj się na {server} w karcie, która się otworzyła, a potem potwierdź, że strona pokazuje ten kod.',
+  'Your password stays between you and the server: the app never sees it. Once you confirm, the server hands the app a token of its own, which is kept in the keychain of this computer.':
+    'Hasło zostaje między Tobą a serwerem: aplikacja go nie widzi. Gdy potwierdzisz, serwer wyda aplikacji jej własny token, trzymany w pęku kluczy tego komputera.',
+  'Waiting for you to confirm…': 'Czekam na Twoje potwierdzenie…',
+  'The page is open in a tab of your browser.': 'Strona jest otwarta w karcie przeglądarki.',
   'Server address': 'Adres serwera',
   'API token': 'Token API',
   'Connecting…': 'Łączę…',
-  Connect: 'Połącz',
 
   // an issue
   Tests: 'Testy',
@@ -184,8 +194,8 @@ export const polish: Record<string, string> = {
   'This computer has no keychain the app can use, so the copy of the server’s data is not kept between runs.':
     'Ten komputer nie ma pęku kluczy, z którego aplikacja może skorzystać, więc kopia danych serwera nie jest przechowywana między uruchomieniami.',
   'Disconnect from the server?': 'Odłączyć od serwera?',
-  'The token is removed from the keychain and the stored copy of the server’s data is deleted. Threads, working trees and repositories stay.':
-    'Token zostanie usunięty z pęku kluczy, a zapisana kopia danych serwera skasowana. Wątki, drzewa robocze i repozytoria zostają.',
+  'The token is removed from the keychain, and on the server too when the app got it by signing in here. The stored copy of the server’s data is deleted. Threads, working trees and repositories stay.':
+    'Token jest usuwany z pęku kluczy, a także na serwerze, jeśli aplikacja dostała go przez logowanie w oknie. Zapisana kopia danych serwera jest kasowana. Wątki, drzewa robocze i repozytoria zostają.',
   Runner: 'Runner',
   'this server has no agent runs': 'ten serwer nie obsługuje zleceń dla agentów',
   'last seen by the server {when}': 'serwer widział go {when}',
@@ -285,6 +295,8 @@ export const polish: Record<string, string> = {
   'Open team-hub in a tab': 'Otwórz team-hub w karcie',
   'Inside the app this place shows the web interface of your team-hub: board, backlog, issues, the knowledge base. A browser cannot show one site inside another, so open it in a tab.':
     'W aplikacji to miejsce pokazuje interfejs webowy Twojego team-huba: tablicę, backlog, zadania, bazę wiedzy. Przeglądarka nie pokaże jednej strony wewnątrz drugiej, więc otwórz go w karcie.',
+  'The server cannot be reached': 'Serwer jest nieosiągalny',
+  'Try again': 'Spróbuj ponownie',
   'The server cannot be reached, so its pages cannot be shown. Threads keep working on this computer.':
     'Nie można połączyć się z serwerem, więc jego stron nie da się pokazać. Wątki dalej działają na tym komputerze.',
 };

@@ -15,14 +15,14 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use tokio::sync::{broadcast, watch, Notify};
 
-use crate::api::{HubClient, LiveEvent, RunnerIdentity};
+use crate::api::{HubClient, LiveEvent, PairingStarted, RunnerIdentity};
 use crate::config::{self, Paths};
 use crate::error::{CoreError, CoreResult};
 use crate::git;
 use crate::headless::Headless;
 use crate::jobs::{JobOptions, JobRunner};
 use crate::model::{
-    AppEvent, CacheMode, ConnectionStatus, DashboardView, Delegation, EventKind, IssueView, NewTestJob, NewThread, Proposal, ProposalKind,
+    AppEvent, CacheMode, ConnectionStatus, DashboardView, Delegation, EventKind, IssueView, NewTestJob, NewThread, PairingView, Proposal, ProposalKind,
     ProposalState, PullRequestPreview, PullRequestResult, PushPreview, PushResult, RepoCheck, RepoMapping, RepoStatus, RunnerStatus, SandboxState,
     SearchView, Settings, Thread, ThreadDetail, ThreadDiff, ThreadKind, ThreadOrigin, ThreadState, WorkspaceView, WorktreeInfo,
 };
@@ -146,7 +146,21 @@ pub struct Core {
     seen_notification: AtomicI64,
     wake: Arc<Notify>,
     closing: Arc<AtomicBool>,
+    /// The request to connect that waits for its person, when there is one.
+    pairing: Mutex<Option<Pairing>>,
 }
+
+/// A request to connect, as the app holds it: with the secret that collects the token.
+#[derive(Clone)]
+struct Pairing {
+    url: String,
+    started: PairingStarted,
+}
+
+/// How often the app asks whether its person has said yes.
+const PAIR_POLL: Duration = Duration::from_secs(2);
+/// The server gives a request ten minutes; a little after that the app stops asking by itself.
+const PAIR_PATIENCE: Duration = Duration::from_secs(11 * 60);
 
 struct Bridge(Weak<Core>);
 
@@ -359,6 +373,9 @@ impl Core {
             return Err(CoreError::not_possible("The server did not accept this token"));
         }
 
+        // Whatever token was there before, its id on the server is not this one's.
+        let _ = self.keychain.delete(secrets::TOKEN_ID_ENTRY);
+
         // Where there is no keychain, a token given through the environment is used as it is
         // and stored nowhere.
         let from_environment = std::env::var(secrets::TOKEN_VARIABLE).is_ok_and(|given| given.trim() == token.expose());
@@ -389,8 +406,129 @@ impl Core {
         Ok(self.status())
     }
 
+    /// Asks the server at `url` to connect this app, and keeps the address. Nothing is
+    /// connected yet: the person says yes in the tracker, at the page this names, and
+    /// `pair_wait` collects the token.
+    pub fn pair_start(&self, url: &str) -> CoreResult<PairingView> {
+        let url = config::normalise_server_url(url)?;
+
+        if self.client().is_ok() {
+            return Err(CoreError::not_possible("The app is connected already; disconnect it first"));
+        }
+
+        let settings = self.settings();
+        let started = HubClient::start_pairing(&url, &settings.runner_name, &settings.runner_id).map_err(|error| match error {
+            error if error.is_not_found() => {
+                CoreError::not_possible("This server is too old to sign in from the window. Connect with an API token instead, under Advanced.")
+            }
+            other => other,
+        })?;
+
+        {
+            let mut settings = self.settings.write().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+            settings.server_url = Some(url.clone());
+            config::save_settings(&self.paths, &settings)?;
+        }
+
+        let view = PairingView {
+            server_url: url.clone(),
+            path: format!("/desktop/pair?code={}", started.code),
+            code: started.code.clone(),
+            expires_at: started.expires_at.clone(),
+        };
+
+        *lock(&self.pairing) = Some(Pairing { url, started });
+
+        Ok(view)
+    }
+
+    /// Gives up the request that waits; whoever waits for it is told so.
+    pub fn pair_cancel(&self) {
+        *lock(&self.pairing) = None;
+    }
+
+    fn pairing_is(&self, id: &str) -> bool {
+        lock(&self.pairing).as_ref().is_some_and(|pairing| pairing.started.id == id)
+    }
+
+    /// Waits until the person has said yes, then connects with the token the server hands
+    /// over, the same way a pasted token is connected. Ends with an error when they said no,
+    /// took too long, or the request was given up here.
+    pub fn pair_wait(&self) -> CoreResult<ConnectionStatus> {
+        let Some(Pairing { url, started }) = lock(&self.pairing).clone() else {
+            return Err(CoreError::not_possible("Nothing is waiting to be connected; start again"));
+        };
+        let began = Instant::now();
+
+        loop {
+            if !self.pairing_is(&started.id) || self.closing.load(Ordering::Relaxed) {
+                return Err(CoreError::not_possible("Connecting was cancelled"));
+            }
+
+            match HubClient::claim_pairing(&url, &started.id, &started.secret) {
+                Ok(Some(grant)) => {
+                    self.pair_cancel();
+
+                    let status = match self.connect(&url, grant.token.expose()) {
+                        Ok(status) => status,
+                        Err(error) => {
+                            // A token that could not be kept (no keychain) is of no use to
+                            // anybody: it is not left behind on the server.
+                            let _ = HubClient::new(&url, grant.token.clone()).revoke_token(grant.token_id);
+
+                            return Err(error);
+                        }
+                    };
+
+                    // Without this the app still works; it only cannot take its token back itself.
+                    let _ = self.keychain.set(secrets::TOKEN_ID_ENTRY, &Secret::new(grant.token_id.to_string()));
+
+                    return Ok(status);
+                }
+                // Nobody has said yes yet, or the server is away for a moment.
+                Ok(None) => {}
+                Err(error) if error.is_offline() => {}
+                Err(CoreError::Api { status: 410, .. }) => {
+                    self.pair_cancel();
+
+                    return Err(CoreError::not_possible("The request to connect was declined or ran out of time. Start again."));
+                }
+                Err(error) => {
+                    self.pair_cancel();
+
+                    return Err(error);
+                }
+            }
+
+            if began.elapsed() > PAIR_PATIENCE {
+                self.pair_cancel();
+
+                return Err(CoreError::not_possible("Nobody approved the request to connect in time. Start again."));
+            }
+
+            // Slept in short pieces, so that giving up is noticed at once.
+            let asked = Instant::now();
+
+            while asked.elapsed() < PAIR_POLL && self.pairing_is(&started.id) && !self.closing.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        }
+    }
+
     /// Forgets the token and the copy of the server's data. Threads and repositories stay.
+    /// A token the app was given in the tracker is removed on the server too, when the
+    /// server can be reached; one that was pasted is its person's to remove.
     pub fn disconnect(&self) -> CoreResult<ConnectionStatus> {
+        let given = self.keychain.get(secrets::TOKEN_ID_ENTRY).ok().flatten().and_then(|id| id.expose().parse::<i64>().ok());
+
+        if let (Some(token_id), Ok(client)) = (given, self.client()) {
+            // When this fails the token stays listed under Settings → Profile and tokens.
+            let _ = client.revoke_token(token_id);
+        }
+
+        self.pair_cancel();
+        self.keychain.delete(secrets::TOKEN_ID_ENTRY)?;
         self.keychain.delete(secrets::TOKEN_ENTRY)?;
         self.store.cache_clear()?;
         *self.session.write().unwrap_or_else(|poisoned| poisoned.into_inner()) = Session::default();
@@ -2505,6 +2643,7 @@ impl Desktop {
             seen_notification: AtomicI64::new(-1),
             wake: Arc::new(Notify::new()),
             closing: Arc::new(AtomicBool::new(false)),
+            pairing: Mutex::new(None),
         });
         let runtime = Runtime::new(Arc::clone(&store), runtime_config, Arc::new(Bridge(Arc::downgrade(&core))), events);
 

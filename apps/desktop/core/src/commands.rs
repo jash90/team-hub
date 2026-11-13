@@ -20,6 +20,12 @@ struct Connect {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct ServerUrl {
+    url: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ByKey {
     key: String,
 }
@@ -151,10 +157,13 @@ fn answer<T: Serialize>(value: CoreResult<T>) -> CoreResult<Value> {
 }
 
 /// Every command the interface may call.
-pub const COMMANDS: [&str; 37] = [
+pub const COMMANDS: [&str; 40] = [
     "status",
     "connect",
     "disconnect",
+    "pair_start",
+    "pair_wait",
+    "pair_cancel",
     "settings",
     "save_settings",
     "models",
@@ -205,6 +214,20 @@ async fn dispatch(desktop: &Desktop, command: &str, args: Value) -> CoreResult<V
             desktop.run(move |core| answer(core.connect(&url, &token))).await
         }
         "disconnect" => desktop.run(|core| answer(core.disconnect())).await,
+        // Signing in from the window: docs/desktop-pairing.md.
+        "pair_start" => {
+            let ServerUrl { url } = arguments(command, args)?;
+
+            desktop.run(move |core| answer(core.pair_start(&url))).await
+        }
+        "pair_wait" => desktop.run(|core| answer(core.pair_wait())).await,
+        "pair_cancel" => {
+            desktop.run(|core| {
+                core.pair_cancel();
+                answer(Ok(()))
+            })
+            .await
+        }
         "settings" => desktop.run(|core| answer(Ok(core.settings()))).await,
         "save_settings" => {
             let settings: Settings = arguments(command, args)?;

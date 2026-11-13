@@ -80,6 +80,42 @@
   max-width: 60ch;
 }
 
+/* Signing in from the window: the code on the left, the server's own pages on the right. */
+.desk-pair {
+  display: flex;
+  gap: 12px;
+  height: 100%;
+  padding: 12px;
+}
+
+.desk-pair-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 340px;
+  flex: none;
+  padding: 16px;
+}
+
+.desk-pair-code {
+  font-family: var(--mono);
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  margin: 4px 0;
+}
+
+.desk-pair-waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.desk-advanced summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
 .desk-web-steps {
   display: inline-flex;
   gap: 2px;
