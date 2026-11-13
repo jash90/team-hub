@@ -1,0 +1,132 @@
+# Drafts a desktop release from the installers a finished "Desktop release" run built.
+#
+# The usual way is a tag: pushing desktop-vX.Y.Z builds and drafts in one go
+# (desktop-release.yml). This is for the case where the installers already exist as the
+# artifacts of a run started by hand, and should become the draft without building again:
+#
+#   Actions → Desktop release: draft from a run → Run workflow, with that run's id.
+#
+# The tag has to exist already; nothing here moves or creates one. The draft says which
+# commit its files were built from. A release a person has published is never changed.
+name: 'Desktop release: draft from a run'
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'The id of the finished "Desktop release" run whose installers to use'
+        required: true
+        type: string
+      version:
+        description: 'The app version those installers are, e.g. 0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-draft-${{ inputs.version }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  draft:
+    name: Draft the release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    env:
+      VERSION: ${{ inputs.version }}
+      TAG: desktop-v${{ inputs.version }}
+      RUN_ID: ${{ inputs.run_id }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # The run has to be this workflow's sibling, finished and green: nothing else's files
+      # become a release.
+      - name: The run that built the installers
+        id: built
+        run: |
+          case "$RUN_ID" in ''|*[!0-9]*) echo "::error::The run id is a number."; exit 1 ;; esac
+          case "$VERSION" in ''|*[!0-9.]*) echo "::error::The version is digits and dots, e.g. 0.1.0."; exit 1 ;; esac
+
+          run=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID")
+          path=$(jq -r .path <<<"$run")
+          conclusion=$(jq -r .conclusion <<<"$run")
+          sha=$(jq -r .head_sha <<<"$run")
+
+          if [ "$path" != ".github/workflows/desktop-release.yml" ] || [ "$conclusion" != "success" ]; then
+            echo "::error::Run $RUN_ID is not a successful Desktop release run ($path, $conclusion)."
+            exit 1
+          fi
+
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      # The release notes as they were when the installers were built.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.built.outputs.sha }}
+          persist-credentials: false
+          sparse-checkout: apps/desktop/RELEASE_NOTES.md
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: dist
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: The files are this version's, and all of them
+        working-directory: dist
+        run: |
+          ls -l
+          count=$(ls | wc -l)
+          other=$(ls | grep -v -- "-$VERSION-" || true)
+
+          if [ "$count" -lt 10 ] || [ -n "$other" ]; then
+            echo "::error::Expected the installers and hub archives of $VERSION, found $count files${other:+, among them: $other}."
+            exit 1
+          fi
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum -- * > ../SHA256SUMS
+          mv ../SHA256SUMS SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create or update the draft
+        env:
+          BUILT: ${{ steps.built.outputs.sha }}
+        run: |
+          title="team-hub desktop v$VERSION"
+          notes=notes.md
+          tagged=$(gh api "repos/$GH_REPO/commits/$TAG" --jq .sha)
+
+          cp apps/desktop/RELEASE_NOTES.md "$notes"
+
+          if [ "$tagged" != "$BUILT" ]; then
+            printf '\n\n---\n\nThese files were built from commit %s, which is later than the commit the tag %s names (%s).\n' "$BUILT" "$TAG" "$tagged" >> "$notes"
+          fi
+
+          if state=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$state" != "true" ]; then
+              echo "::error::The release $TAG is published already. Delete it, or release a new version."
+              exit 1
+            fi
+
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --draft --title "$title" --notes-file "$notes"
+          else
+            gh release create "$TAG" dist/* --draft --verify-tag --title "$title" --notes-file "$notes"
+          fi
+
+          gh release view "$TAG" --json url,isDraft,assets --jq '"\(.url) (draft: \(.isDraft))", (.assets[] | "  \(.name)  \(.size) bytes")'
