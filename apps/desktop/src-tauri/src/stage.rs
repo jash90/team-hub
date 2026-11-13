@@ -167,8 +167,8 @@ async fn web(app: &AppHandle, shell: &Shell, stage: &Stage) -> Result<(Webview, 
 }
 
 /// Shows the server's web interface over this part of the local interface, in the local
-/// interface's own units.
-// The four numbers are the command's arguments, as the interface sends them.
+/// interface's own units. `page` is how high the local interface's page is, in the same units.
+// The numbers are the command's arguments, as the interface sends them.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn web_show(
@@ -180,12 +180,13 @@ pub async fn web_show(
     y: f64,
     width: f64,
     height: f64,
+    page: f64,
 ) -> Result<(), String> {
     local_only(&webview)?;
 
     let (view, _) = web(&app, &shell, &stage).await?;
 
-    layout::place(&app, &view, Some((x.max(0.0), y.max(0.0), width.max(1.0), height.max(1.0)))).map_err(|error| error.to_string())
+    layout::place(&app, &view, Some((x.max(0.0), y.max(0.0), width.max(1.0), height.max(1.0))), page).map_err(|error| error.to_string())
 }
 
 /// Takes the web interface off the window; it keeps its page.
@@ -194,7 +195,7 @@ pub async fn web_hide(app: AppHandle, webview: Webview) -> Result<(), String> {
     local_only(&webview)?;
 
     match app.get_webview(WEB) {
-        Some(view) => layout::place(&app, &view, None).map_err(|error| error.to_string()),
+        Some(view) => layout::place(&app, &view, None, 0.0).map_err(|error| error.to_string()),
         None => Ok(()),
     }
 }
@@ -384,14 +385,42 @@ mod layout {
 
     pub fn release(_app: &AppHandle) {}
 
-    pub fn place(_app: &AppHandle, view: &Webview, at: Option<(f64, f64, f64, f64)>) -> tauri::Result<()> {
+    pub fn place(_app: &AppHandle, view: &Webview, at: Option<(f64, f64, f64, f64)>, page: f64) -> tauri::Result<()> {
         match at {
             Some((x, y, width, height)) => {
+                let y = y + title_bar(view, page);
+
                 view.set_bounds(Rect { position: LogicalPosition::new(x, y).into(), size: LogicalSize::new(width, height).into() })?;
                 view.show()
             }
             None => view.hide(),
         }
+    }
+
+    /// On macOS a webview's place is counted from the top of the window's frame, title bar
+    /// included, while the page that asks counts from its own top, which is under the title
+    /// bar: without this the web interface lies a title bar too high, over the bottom of the
+    /// app's bar. Tauri gives one number for the window's height and for the height of what
+    /// is in it, so the title bar is what the window has more than the page that asks, which
+    /// fills the rest; in full screen that is nothing.
+    #[cfg(target_os = "macos")]
+    fn title_bar(view: &Webview, page: f64) -> f64 {
+        let window = view.window();
+
+        match (window.outer_size(), window.scale_factor()) {
+            (Ok(outer), Ok(scale)) if scale > 0.0 && page > 0.0 => (f64::from(outer.height) / scale - page).clamp(0.0, MOST_TITLE_BAR),
+            _ => 0.0,
+        }
+    }
+
+    /// More than any title bar: a page that says it is much lower than its window is a page
+    /// that has not been laid out yet, and moves nothing.
+    #[cfg(target_os = "macos")]
+    const MOST_TITLE_BAR: f64 = 80.0;
+
+    #[cfg(not(target_os = "macos"))]
+    fn title_bar(_view: &Webview, _page: f64) -> f64 {
+        0.0
     }
 }
 
@@ -471,7 +500,7 @@ mod layout {
         });
     }
 
-    pub fn place(app: &AppHandle, _view: &Webview, at: Option<(f64, f64, f64, f64)>) -> tauri::Result<()> {
+    pub fn place(app: &AppHandle, _view: &Webview, at: Option<(f64, f64, f64, f64)>, _page: f64) -> tauri::Result<()> {
         app.run_on_main_thread(move || {
             LAID.with(|laid| {
                 let laid = laid.borrow();

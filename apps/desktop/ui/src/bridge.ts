@@ -133,7 +133,7 @@ async function shell<T>(command: string, args?: Record<string, unknown>): Promis
  */
 export const web = {
   /** Shows it over this rectangle of the window. */
-  show: (box: { x: number; y: number; width: number; height: number }) => shell<null>('web_show', box),
+  show: (box: { x: number; y: number; width: number; height: number; page: number }) => shell<null>('web_show', box),
   hide: () => shell<null>('web_hide'),
   /** Opens a page of the server, such as `/issue/WEB-12`. */
   open: (path: string) => shell<null>('web_open', { path }),

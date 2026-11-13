@@ -28,7 +28,8 @@ export function useWebSlot(slot: RefObject<HTMLElement | null>, server: string |
       frame = window.requestAnimationFrame(() => {
         const box = element.getBoundingClientRect();
 
-        web.show({ x: box.left, y: box.top, width: box.width, height: box.height }).then(
+        // `page`: how high this page is. On macOS the window measures from above its title bar.
+        web.show({ x: box.left, y: box.top, width: box.width, height: box.height, page: window.innerHeight }).then(
           () => !gone && setFailure(undefined),
           (reason: unknown) => !gone && setFailure(reason instanceof Error ? reason.message : String(reason)),
         );
