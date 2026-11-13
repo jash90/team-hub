@@ -13,8 +13,8 @@ use ureq::tls::{RootCerts, TlsConfig};
 use ureq::Agent;
 
 use crate::error::{CoreError, CoreResult};
-use crate::protocol::HubTool;
 use crate::jobs::{ClaimedJob, JobPatch, TestJob};
+use crate::protocol::HubTool;
 use crate::runs::{AgentRun, AgentRunDetail, ClaimedRun, NewRun, RunChanges, RunEventKind, RunKind, RunPatch, RunProposal};
 use crate::secrets::Secret;
 

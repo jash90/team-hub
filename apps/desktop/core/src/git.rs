@@ -596,7 +596,10 @@ const CREDENTIAL_HELPER: &str = "!f() { test \"$1\" = get && printf 'username=x-
 /// remote's address.
 #[derive(Debug, Clone)]
 pub enum RemoteAuth {
-    Token { base: String, token: Secret },
+    Token {
+        base: String,
+        token: Secret,
+    },
     /// However the person at this computer has signed git in (a credential helper, the
     /// GitHub CLI): the desktop app has no token of its own and leaves that as it is.
     PersonsOwn,

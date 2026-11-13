@@ -71,7 +71,8 @@ async fn eventually(what: &str, runner: &Runner, holds: impl Fn() -> bool) {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_half_configured_runner_stays_up_says_what_is_missing_and_leaves_when_asked() {
-    let runner = start(&[("TEAM_HUB_URL".to_string(), "https://hub.example.com".to_string()), ("RUNNER_MAX_RUNNING".to_string(), "lots".to_string())]);
+    let runner =
+        start(&[("TEAM_HUB_URL".to_string(), "https://hub.example.com".to_string()), ("RUNNER_MAX_RUNNING".to_string(), "lots".to_string())]);
 
     eventually("the runner says what is missing", &runner, || runner.said("Not configured: set TEAM_HUB_TOKEN.")).await;
     assert!(runner.said("RUNNER_MAX_RUNNING is a number between 1 and 16"));
@@ -124,7 +125,10 @@ async fn the_runner_leaves_within_seconds_of_sigterm_keeps_its_run_and_continues
     // A run that takes long is being worked on when the platform replaces the container.
     let run_id = hub.delegate_in("WEB-1", "implement", "[fake:slow]", Some("acme/web"));
 
-    eventually("the run is being worked on", &runner, || hub.run(run_id)["events"].as_array().unwrap().iter().any(|event| event["text"] == "This will take a while.")).await;
+    eventually("the run is being worked on", &runner, || {
+        hub.run(run_id)["events"].as_array().unwrap().iter().any(|event| event["text"] == "This will take a while.")
+    })
+    .await;
 
     let children = Command::new("ps").args(["-o", "pid=", "--ppid", &runner.child.id().to_string()]).output().unwrap();
     let helpers: Vec<u32> = String::from_utf8_lossy(&children.stdout).lines().filter_map(|pid| pid.trim().parse().ok()).collect();
@@ -145,7 +149,8 @@ async fn the_runner_leaves_within_seconds_of_sigterm_keeps_its_run_and_continues
 
     eventually("the run is finished by the runner that came back", &runner, || hub.run(run_id)["run"]["state"] == "succeeded").await;
 
-    let events: Vec<String> = hub.run(run_id)["events"].as_array().unwrap().iter().map(|event| event["text"].as_str().unwrap_or_default().to_string()).collect();
+    let events: Vec<String> =
+        hub.run(run_id)["events"].as_array().unwrap().iter().map(|event| event["text"].as_str().unwrap_or_default().to_string()).collect();
 
     assert!(events.iter().any(|text| text == "Resumed."), "{events:#?}");
     assert!(events.iter().any(|text| text.starts_with("Continuing.")), "{events:#?}");

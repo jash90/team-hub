@@ -361,7 +361,11 @@ impl RunChanges {
             commits: committed
                 .commits
                 .into_iter()
-                .map(|commit| ChangedCommit { sha: commit.sha, subject: commit.subject, author: Some(commit.author).filter(|author| !author.is_empty()) })
+                .map(|commit| ChangedCommit {
+                    sha: commit.sha,
+                    subject: commit.subject,
+                    author: Some(commit.author).filter(|author| !author.is_empty()),
+                })
                 .collect(),
             files: committed
                 .files

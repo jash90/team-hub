@@ -223,7 +223,9 @@ async fn a_job_is_checked_out_run_and_its_report_and_files_come_back() {
 
     assert!(env.keys().all(|name| given.contains(&name.as_str()) || added_by_npx(name)), "{:?}", env.keys().collect::<Vec<_>>());
     assert!(std::env::var("TEAM_HUB_TOKEN").is_ok(), "the runner's own environment has them");
-    assert!(!seen.to_string().contains(TOKEN) && !seen.to_string().contains(GITHUB_TOKEN) && !seen.to_string().contains("sk-ant-not-for-test-suites"));
+    assert!(
+        !seen.to_string().contains(TOKEN) && !seen.to_string().contains(GITHUB_TOKEN) && !seen.to_string().contains("sk-ant-not-for-test-suites")
+    );
 
     // The arguments: the filter as typed, the job's recording modes, then the settings' own.
     assert_eq!(seen["args"], json!(["run", "tests/login.e2e.ts", "--grep", "signs in", "--video=retain-on-failure", "--trace=on", "--workers", "2"]));
@@ -305,7 +307,11 @@ async fn the_output_reaches_the_log_while_the_suite_runs_and_a_cancel_ends_it_wi
     // Lines arrive in several small batches while the job is still running.
     eventually("ten steps in the log", || hub.job_log(job).iter().filter(|line| line.starts_with("step ")).count() >= 10).await;
     assert_eq!((&hub.job(job)["state"], &hub.job(job)["step"]), (&json!("running"), &json!("running")));
-    assert!(hub.state().e2e.log_batches.len() >= 3 && hub.state().e2e.log_batches.iter().all(|lines| *lines < 40), "{:?}", hub.state().e2e.log_batches);
+    assert!(
+        hub.state().e2e.log_batches.len() >= 3 && hub.state().e2e.log_batches.iter().all(|lines| *lines < 40),
+        "{:?}",
+        hub.state().e2e.log_batches
+    );
 
     let pid: u32 = hub.job_log(job).iter().find_map(|line| line.strip_prefix("pid ").and_then(|pid| pid.parse().ok())).unwrap();
     let group = std::process::Command::new("ps").args(["-o", "pgid=", "-p", &pid.to_string()]).output().unwrap();
@@ -438,7 +444,10 @@ async fn as_root_a_job_runs_as_another_user_who_cannot_read_the_runners_state_or
 
     assert_eq!(seen["uid"], uid);
     assert!(state_file.exists() && clone_file.exists());
-    assert_eq!(seen["probes"], json!({ state_file.to_str().unwrap(): "EACCES", clone_file.to_str().unwrap(): "EACCES", data.join("state/settings.json").to_str().unwrap(): "EACCES" }));
+    assert_eq!(
+        seen["probes"],
+        json!({ state_file.to_str().unwrap(): "EACCES", clone_file.to_str().unwrap(): "EACCES", data.join("state/settings.json").to_str().unwrap(): "EACCES" })
+    );
     // The browsers it installed are its own, for the next job.
     assert!(data.join("browsers/installs.txt").exists());
 }

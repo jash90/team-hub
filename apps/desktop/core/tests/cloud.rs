@@ -62,7 +62,11 @@ async fn until(bench: &Bench, hub: &FakeHub, what: &str, shown: impl Fn(&FakeHub
 }
 
 fn said(bench_events: &[hub_desktop_core::model::ThreadEvent], start: &str) -> String {
-    bench_events.iter().find(|event| event.kind == EventKind::Message && event.text.starts_with(start)).map(|event| event.text.clone()).unwrap_or_default()
+    bench_events
+        .iter()
+        .find(|event| event.kind == EventKind::Message && event.text.starts_with(start))
+        .map(|event| event.text.clone())
+        .unwrap_or_default()
 }
 
 // ---------- configuration and presence ----------
@@ -79,7 +83,10 @@ async fn the_runner_announces_itself_headless_with_what_the_environment_says() {
     let runner = hub.state().runners[0].clone();
 
     assert_eq!(runner["interactive"], false);
-    assert_eq!((&runner["name"], &runner["kinds"], &runner["projects"]), (&json!("Railway runner"), &json!(["implement", "review"]), &json!(["WEB"])));
+    assert_eq!(
+        (&runner["name"], &runner["kinds"], &runner["projects"]),
+        (&json!("Railway runner"), &json!(["implement", "review"]), &json!(["WEB"]))
+    );
     assert!(runner["runnerId"].as_str().unwrap().starts_with("runner-"));
     assert!(runner.get("pinnedOnly").is_none());
 
@@ -129,7 +136,11 @@ async fn a_repository_is_cloned_when_a_run_first_names_it_and_the_token_is_left_
     // project is mapped to it without anybody doing so.
     assert_eq!(PathBuf::from(&thread.repo_path), clone);
     assert_eq!(git(&clone, &["remote", "get-url", "origin"]), format!("{}/acme/web.git", host.url));
-    assert_eq!(std::fs::read_to_string(clone.join(".git/config")).unwrap().matches("credential").count() + std::fs::read_to_string(clone.join(".git/config")).unwrap().matches("extraheader").count(), 0);
+    assert_eq!(
+        std::fs::read_to_string(clone.join(".git/config")).unwrap().matches("credential").count()
+            + std::fs::read_to_string(clone.join(".git/config")).unwrap().matches("extraheader").count(),
+        0
+    );
 
     let mapped = bench.desktop.run(|core| core.repos()).await.unwrap();
 
@@ -197,7 +208,10 @@ async fn what_the_thread_committed_is_uploaded_and_again_when_it_commits_more() 
     assert_eq!(hub.proposal_on_run(run_id, "push")["changesWereThere"], true);
     assert_eq!(hub.proposal_on_run(run_id, "pull_request")["changesWereThere"], true);
     // The push proposal names the commit it would push.
-    assert_eq!(hub.proposal_on_run(run_id, "push")["payload"], json!({ "branch": BRANCH, "note": "One commit, tests not run (no test suite).", "commit": head }));
+    assert_eq!(
+        hub.proposal_on_run(run_id, "push")["payload"],
+        json!({ "branch": BRANCH, "note": "One commit, tests not run (no test suite).", "commit": head })
+    );
 
     // The thread commits more: the run gets the new head, with both commits.
     write(&tree, "later.txt", "added later\n");
@@ -295,7 +309,10 @@ async fn a_pull_request_approved_on_the_web_is_opened_through_the_server_once_th
         bench.desktop.tick(true).await.unwrap();
     }
 
-    assert_eq!((&hub.proposal_on_run(run_id, "pull_request")["state"], &hub.proposal_on_run(run_id, "pull_request")["result"]), (&json!("approved"), &Value::Null));
+    assert_eq!(
+        (&hub.proposal_on_run(run_id, "pull_request")["state"], &hub.proposal_on_run(run_id, "pull_request")["result"]),
+        (&json!("approved"), &Value::Null)
+    );
     assert!(!hub.written().iter().any(|line| line.ends_with("/pull-request")));
 
     hub.decide_like_the_web(push["id"].as_i64().unwrap(), true).await.unwrap();
@@ -336,10 +353,7 @@ async fn a_pull_request_the_server_cannot_open_and_a_push_that_is_rejected() {
     hub.decide_like_the_web(pull_request["id"].as_i64().unwrap(), true).await.unwrap();
     until(&bench, &hub, "the pull request refused", |hub| hub.proposal_on_run(run_id, "pull_request")["state"] == "failed").await;
 
-    assert_eq!(
-        hub.proposal_on_run(run_id, "pull_request")["note"],
-        format!("Branch {BRANCH} is not on GitHub: its push has to be approved first.")
-    );
+    assert_eq!(hub.proposal_on_run(run_id, "pull_request")["note"], format!("Branch {BRANCH} is not on GitHub: its push has to be approved first."));
 }
 
 mod futures_free {
@@ -358,12 +372,25 @@ async fn the_helper_gets_the_model_key_a_home_of_its_own_and_none_of_the_runners
     let events = bench.desktop.run(move |core| core.thread(thread.id)).await.unwrap().events;
     let names: Vec<String> = said(&events, "Variables: ").trim_start_matches("Variables: ").split(' ').map(String::from).collect();
 
-    for withheld in ["TEAM_HUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN", "RUNNER_DATA_DIR", "TEAM_HUB_URL", "TEAM_HUB_GIT_PASSWORD", "AWS_SECRET_ACCESS_KEY", "CLAUDE_CODE_MESSAGING_TOKEN"] {
+    for withheld in [
+        "TEAM_HUB_TOKEN",
+        "GITHUB_TOKEN",
+        "GH_TOKEN",
+        "RUNNER_DATA_DIR",
+        "TEAM_HUB_URL",
+        "TEAM_HUB_GIT_PASSWORD",
+        "AWS_SECRET_ACCESS_KEY",
+        "CLAUDE_CODE_MESSAGING_TOKEN",
+    ] {
         assert!(!names.contains(&withheld.to_string()), "{withheld} reached the helper: {names:?}");
     }
 
     assert!(names.contains(&"PATH".to_string()) && names.contains(&"ANTHROPIC_API_KEY".to_string()));
-    assert!(names.iter().all(|name| hub_desktop_core::policy::PASSED_TO_A_HEADLESS_HELPER.contains(&name.as_str()) || ["HOME", "ANTHROPIC_API_KEY"].contains(&name.as_str())), "{names:?}");
+    assert!(
+        names.iter().all(|name| hub_desktop_core::policy::PASSED_TO_A_HEADLESS_HELPER.contains(&name.as_str())
+            || ["HOME", "ANTHROPIC_API_KEY"].contains(&name.as_str())),
+        "{names:?}"
+    );
     assert_eq!(said(&events, "HOME="), format!("HOME={}", bench.data.path().join("agent-home").display()));
     assert_eq!(said(&events, "Model key: "), format!("Model key: {} characters, ending in {}", MODEL_KEY.len(), &MODEL_KEY[MODEL_KEY.len() - 8..]));
 }
@@ -485,7 +512,10 @@ mod shared {
         let (run_id, thread) = carried_out(&bench, &hub, "[fake:environment]").await;
         let runner = hub.state().runners[0].clone();
 
-        assert_eq!((&runner["shared"], &runner["interactive"], &runner["kinds"]), (&json!(true), &json!(false), &json!(["implement", "review", "custom"])));
+        assert_eq!(
+            (&runner["shared"], &runner["interactive"], &runner["kinds"]),
+            (&json!(true), &json!(false), &json!(["implement", "review", "custom"]))
+        );
 
         // The helper of that run got that person's model key; the clone was made with their token.
         let id = thread.id;

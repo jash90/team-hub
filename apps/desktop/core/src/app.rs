@@ -22,9 +22,9 @@ use crate::git;
 use crate::headless::Headless;
 use crate::jobs::{JobOptions, JobRunner};
 use crate::model::{
-    AppEvent, CacheMode, ConnectionStatus, DashboardView, Delegation, EventKind, IssueView, NewTestJob, NewThread, Proposal, ProposalKind, ProposalState, PullRequestPreview,
-    PullRequestResult, PushPreview, PushResult, RepoCheck, RepoMapping, RepoStatus, RunnerStatus, SandboxState, SearchView, Settings, Thread,
-    ThreadDetail, ThreadDiff, ThreadKind, ThreadOrigin, ThreadState, WorkspaceView, WorktreeInfo,
+    AppEvent, CacheMode, ConnectionStatus, DashboardView, Delegation, EventKind, IssueView, NewTestJob, NewThread, Proposal, ProposalKind,
+    ProposalState, PullRequestPreview, PullRequestResult, PushPreview, PushResult, RepoCheck, RepoMapping, RepoStatus, RunnerStatus, SandboxState,
+    SearchView, Settings, Thread, ThreadDetail, ThreadDiff, ThreadKind, ThreadOrigin, ThreadState, WorkspaceView, WorktreeInfo,
 };
 use crate::policy;
 use crate::protocol::{self, HubTool};
@@ -1260,8 +1260,13 @@ impl Core {
     fn say_pushed(&self, thread_id: i64, branch: &str, read: &git::PushRead) -> CoreResult<()> {
         let short: String = read.commit.chars().take(8).collect();
         let count = if read.commits.len() == 1 { "1 commit".to_string() } else { format!("{} commits", read.commits.len()) };
-        let event =
-            self.store.add_event(thread_id, EventKind::Status, &format!("Pushed {branch} at {short} ({count})"), &json!({ "commit": read.commit }), false)?;
+        let event = self.store.add_event(
+            thread_id,
+            EventKind::Status,
+            &format!("Pushed {branch} at {short} ({count})"),
+            &json!({ "commit": read.commit }),
+            false,
+        )?;
 
         self.emit(AppEvent::ThreadEvent { thread_id, event });
 
@@ -1301,7 +1306,8 @@ impl Core {
     fn repo_on_server(code: Option<&Value>, repo: Option<&str>) -> Option<i64> {
         let repo = repo?;
 
-        code?.get("repos")?.as_array()?.iter().find(|known| known["fullName"].as_str().is_some_and(|name| name.eq_ignore_ascii_case(repo)))?["id"].as_i64()
+        code?.get("repos")?.as_array()?.iter().find(|known| known["fullName"].as_str().is_some_and(|name| name.eq_ignore_ascii_case(repo)))?["id"]
+            .as_i64()
     }
 
     pub fn pull_request_preview(&self, thread_id: i64) -> CoreResult<PullRequestPreview> {
@@ -2111,7 +2117,9 @@ impl Core {
         let held = thread.run_id.and_then(|run_id| keys.get(&run_id)).ok_or_else(|| CoreError::not_possible(LOST_KEYS))?;
 
         held.anthropic_api_key.clone().map(Some).ok_or_else(|| {
-            CoreError::not_possible("This run came without a model key. Store your Anthropic API key in team-hub under Settings → My keys and start it again.")
+            CoreError::not_possible(
+                "This run came without a model key. Store your Anthropic API key in team-hub under Settings → My keys and start it again.",
+            )
         })
     }
 

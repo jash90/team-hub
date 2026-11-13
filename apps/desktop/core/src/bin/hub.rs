@@ -562,14 +562,30 @@ async fn run(cli: Cli, desktop: &Desktop) -> CoreResult<ExitCode> {
             }
 
             for runner in runners.as_array().cloned().unwrap_or_default() {
-                let words = |value: &serde_json::Value| value.as_array().map(|items| items.iter().filter_map(|item| item.as_str()).collect::<Vec<_>>().join(", "));
-                let kind = if runner["interactive"] == true { "computer" } else if runner["shared"] == true { "shared service" } else { "service" };
+                let words = |value: &serde_json::Value| {
+                    value.as_array().map(|items| items.iter().filter_map(|item| item.as_str()).collect::<Vec<_>>().join(", "))
+                };
+                let kind = if runner["interactive"] == true {
+                    "computer"
+                } else if runner["shared"] == true {
+                    "shared service"
+                } else {
+                    "service"
+                };
                 let mark = if runner["id"] == here.as_str() { "  (this computer)" } else { "" };
 
-                println!("{} · {} · {kind} · {}{mark}", runner["id"].as_str().unwrap_or_default(), runner["name"].as_str().unwrap_or_default(), if runner["online"] == true { "online" } else { "offline" });
+                println!(
+                    "{} · {} · {kind} · {}{mark}",
+                    runner["id"].as_str().unwrap_or_default(),
+                    runner["name"].as_str().unwrap_or_default(),
+                    if runner["online"] == true { "online" } else { "offline" }
+                );
 
                 for work in runner["work"].as_array().cloned().unwrap_or_default() {
-                    let active: Vec<String> = work["active"].as_array().map(|items| items.iter().filter_map(|item| item["title"].as_str().map(String::from)).collect()).unwrap_or_default();
+                    let active: Vec<String> = work["active"]
+                        .as_array()
+                        .map(|items| items.iter().filter_map(|item| item["title"].as_str().map(String::from)).collect())
+                        .unwrap_or_default();
 
                     println!(
                         "    {:<7} {}{}{}",
@@ -644,7 +660,11 @@ async fn run(cli: Cli, desktop: &Desktop) -> CoreResult<ExitCode> {
                     let _ = tokio::time::timeout(Duration::from_secs(5), working).await;
                 }
 
-                println!("Job {id} {}{}", ended["state"].as_str().unwrap_or_default(), ended["error"].as_str().map(|error| format!(": {error}")).unwrap_or_default());
+                println!(
+                    "Job {id} {}{}",
+                    ended["state"].as_str().unwrap_or_default(),
+                    ended["error"].as_str().map(|error| format!(": {error}")).unwrap_or_default()
+                );
 
                 return Ok(if ended["state"] == "succeeded" { ExitCode::SUCCESS } else { ExitCode::FAILURE });
             }

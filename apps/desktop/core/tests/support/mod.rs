@@ -619,7 +619,8 @@ async fn create_run(State(state): Shared, headers: HeaderMap, UrlPath(key): UrlP
     let Some(issue) = state.issues.get(&key).cloned() else { return error(StatusCode::NOT_FOUND, "No such issue") };
     // Like the server: a run that names the caller's runner is born claimed by it.
     let runner = body["runnerId"].as_str().map(String::from);
-    let name = runner.as_ref().and_then(|id| state.runners.iter().find(|runner| runner["runnerId"] == id.as_str()).map(|runner| runner["name"].clone()));
+    let name =
+        runner.as_ref().and_then(|id| state.runners.iter().find(|runner| runner["runnerId"] == id.as_str()).map(|runner| runner["name"].clone()));
 
     if runner.is_some() && name.is_none() {
         return error(StatusCode::BAD_REQUEST, "That runner has not announced itself yet; send a heartbeat first");
@@ -651,7 +652,10 @@ async fn claim(State(state): Shared, headers: HeaderMap, Json(body): Json<Value>
         // A run sent to one runner by name waits for that runner and is offered to no other.
         let for_caller = run["onRunner"].is_null() || run["onRunner"] == body["runnerId"];
 
-        run["state"] == "queued" && for_caller && kinds.contains(&run["kind"]) && projects.as_ref().is_none_or(|projects| projects.contains(&run["projectKey"]))
+        run["state"] == "queued"
+            && for_caller
+            && kinds.contains(&run["kind"])
+            && projects.as_ref().is_none_or(|projects| projects.contains(&run["projectKey"]))
     });
     let Some(index) = found else { return Json(Value::Null).into_response() };
     let name = state.runners.iter().find(|runner| runner["runnerId"] == body["runnerId"]).map(|runner| runner["name"].clone()).unwrap_or(Value::Null);

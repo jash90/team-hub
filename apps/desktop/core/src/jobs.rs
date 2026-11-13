@@ -22,9 +22,9 @@ use tokio::time::Instant;
 
 use crate::api::HubClient;
 use crate::app::Core;
+use crate::config::Paths;
 use crate::error::{CoreError, CoreResult};
 use crate::git;
-use crate::config::Paths;
 use crate::headless::Folders;
 use crate::model::SandboxState;
 use crate::runner::say;
@@ -190,7 +190,9 @@ impl JobUser {
         match self {
             Self::Same => "Test jobs run as the runner's own user: they are kept apart by their environment and folder only.".to_string(),
             Self::Other { name, uid, .. } => format!("Test jobs run as user {name} (uid {uid}), who cannot read the runner's state or clones."),
-            Self::Missing { name } => format!("This runner is root and there is no user \"{name}\" to run test jobs as: jobs will fail until there is one."),
+            Self::Missing { name } => {
+                format!("This runner is root and there is no user \"{name}\" to run test jobs as: jobs will fail until there is one.")
+            }
         }
     }
 }
@@ -356,7 +358,8 @@ pub fn named_artifacts(report: &Value) -> Vec<(String, String)> {
     fn walk(value: &Value, found: &mut Vec<(String, String)>) {
         match value {
             Value::Object(fields) => {
-                if let (Some(path), Some(media_type)) = (fields.get("path").and_then(Value::as_str), fields.get("mediaType").and_then(Value::as_str)) {
+                if let (Some(path), Some(media_type)) = (fields.get("path").and_then(Value::as_str), fields.get("mediaType").and_then(Value::as_str))
+                {
                     if !found.iter().any(|(known, _)| known == path) {
                         found.push((path.to_string(), media_type.to_string()));
                     }
@@ -678,7 +681,10 @@ impl JobRunner {
             let installed = self.exec(session, stop, "npx", &owned(&["--no", "--", "e2e-web", "install", "chromium"]), &suite).await?;
 
             if installed != Some(0) {
-                return Err(Failure::because(format!("The browser could not be installed (npx e2e-web install chromium ended with {}).", exit_text(installed))));
+                return Err(Failure::because(format!(
+                    "The browser could not be installed (npx e2e-web install chromium ended with {}).",
+                    exit_text(installed)
+                )));
             }
         }
 
@@ -978,7 +984,9 @@ fn send_results(core: &Core, job: &TestJob, report: &Path, results: &Path, shown
     }
 
     let bytes = std::fs::read(report).map_err(|_| no_report())?;
-    let named = serde_json::from_slice::<Value>(&bytes).map(|report| named_artifacts(&report)).map_err(|error| format!("The report at {shown} is not JSON: {error}"))?;
+    let named = serde_json::from_slice::<Value>(&bytes)
+        .map(|report| named_artifacts(&report))
+        .map_err(|error| format!("The report at {shown} is not JSON: {error}"))?;
     let client = core.client().map_err(|error| error.to_string())?;
     let run_id = client.send_report(&job.project_key, job.id, bytes).map_err(|error| format!("The server did not take the report: {error}"))?;
     let traces = trace_pages(results).into_iter().map(|path| (path, "text/markdown".to_string()));
@@ -1089,7 +1097,8 @@ mod tests {
 
     #[test]
     fn settings_show_their_secrets_by_name_only() {
-        let settings: JobSettings = serde_json::from_value(json!({ "secrets": { "API_KEY": "s3cr3t-value" }, "env": { "BASE": "http://x" } })).unwrap();
+        let settings: JobSettings =
+            serde_json::from_value(json!({ "secrets": { "API_KEY": "s3cr3t-value" }, "env": { "BASE": "http://x" } })).unwrap();
 
         assert_eq!((settings.install_command.as_str(), settings.timeout_minutes), ("npm ci", 30));
         assert!(format!("{settings:?}").contains("API_KEY") && !format!("{settings:?}").contains("s3cr3t-value"));

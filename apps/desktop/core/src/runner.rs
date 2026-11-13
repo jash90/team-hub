@@ -153,7 +153,9 @@ pub async fn headless(env: &RunnerEnv, adjust: impl FnOnce(&mut OpenOptions, &mu
     say(&last_status);
     say(match (status.sandbox, env.allow_shell) {
         (SandboxState::Available, _) => "Agent threads get a shell inside the operating system's sandbox.",
-        (SandboxState::Unavailable, true) => "Agent threads get an unconfined shell (RUNNER_ALLOW_SHELL): only for repositories and people you trust.",
+        (SandboxState::Unavailable, true) => {
+            "Agent threads get an unconfined shell (RUNNER_ALLOW_SHELL): only for repositories and people you trust."
+        }
         (SandboxState::Unavailable, false) => "Agent threads work without a shell: there is no working sandbox here and RUNNER_ALLOW_SHELL is off.",
     });
 

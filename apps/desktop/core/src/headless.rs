@@ -151,7 +151,8 @@ impl RunnerEnv {
         let kinds = match text("RUNNER_KINDS") {
             Some(wanted) => {
                 let named = list(&wanted);
-                let (known, unknown): (Vec<_>, Vec<_>) = named.iter().partition(|name| RUNNER_KINDS.iter().any(|kind| kind.as_str() == name.as_str()));
+                let (known, unknown): (Vec<_>, Vec<_>) =
+                    named.iter().partition(|name| RUNNER_KINDS.iter().any(|kind| kind.as_str() == name.as_str()));
 
                 if !unknown.is_empty() {
                     remarks.push(format!(
@@ -213,7 +214,11 @@ impl RunnerEnv {
 
     /// The variables without which the runner can do nothing at all.
     pub fn missing(&self) -> Vec<&'static str> {
-        [(URL_VARIABLE, self.url.is_none()), (TOKEN_VARIABLE, self.token.is_none())].into_iter().filter(|(_, missing)| *missing).map(|(name, _)| name).collect()
+        [(URL_VARIABLE, self.url.is_none()), (TOKEN_VARIABLE, self.token.is_none())]
+            .into_iter()
+            .filter(|(_, missing)| *missing)
+            .map(|(name, _)| name)
+            .collect()
     }
 
     /// What is switched off by what is not set, in words for the log.

@@ -232,8 +232,13 @@ async fn job_log(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<
         return error(StatusCode::CONFLICT, "The job is finished");
     }
 
-    let lines: Vec<String> =
-        body["lines"].as_array().cloned().unwrap_or_default().iter().map(|line| line.as_str().unwrap_or_default().chars().take(2000).collect()).collect();
+    let lines: Vec<String> = body["lines"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .map(|line| line.as_str().unwrap_or_default().chars().take(2000).collect())
+        .collect();
 
     state.e2e.log_batches.push(lines.len());
 
@@ -500,7 +505,13 @@ impl FakeHub {
 
     /// The artifacts of a run: path → (content type, bytes).
     pub fn artifacts_of(&self, run_id: i64) -> BTreeMap<String, (String, Vec<u8>)> {
-        self.state().e2e.artifacts.iter().filter(|(run, ..)| *run == run_id).map(|(_, path, kind, bytes)| (path.clone(), (kind.clone(), bytes.clone()))).collect()
+        self.state()
+            .e2e
+            .artifacts
+            .iter()
+            .filter(|(run, ..)| *run == run_id)
+            .map(|(_, path, kind, bytes)| (path.clone(), (kind.clone(), bytes.clone())))
+            .collect()
     }
 }
 
@@ -512,8 +523,7 @@ pub struct GitHost {
     pub root: TempDir,
     /// What `RUNNER_GIT_BASE` is set to.
     pub url: String,
-    /// (path and query, whether it carried the token).
-    pub requests: Arc<Mutex<Vec<(String, bool)>>>,
+    pub requests: GitRequests,
 }
 
 fn base64(bytes: &[u8]) -> String {
@@ -530,11 +540,15 @@ fn base64(bytes: &[u8]) -> String {
         .collect()
 }
 
-async fn serve_git(State((root, requests)): State<(PathBuf, Arc<Mutex<Vec<(String, bool)>>>)>, request: Request) -> Response {
+/// What the stand-in was asked: (path and query, whether it carried a token it takes).
+type GitRequests = Arc<Mutex<Vec<(String, bool)>>>;
+
+async fn serve_git(State((root, requests)): State<(PathBuf, GitRequests)>, request: Request) -> Response {
     let (parts, body) = request.into_parts();
     let header = |name: &str| parts.headers.get(name).and_then(|value| value.to_str().ok()).unwrap_or_default().to_string();
     let sent = header("authorization");
-    let authorised = [GITHUB_TOKEN, PERSON_GITHUB_TOKEN].iter().any(|token| sent == format!("Basic {}", base64(format!("x-access-token:{token}").as_bytes())));
+    let authorised =
+        [GITHUB_TOKEN, PERSON_GITHUB_TOKEN].iter().any(|token| sent == format!("Basic {}", base64(format!("x-access-token:{token}").as_bytes())));
     let query = parts.uri.query().unwrap_or_default().to_string();
 
     requests.lock().unwrap().push((format!("{}?{query}", parts.uri.path()), authorised));
@@ -597,7 +611,7 @@ pub async fn github(label: &str) -> GitHost {
     git(&seed, &["commit", "-m", "Initial commit"]);
     git(&seed, &["push", "origin", "HEAD:main"]);
 
-    let requests = Arc::new(Mutex::new(Vec::new()));
+    let requests: GitRequests = Arc::new(Mutex::new(Vec::new()));
     let app = Router::new().fallback(serve_git).with_state((root.path().to_path_buf(), Arc::clone(&requests)));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
@@ -679,7 +693,13 @@ pub async fn open_headless(label: &str, hub: &FakeHub, git_host: &GitHost, more:
     open_headless_in(TempDir::new(label), hub, git_host, more, adjust).await
 }
 
-pub async fn open_headless_in(data: TempDir, hub: &FakeHub, git_host: &GitHost, more: &[(&str, &str)], adjust: impl FnOnce(&mut OpenOptions)) -> Bench {
+pub async fn open_headless_in(
+    data: TempDir,
+    hub: &FakeHub,
+    git_host: &GitHost,
+    more: &[(&str, &str)],
+    adjust: impl FnOnce(&mut OpenOptions),
+) -> Bench {
     let mut variables = runner_variables(hub, git_host, data.path());
 
     for (name, value) in more {

@@ -22,9 +22,10 @@ server, to GitHub, to the model provider. What it is built to is in
 | Variable | Meaning |
 |---|---|
 | `TEAM_HUB_URL` | The server: its private address (`http://team-hub.railway.internal:8080`) or the public one |
-| `TEAM_HUB_TOKEN` | An API token of the person the runner acts as (team-hub → Settings → API tokens) |
-| `GITHUB_TOKEN` | Clones, fetches and pushes over HTTPS. Without it only public repositories can be cloned and nothing is pushed |
-| `ANTHROPIC_API_KEY` | For agent runs. Without it the runner takes test jobs only |
+| `TEAM_HUB_TOKEN` | An API token the runner signs in with (team-hub → Settings → API tokens). For a shared runner: an administrator's, made for the runner alone |
+| `RUNNER_SHARED` | `1` (the default when neither key below is set): the team's runner, which works with each person's own keys. `0`: its owner's, with the two keys below |
+| `GITHUB_TOKEN` | Only for a runner that is not shared: clones, fetches and pushes over HTTPS. Without it such a runner clones only public repositories and pushes nothing |
+| `ANTHROPIC_API_KEY` | Only for a runner that is not shared: the model key for agent runs. Without it such a runner takes test jobs only |
 | `RUNNER_NAME` | Shown on runs, jobs and the Runners list; default `Cloud runner` |
 | `RUNNER_KINDS` | Agent run kinds it takes, comma-separated; default `implement,review,custom` |
 | `RUNNER_PROJECTS` | Project keys it works for, comma-separated; default: every project the person can edit |
@@ -39,6 +40,29 @@ With `TEAM_HUB_URL` or `TEAM_HUB_TOKEN` missing the runner stays up, says once a
 is missing and does nothing else. A value it cannot use (a number that is not one, a kind it
 does not carry out) is replaced by the default and named in the log.
 
+## Shared, or somebody's own
+
+**Shared** (the default, with no key in its environment): the runner is the team's. It has
+no model key and no GitHub token; each person stores their own in team-hub (Settings → My
+keys), and the runner is handed the requester's keys with every run or job it claims
+([`docs/runners.md`](../../docs/runners.md) → Shared runners). It uses them for that work
+only: the model key in the environment of that one helper process, the token for that
+work's git commands. It writes neither to disk; they are dropped when the work is over.
+
+- The server takes a runner as shared only from an **administrator's** token. With another
+  one it answers 403; the runner says so in its log and asks again with each heartbeat.
+- Clones are shared between people. Before each use the runner fetches with the requester's
+  token, and when that token cannot read the repository the work fails with the reason; the
+  clone somebody else's token made is not used instead.
+- When the runner restarts, the keys it held are gone. A run it was working on fails with
+  "the runner restarted and no longer holds your keys; start the run again".
+- Two runners side by side are two services, each with a volume and a `RUNNER_NAME` of its
+  own ("Cloud runner 1", "Cloud runner 2"). A runner's id is made once and kept on its volume.
+
+**Not shared** (`RUNNER_SHARED=0`, or a key of its own set): the runner is its owner's, takes
+their runs and those marked as shared, and uses `GITHUB_TOKEN` and `ANTHROPIC_API_KEY` from
+its environment. After a restart it continues its threads in the same session.
+
 ## On Railway, next to the server
 
 1. In the project that runs team-hub: **New → GitHub Repo**, the same repository again. That
@@ -50,16 +74,18 @@ does not carry out) is replaced by the default and named in the log.
    again, and forgets the threads it was working on.
 4. Service → **Variables**: `TEAM_HUB_URL=http://${{team-hub.RAILWAY_PRIVATE_DOMAIN}}:8080`
    (the server's service name in place of `team-hub`; the port is the one the server listens
-   on), `TEAM_HUB_TOKEN`, `GITHUB_TOKEN`, `ANTHROPIC_API_KEY`, and whatever else from the table.
+   on) and `TEAM_HUB_TOKEN` (an administrator's, for a shared runner), plus `RUNNER_NAME` and
+   whatever else from the table. `GITHUB_TOKEN` and `ANTHROPIC_API_KEY` only for a runner
+   that is not shared.
    Private networking keeps the traffic inside the project; the public address works too.
 5. No domain and no port: the runner listens on nothing. One replica: two would share
    nothing and each be a runner of its own, which is fine, but each then needs its own volume.
 
-The token is a person's: the runner sees and may edit what that person may. An account made
-for it, added to the projects it should work for, keeps that small. For GitHub, a
-fine-grained token with *Contents: read and write* on the repositories is enough; pull
-requests are opened by the server with its own token (Settings → GitHub), so the repository
-has to be connected to the project there.
+The token is a person's: the runner sees and may edit what that person may. Make an account
+for the runner alone (an administrator, for a shared one) and a token for nothing else. For
+GitHub, each person's (or the runner's own) fine-grained token with *Contents: read and
+write* on the repositories is enough; pull requests are opened by the server with its own
+token (Settings → GitHub), so the repository has to be connected to the project there.
 
 Anywhere else it is the same container: `docker build -f apps/runner/Dockerfile -t team-hub-runner .`
 from the repository root, a volume at `/data`, the variables. The process ends within ten
@@ -71,8 +97,9 @@ server gives them to another runner if it stays away for ten minutes).
 ```bash
 (cd apps/desktop/sidecar && npm ci --omit=dev)
 cargo build --release -p hub-desktop-core --bin hub-runner
-TEAM_HUB_URL=http://localhost:8080 TEAM_HUB_TOKEN=th_… GITHUB_TOKEN=ghp_… ANTHROPIC_API_KEY=sk-ant-… \
-RUNNER_DATA_DIR=$HOME/.team-hub-runner target/release/hub-runner
+TEAM_HUB_URL=http://localhost:8080 TEAM_HUB_TOKEN=th_… \
+RUNNER_DATA_DIR=$HOME/.team-hub-runner target/release/hub-runner        # shared; or with its own keys:
+# GITHUB_TOKEN=ghp_… ANTHROPIC_API_KEY=sk-ant-… (then RUNNER_SHARED is 0 by itself)
 ```
 
 Needs git and Node 22.18 or newer on the PATH. Not being root, it runs test jobs as itself
@@ -96,7 +123,7 @@ and says so.
   you trust.
 - **The helper holds the model key and none of the runner's tokens.** Its environment is
   made from nothing: where programs are, proxy and certificate settings, a home of its own,
-  `ANTHROPIC_API_KEY`. The runner removes `TEAM_HUB_TOKEN`, `GITHUB_TOKEN` and
+  `ANTHROPIC_API_KEY` (on a shared runner: the key of the person that run is for). The runner removes `TEAM_HUB_TOKEN`, `GITHUB_TOKEN` and
   `ANTHROPIC_API_KEY` from its own environment at start, also from what the kernel shows of
   it, and closes itself to inspection by its children.
 - **The GitHub token goes to git for one command at a time**, through that command's
@@ -124,5 +151,9 @@ and says so.
 - It runs `npx --no -- e2e run …`: the suite's own `e2e`, never one fetched from a registry.
   The report is read from `<directory>/.e2e/report.json`, or from the folder `--output` names
   in the project's run arguments; an `output` set only in the suite's config file is not seen.
-- Nothing in the image was run against a real model, real GitHub or on Railway by its
-  authors; the build steps were rehearsed outside a container. See the report with the change.
+- Checked without a container: the two build steps of the image (the release build with
+  `--locked`, `npm ci --omit=dev` for the helper and a start of it), the runner as a process
+  against a real team-hub server (a real suite with a real Chromium, as another user, its
+  report and files arriving; a shared runner taken by the server), and everything else
+  against stand-ins (`cargo test -p hub-desktop-core`). Not checked: the image itself, a
+  real model, real GitHub, Railway.

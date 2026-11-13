@@ -193,7 +193,10 @@ async fn the_app_shows_the_same_runners_and_hands_work_to_another_one() {
     assert_eq!(runners.as_array().unwrap().len(), 2);
     assert_eq!((&of(&here)["interactive"], of(&here)["work"].as_array().unwrap().len()), (&json!(true), 2));
     assert_eq!((&of(&there)["interactive"], &of(&there)["name"]), (&json!(false), &json!("Cloud runner 1")));
-    assert_eq!(of(&here)["work"][1], json!({ "module": "e2e", "what": ["tests"], "projects": null, "pinnedOnly": true, "online": true, "lastSeenAt": support::NOW, "active": [] }));
+    assert_eq!(
+        of(&here)["work"][1],
+        json!({ "module": "e2e", "what": ["tests"], "projects": null, "pinnedOnly": true, "online": true, "lastSeenAt": support::NOW, "active": [] })
+    );
 
     // Work on an issue sent to the cloud runner: no thread starts here, and this app never claims it.
     let new = Delegation {
@@ -250,7 +253,10 @@ async fn the_app_shows_the_same_runners_and_hands_work_to_another_one() {
     assert_eq!(hub.proposal_on_run(run_id, "push")["result"]["commit"], push["payload"]["commit"]);
 
     // The project's jobs, started for any runner, followed and cancelled through the same commands.
-    let started = commands::invoke(&computer.desktop, "start_test_job", json!({ "projectKey": "WEB", "reference": "main", "filter": "tests/a.e2e.ts" })).await.unwrap();
+    let started =
+        commands::invoke(&computer.desktop, "start_test_job", json!({ "projectKey": "WEB", "reference": "main", "filter": "tests/a.e2e.ts" }))
+            .await
+            .unwrap();
     let listed = commands::invoke(&computer.desktop, "test_jobs", json!({ "key": "WEB" })).await.unwrap();
 
     assert_eq!((&started["onRunner"], &started["filter"]), (&Value::Null, &json!("tests/a.e2e.ts")));

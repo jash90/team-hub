@@ -58,7 +58,14 @@ target/debug/hub thread list | show 1 | diff 1 | say 1 "…" | pr 1 --url … | 
 target/debug/hub proposals ; hub decide 3 --approve ; hub push 1 ; hub push 1 --yes
 target/debug/hub runs --mine
 target/debug/hub runner            # claim and carry out delegated runs until Ctrl-C
+target/debug/hub runners           # every runner I may see: this computer, others', services
+target/debug/hub tests list WEB    # the project's test jobs
+target/debug/hub tests run WEB --here [--ref main] [--filter "tests/a.e2e.ts"]   # run the suite on this computer and follow it
+target/debug/hub tests run WEB --on <runner id>                                  # …or send it to another runner; without either, to any that fits
 ```
+
+`hub-runner` (same crate) is the core without a person at it: see
+[`apps/runner`](../runner/README.md) and [`docs/cloud-runner.md`](../../docs/cloud-runner.md).
 
 Environment: `TEAM_HUB_DESKTOP_DIR` moves the app's data; `TEAM_HUB_TOKEN` gives the token for
 one process on a machine without a keychain (it is then stored nowhere); `TEAM_HUB_SIDECAR`
@@ -101,6 +108,55 @@ that token. The app acts as you, with your permissions.
 5. You look at the diff and the commits, decide the proposals, push from a preview, open the
    pull request. The run ends with the branch and the pull request's address.
 
+## A runner for both kinds of work
+
+The app is one of the team's **runners** ([`docs/runners.md`](../../docs/runners.md)): a
+machine with the repositories that carries out agent runs and test suites, with this
+computer's processor, memory and disk. The same list and the same work as on the web:
+
+- **Runners** shows every runner you may see (`GET /api/runners`): this computer first and
+  marked, other people's computers, services such as the cloud runner; what each takes and
+  what it is carrying out now.
+- **Where** on a new thread: *This computer* (the default: the agent works here, with your
+  own model sign-in), another runner that takes that kind of work for the project, or any
+  that fits. Work sent elsewhere starts nothing here; the app follows the run (what the
+  agent said, its proposals) and can decide what the web can decide: changes to the issue,
+  and the push or pull request of a runner nobody sits at.
+- **My work** lists your runs wherever they are carried out, each with its runner's name.
+- **Tests** lists a project's test jobs and starts the suite: on this computer (the
+  default), on a runner by name, or on any that fits. A job is followed live (state, step,
+  the tail of its log) and can be cancelled; a finished one opens its page on the web,
+  where the results, recordings and traces are.
+
+### Test suites on this computer
+
+The app uses the same executor as the cloud runner (`core/src/jobs.rs`). By default it takes
+only the jobs **sent to this computer by name** (`pinnedOnly`): running a suite is running a
+repository's code on your machine, so it happens when you asked for it. Settings → *Also
+take the team's queued test jobs* turns that off; *Run test suites on this computer* turns
+jobs off altogether.
+
+A job uses the clone mapped to the project when there is one (fetched with your own git
+sign-in; your checkout, index and branches are not touched: the job gets a folder of its
+own with a copy of the one commit), and otherwise clones the repository by itself under the
+app's data folder, again with whatever git on this computer is signed in with. The app has
+no GitHub token of its own.
+
+What is and is not kept apart:
+
+- The job's processes get an environment made from nothing: `PATH`, a home inside the job's
+  folder, the browsers' folder, `CI=1`, and the variables and secrets the project's test
+  settings list. Not your shell's environment, not the app's token.
+- They run in their own process group, ended as a whole when the job ends, is cancelled or
+  runs past its time. The job's folder is removed afterwards; browsers are kept.
+- On Linux with bubblewrap (the same condition as for an agent's shell) they run inside it:
+  the disk is read-only, they write only in the job's folder and the browsers' folder, and
+  the app's state and the usual folders of keys (`~/.ssh`, `~/.aws`, `~/.config/gh`, …) are
+  empty to them. The network stays on: a suite has to reach the application it tests.
+- They run **as you**. There is no other user to switch to on a desktop, so where there is
+  no such sandbox (macOS and Windows today, Linux without bubblewrap) a suite can read and
+  write what you can. That is why the default is "only what I sent here".
+
 ## The safety model, in plain words
 
 - **One working tree and branch per thread.** The main clone's checkout, index and branch are
@@ -115,7 +171,11 @@ that token. The app acts as you, with your permissions.
   Settings; it then commits through the app (`commit_changes`), which runs no hook.
 - **File tools are tied to the working tree**: `Edit` and `Write` are allowed for that folder
   only; review and analysis threads do not get them. Credential folders (`~/.ssh`, `~/.aws`,
-  `~/.config/gh`, …) and the app's own state cannot be read.
+  `~/.config/gh`, …) and the app's own state cannot be read. Reading other files of the
+  computer is otherwise allowed in the desktop app (a person is beside it); the headless
+  runner ties reading to the working tree too. A file named in the prompt as `@path` is
+  never attached by the agent's SDK on anyone's word: the helper breaks such mentions, in
+  both.
 - **No sub-agents** (`Agent`, `Task`), no web tools. A deny list (`git push`, `gh`, `curl`,
   `ssh`, `git config`, …) wins over every allow rule, and the helper runs with
   `permissionMode: 'dontAsk'`: what is not on the allow list is refused, because nobody is
@@ -199,6 +259,13 @@ no sandbox); the tray icon, system notifications and the folder dialog (no deskt
 here); a long real implementation run; how the SDK reports cost for a resumed session (the
 app takes the larger of "replace" and "add", see `Store::record_result`).
 
+Added with the runner work, and checked: the real helper and Agent SDK against a scripted
+stand-in for the model (`sidecar/test/confinement.test.ts`), which asks for files outside
+the working tree and is refused each of them; the Runners and Tests views in a browser
+against a real server with the real core behind them; this repository's own e2e suite run
+on this computer by the app's executor inside bubblewrap, with its report and trace pages
+arriving on that server.
+
 ## What is not done
 
 - Packaging is configured (`tauri.conf.json` bundles the sidecar's sources and its
@@ -213,6 +280,10 @@ app takes the larger of "replace" and "add", see `Store::record_result`).
   supervisor threads: those parts of agent-hub were left out on purpose.
 - Core messages (errors, status lines of threads) are English only; the interface is
   translated.
+- A run or a job carried out elsewhere is followed, not replayed: its diff is on the web.
+  A finished job shows its state and opens its page in the browser; the totals are there.
+- Test jobs on macOS and Windows run unconfined (as you, with a clean environment): there
+  is no sandbox wrapper for them yet.
 - Agent proposals are limited to a comment, a status change, subtasks, a push and a pull
   request. The run contract's `update_fields`, `create_issue` and `log_work` are not offered
   to agents, and an edited payload on approval is not sent.

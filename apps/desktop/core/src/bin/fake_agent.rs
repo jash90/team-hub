@@ -267,7 +267,11 @@ fn work(agent: &mut Agent, start: &StartThread) -> Option<()> {
             // Which key it is, without repeating it: what an agent says is kept.
             let key = std::env::var("ANTHROPIC_API_KEY").unwrap_or_default();
 
-            say(&format!("Model key: {} characters, ending in {}", key.len(), key.chars().rev().take(8).collect::<String>().chars().rev().collect::<String>()));
+            say(&format!(
+                "Model key: {} characters, ending in {}",
+                key.len(),
+                key.chars().rev().take(8).collect::<String>().chars().rev().collect::<String>()
+            ));
             result(true, "Listed the environment.");
         }
         "permissions" => {
