@@ -86,7 +86,8 @@ say "the person answers on the web; the runner hears it and resumes the same ses
 api -X POST "$R/runs/$RUN/answer" -d '{"text":"Twenty per page."}' >/dev/null
 "$HUB" runner --once
 expect "run state (the push and the pull request wait for a click)" "$(run_field "$RUN" state)" waiting
-expect "pending proposals on the run" "$(run_field "$RUN" pendingProposals)" 1
+# The comment, and the push and the pull request the app mirrors to the run while they wait.
+expect "pending proposals on the run" "$(run_field "$RUN" pendingProposals)" 3
 expect "comments on the issue before any decision" "$(api "$B/api/issues/WEB-12" | json "len(d['comments'])")" 0
 expect "branches on origin before the click" "$(git -C "$WORK/repo/origin.git" for-each-ref --format='%(refname)' | tr '\n' ' ')" "refs/heads/main "
 "$HUB" proposals
@@ -125,7 +126,8 @@ api -X POST "$R/runs/$THIRD/cancel" >/dev/null
 wait %2 2>/dev/null || wait
 expect "the cancelled run" "$(run_field "$THIRD" state)" cancelled
 expect "its thread" "$("$HUB" thread list --json | json "d[0]['state']")" stopped
-expect "agent processes left" "$(pgrep -fc hub-fake-agent || true)" 0
+# Counted with wc: pgrep's -c is not in macOS's pgrep.
+expect "agent processes left" "$(pgrep -f hub-fake-agent | wc -l | tr -d ' ')" 0
 
 say "hub runs, hub thread list, hub repo list"
 "$HUB" runs
