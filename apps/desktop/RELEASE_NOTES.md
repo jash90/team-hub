@@ -20,6 +20,15 @@ A developer's cockpit on top of a team-hub server.
 - The app is also a **runner**: work delegated to an agent in the team-hub web interface
   ("Implement in code", "Review the pull request", a custom task) is claimed by the app on a
   computer that has the repository, and reported back to the run the web shows.
+- It is a runner for **test jobs** too: a project's e2e suite started from team-hub, or
+  from the app's Tests view, runs on this computer, with its processor and memory, and the
+  report, recordings and screenshots go back to the project. By default the app runs only
+  the suites you send to it by name; a setting opens it to the team's queue, another turns
+  test jobs off.
+- **Runners** lists every runner of the server (this computer, other people's computers
+  that are connected, the cloud runners the team shares), and both an agent thread and a
+  test run can be handed to another runner instead of this computer; the app then follows
+  the work like the web does.
 - The agent's shell runs in the operating system's sandbox (no network, writes only inside
   its working tree); where there is no sandbox the thread gets no shell unless you allow one.
 - Your team-hub token lives in the system's keychain; the agent never holds it.
