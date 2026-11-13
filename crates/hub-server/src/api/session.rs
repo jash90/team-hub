@@ -32,8 +32,11 @@ async fn bootstrap(State(app): State<App>, caller: MaybeUser) -> Reply<Bootstrap
             let user = caller.user.as_ref().map(|user| users::get_user(connection, user.id)).transpose()?;
             let signed_in = caller.user.as_ref();
 
+            let setup_required = users::setup_required(connection)?;
+
             Ok(Bootstrap {
-                setup_required: users::setup_required(connection)?,
+                setup_required,
+                setup_token_required: setup_required && app.config.setup_token.is_some(),
                 csrf: caller.csrf.clone(),
                 users: if signed_in.is_some() { users::list_users(connection)? } else { Vec::new() },
                 projects: signed_in.map(|user| projects::list_projects(connection, user)).transpose()?.unwrap_or_default(),
@@ -61,6 +64,8 @@ struct SetupRequest {
     password: String,
     #[serde(default)]
     demo: bool,
+    #[serde(default, rename = "setupToken")]
+    setup_token: String,
 }
 
 /// Creates the first account, an administrator. Works exactly once.
@@ -70,6 +75,11 @@ async fn setup(State(app): State<App>, Json(request): Json<SetupRequest>) -> Api
             let user = app.db.write(|tx| {
                 if !users::setup_required(tx)? {
                     return Err(ApiError::conflict("This instance is already set up"));
+                }
+
+                // Compared by digest, so that the time it takes says nothing about the token.
+                if app.config.setup_token.as_deref().is_some_and(|wanted| auth::digest(wanted) != auth::digest(request.setup_token.trim())) {
+                    return Err(ApiError::forbidden("The setup token is not right"));
                 }
 
                 let new = NewUser {

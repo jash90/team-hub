@@ -3,4 +3,8 @@ import type { ModuleInfo } from "./ModuleInfo";
 import type { ProjectSummary } from "./ProjectSummary";
 import type { User } from "./User";
 
-export type Bootstrap = { setupRequired: boolean, user: User | null, csrf: string | null, users: Array<User>, projects: Array<ProjectSummary>, modules: Array<ModuleInfo>, version: string, unreadNotifications: number, };
+export type Bootstrap = { setupRequired: boolean, 
+/**
+ * The first account needs the instance's setup token as well.
+ */
+setupTokenRequired: boolean, user: User | null, csrf: string | null, users: Array<User>, projects: Array<ProjectSummary>, modules: Array<ModuleInfo>, version: string, unreadNotifications: number, };

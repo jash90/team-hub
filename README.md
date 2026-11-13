@@ -84,12 +84,28 @@ The desktop app is built separately, from `apps/desktop`; see
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TEAM_HUB_PORT` | `8080` | Port to listen on |
+| `TEAM_HUB_PORT` | `$PORT`, else `8080` | Port to listen on |
 | `TEAM_HUB_BIND` | `127.0.0.1` | Address to bind; put a TLS-terminating proxy in front before exposing it |
 | `TEAM_HUB_BASE_URL` | `http://localhost:<port>` | The address people use; appears in webhook URLs and makes the session cookie `Secure` when it is `https://` |
 | `TEAM_HUB_DATA_DIR` | `data` | Database, attachments, and the generated instance key |
 | `TEAM_HUB_WEB_DIR` | `web/dist` | The built interface |
 | `TEAM_HUB_SECRET_KEY` | generated into the data directory | 64 hex characters; encrypts stored integration tokens |
+| `TEAM_HUB_SETUP_TOKEN` | none | When set, creating the first account asks for it. Set it wherever the address is reachable by others before you have set the instance up. |
+
+### In a container
+
+```bash
+docker build -t team-hub .
+```
+
+```bash
+docker run -p 8080:8080 -v team-hub-data:/data -e TEAM_HUB_SETUP_TOKEN=choose-one team-hub
+```
+
+The image holds the server and the built interface, listens on all interfaces, and keeps
+everything in `/data`. On [Railway](https://railway.com) the repository deploys as it is
+(`railway.toml`): add a volume mounted at `/data`, a public domain, and the variables
+`TEAM_HUB_BASE_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}` and `TEAM_HUB_SETUP_TOKEN`.
 
 Back up the data directory. Without the instance key the stored integration tokens cannot be
 read and have to be entered again; everything else is in `team-hub.db`.

@@ -1,0 +1,11 @@
+.git
+target
+**/node_modules
+**/dist
+data
+*.log
+.env
+e2e/.e2e
+apps/desktop/src-tauri/target
+apps/desktop/src-tauri/gen
+apps/desktop/sidecar/.run

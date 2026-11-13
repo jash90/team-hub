@@ -26,8 +26,8 @@ function AuthFrame({ title, lead, children }: { title: string; lead: string; chi
   );
 }
 
-export function SetupView({ onDone }: { onDone: () => Promise<void> }) {
-  const [form, setForm] = useState({ name: '', email: '', password: '', demo: true });
+export function SetupView({ onDone, tokenRequired }: { onDone: () => Promise<void>; tokenRequired: boolean }) {
+  const [form, setForm] = useState({ name: '', email: '', password: '', demo: true, setupToken: '' });
   const [busy, run] = useBusy();
 
   function submit(event: FormEvent): void {
@@ -50,6 +50,11 @@ export function SetupView({ onDone }: { onDone: () => Promise<void> }) {
         <Field label={t('Password')} hint={t('At least 8 characters')}>
           <input className="input" type="password" required minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} autoComplete="new-password" />
         </Field>
+        {tokenRequired && (
+          <Field label={t('Setup token')} hint={t('Whoever installed this instance set it as TEAM_HUB_SETUP_TOKEN. It is needed only this once.')}>
+            <input className="input" type="password" required value={form.setupToken} onChange={(event) => setForm({ ...form, setupToken: event.target.value })} autoComplete="off" />
+          </Field>
+        )}
         <label className="check">
           <input type="checkbox" checked={form.demo} onChange={(event) => setForm({ ...form, demo: event.target.checked })} />
           <span>{t('Start with example projects, a team and a few weeks of history')}</span>

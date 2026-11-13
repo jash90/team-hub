@@ -101,7 +101,7 @@ export function App() {
   if (boot.setupRequired) {
     return (
       <>
-        <SetupView onDone={refresh} />
+        <SetupView onDone={refresh} tokenRequired={boot.setupTokenRequired} />
         <Toaster />
       </>
     );

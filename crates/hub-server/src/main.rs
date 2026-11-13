@@ -30,11 +30,29 @@ fn start() -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("team-hub listening on http://{}", listener.local_addr()?);
 
         axum::serve(listener, build_router(app))
-            .with_graceful_shutdown(async {
-                let _ = tokio::signal::ctrl_c().await;
-            })
+            .with_graceful_shutdown(stop_signal())
             .await?;
 
         Ok::<(), Box<dyn std::error::Error>>(())
     })
+}
+
+/// Resolves when the process is asked to stop: Ctrl-C, or the SIGTERM a container gets when
+/// it is replaced. Requests in flight are then finished before the server exits.
+async fn stop_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+
+        if let Ok(mut terminate) = signal(SignalKind::terminate()) {
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {}
+                _ = terminate.recv() => {}
+            }
+
+            return;
+        }
+    }
+
+    let _ = tokio::signal::ctrl_c().await;
 }

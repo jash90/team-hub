@@ -14,6 +14,9 @@ pub struct Config {
     pub web_dir: PathBuf,
     /// Encrypts stored integration tokens.
     pub secret_key: [u8; 32],
+    /// When set, the first account can only be created by someone who knows it. For an
+    /// instance that is reachable by others before its owner has set it up.
+    pub setup_token: Option<String>,
 }
 
 fn env(name: &str) -> Option<String> {
@@ -63,7 +66,8 @@ fn load_secret_key(data_dir: &std::path::Path) -> ApiResult<[u8; 32]> {
 impl Config {
     pub fn from_env() -> ApiResult<Self> {
         let data_dir = PathBuf::from(env("TEAM_HUB_DATA_DIR").unwrap_or_else(|| "data".to_string()));
-        let port = env("TEAM_HUB_PORT").and_then(|value| value.parse().ok()).unwrap_or(8080);
+        // `PORT` is what hosting platforms hand a container.
+        let port = env("TEAM_HUB_PORT").or_else(|| env("PORT")).and_then(|value| value.parse().ok()).unwrap_or(8080);
         let secret_key = load_secret_key(&data_dir)?;
 
         Ok(Self {
@@ -73,6 +77,7 @@ impl Config {
             data_dir,
             port,
             secret_key,
+            setup_token: env("TEAM_HUB_SETUP_TOKEN").map(|token| token.trim().to_string()),
         })
     }
 
@@ -85,6 +90,7 @@ impl Config {
             base_url: "http://localhost".to_string(),
             web_dir: PathBuf::from("web/dist"),
             secret_key: [7; 32],
+            setup_token: None,
         }
     }
 

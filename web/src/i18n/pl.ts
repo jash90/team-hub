@@ -71,6 +71,9 @@ export const pl: Record<string, string> = {
   Updated: 'Zmienione',
 
   // sign-in
+  'Setup token': 'Token instalacyjny',
+  'Whoever installed this instance set it as TEAM_HUB_SETUP_TOKEN. It is needed only this once.':
+    'Osoba, która zainstalowała tę instancję, ustawiła go jako TEAM_HUB_SETUP_TOKEN. Jest potrzebny tylko ten jeden raz.',
   'Set up team-hub': 'Konfiguracja team-hub',
   'Create the first account. It becomes the administrator of this instance.': 'Utwórz pierwsze konto. Będzie to konto administratora tej instancji.',
   'Your name': 'Imię i nazwisko',

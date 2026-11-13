@@ -74,6 +74,7 @@ export const exact: Record<string, string> = {
   'Wrong e-mail or password': 'Nieprawidłowy e-mail lub hasło',
   'Too many attempts; try again in a few minutes': 'Zbyt wiele prób; spróbuj ponownie za kilka minut',
   'Missing or stale CSRF token; reload the page': 'Brak tokenu CSRF albo token jest nieaktualny; odśwież stronę',
+  'The setup token is not right': 'Token instalacyjny jest nieprawidłowy',
   'This instance is already set up': 'Ta instancja jest już skonfigurowana',
   'You can only view this project': 'Ten projekt możesz tylko przeglądać',
   'Only a project administrator can do that': 'To może zrobić tylko administrator projektu',

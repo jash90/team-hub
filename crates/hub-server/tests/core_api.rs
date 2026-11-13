@@ -449,3 +449,32 @@ async fn changing_your_own_password_needs_the_current_one() {
     admin.patch(&path, json!({ "active": false })).await;
     assert_eq!(again.refused(Method::GET, "/api/projects", None).await, StatusCode::UNAUTHORIZED, "deactivating ends their sessions");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_instance_with_a_setup_token_gives_its_first_account_only_to_whoever_knows_it() {
+    let app = test_app(Vec::new());
+    let mut config = app.config.clone();
+    config.setup_token = Some("only-the-owner-knows".to_string());
+
+    let mut client = Client::new(build_router(hub_app::App::new(config, Vec::new()).expect("the application starts")));
+    let account = |token: Option<&str>| {
+        let mut body = json!({ "name": "Bartek Admin", "email": "admin@example.com", "password": "correct horse" });
+
+        if let Some(token) = token {
+            body["setupToken"] = json!(token);
+        }
+
+        body
+    };
+
+    assert_eq!(client.get("/api/bootstrap").await["setupTokenRequired"], true);
+    assert_eq!(client.refused(Method::POST, "/api/setup", Some(account(None))).await, StatusCode::FORBIDDEN);
+    assert_eq!(client.refused(Method::POST, "/api/setup", Some(account(Some("a guess")))).await, StatusCode::FORBIDDEN);
+    assert_eq!(client.get("/api/bootstrap").await["setupRequired"], true, "nobody got in");
+
+    client.post("/api/setup", account(Some("only-the-owner-knows"))).await;
+
+    let bootstrap = client.get("/api/bootstrap").await;
+    assert_eq!((&bootstrap["setupRequired"], &bootstrap["setupTokenRequired"]), (&json!(false), &json!(false)));
+    assert_eq!(bootstrap["user"]["role"], "admin");
+}
