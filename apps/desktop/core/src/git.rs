@@ -172,6 +172,20 @@ pub fn inspect(path: &Path) -> CoreResult<Inspection> {
     })
 }
 
+/// The person's global ignore file, as git itself would find it.
+pub fn global_excludes() -> Option<String> {
+    let configured =
+        Command::new("git").args(["config", "--global", "--get", "core.excludesFile"]).output().ok().filter(|output| output.status.success());
+    let named = configured.map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string()).filter(|path| !path.is_empty());
+    let home = dirs::home_dir().unwrap_or_default();
+    let path = match named {
+        Some(path) => path.strip_prefix("~/").map(|rest| home.join(rest)).unwrap_or_else(|| PathBuf::from(&path)),
+        None => dirs::config_dir().unwrap_or_else(|| home.join(".config")).join("git/ignore"),
+    };
+
+    std::fs::read_to_string(path).ok()
+}
+
 // ---------- one working tree per thread ----------
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -201,6 +215,10 @@ pub fn create_worktree(repo: &Path, path: &Path, branch: &str) -> CoreResult<Wor
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
+
+    // A tree whose folder somebody deleted is still on git's list; forgetting it is what
+    // `git worktree prune` is for, and it touches nothing that exists.
+    git(repo, &["worktree", "prune"])?;
 
     let base = base_ref(repo)?;
     let place = path.to_string_lossy().into_owned();
@@ -263,28 +281,68 @@ pub struct WriteAccess {
 }
 
 /// A commit in a working tree needs four places in the clone's `.git`: the object store, the
-/// tree's administrative folder, and the ref and reflog of its branch. Everything in `.git`
-/// that runs code or redirects git (hooks, config, info, modules, the tree's pointers back to
-/// the clone) stays closed.
+/// tree's administrative folder, and the folders that hold the ref and the reflog of its
+/// branch (git updates a ref by writing `<ref>.lock` beside it and renaming, so the folder
+/// has to be writable, not only the file). Every other ref already in those folders is
+/// closed again by name, so a thread can move its own branch and nobody else's. Everything
+/// in `.git` that runs code or redirects git (hooks, config, info, modules, the tree's
+/// pointers back to the clone) stays closed.
 pub fn write_access(repo: &Path, worktree: &Path, branch: &str) -> CoreResult<WriteAccess> {
     let common = std::fs::canonicalize(git(repo, &["rev-parse", "--path-format=absolute", "--git-common-dir"])?)?;
     let admin = admin_dir(repo, worktree)?;
     let text = |path: PathBuf| path.to_string_lossy().into_owned();
+    let own = Path::new(branch).file_name().map(|name| name.to_os_string()).unwrap_or_default();
+    let folder_of = |root: &str| common.join(root).join(branch).parent().map(Path::to_path_buf).unwrap_or_else(|| common.join(root));
+    let folders = [folder_of("refs/heads"), folder_of("logs/refs/heads")];
+    let mut protected: Vec<PathBuf> = ["commondir", "gitdir", "config.worktree"]
+        .map(|name| admin.join(name))
+        .into_iter()
+        .chain(["hooks", "config", "info", "modules"].map(|name| common.join(name)))
+        .collect();
+
+    for folder in &folders {
+        // The sandbox can only open a folder that exists; git would make these itself.
+        std::fs::create_dir_all(folder)?;
+
+        for entry in std::fs::read_dir(folder)?.flatten() {
+            if entry.file_name() != own {
+                protected.push(entry.path());
+            }
+        }
+    }
+
+    protected.sort();
 
     Ok(WriteAccess {
-        writable: vec![
-            text(common.join("objects")),
-            text(common.join("refs/heads").join(branch)),
-            text(common.join("logs/refs/heads").join(branch)),
-            text(admin.clone()),
-        ],
-        protected: ["commondir", "gitdir", "config.worktree"]
-            .map(|name| admin.join(name))
-            .into_iter()
-            .chain(["hooks", "config", "info", "modules"].map(|name| common.join(name)))
-            .map(text)
-            .collect(),
+        writable: [common.join("objects"), folders[0].clone(), folders[1].clone(), admin].into_iter().map(text).collect(),
+        protected: protected.into_iter().map(text).collect(),
     })
+}
+
+/// Commits what the thread changed, for threads that have no shell to run git in. Run by the
+/// app itself, so with the same precautions as every other call here: no hooks, the tree's
+/// administrative folder named from the clone's side. With no paths, everything changed in
+/// the tree is committed. Returns the new commit as `abc1234 Subject`.
+pub fn commit(repo: &Path, worktree: &Path, message: &str, paths: &[String]) -> CoreResult<String> {
+    if message.trim().is_empty() {
+        return Err(CoreError::git("commit", "the commit needs a message"));
+    }
+
+    if let Some(bad) = paths.iter().find(|path| path.starts_with('-') || path.starts_with('/') || path.split('/').any(|part| part == "..")) {
+        return Err(CoreError::git("commit", format!("\"{bad}\" is not a path inside the working tree")));
+    }
+
+    let mut add = vec!["add", "--"];
+
+    if paths.is_empty() {
+        add = vec!["add", "--all"];
+    } else {
+        add.extend(paths.iter().map(String::as_str));
+    }
+
+    git_in_tree(repo, worktree, &add)?;
+    git_in_tree(repo, worktree, &["commit", "--quiet", "--message", message.trim()])?;
+    git_in_tree(repo, worktree, &["log", "-1", "--format=%h %s"])
 }
 
 fn commits_between(repo: &Path, range: &str) -> CoreResult<Vec<CommitInfo>> {
@@ -388,7 +446,15 @@ pub fn read_push(repo: &Path, branch: &str, commit: Option<&str>, fork_point: &s
     };
     let remote_url = git(repo, &["remote", "get-url", "origin"]).map_err(|_| CoreError::git("push", "the repository has no remote called origin"))?;
     let base = pushed_base(repo, branch, fork_point)?;
-    let mut read = PushRead { commit: commit.clone(), base: base.clone(), remote_url, commits: Vec::new(), files: Vec::new(), readings: Vec::new(), blocked: None };
+    let mut read = PushRead {
+        commit: commit.clone(),
+        base: base.clone(),
+        remote_url,
+        commits: Vec::new(),
+        files: Vec::new(),
+        readings: Vec::new(),
+        blocked: None,
+    };
 
     if base == commit {
         read.blocked = Some("There is nothing to push: the server already has this commit.".to_string());
@@ -397,7 +463,8 @@ pub fn read_push(repo: &Path, branch: &str, commit: Option<&str>, fork_point: &s
     }
 
     if review_git(repo, &["merge-base", "--is-ancestor", &base, &commit]).is_err() {
-        read.blocked = Some("The branch no longer grows out of what the server has (its history was rewritten). The app never force-pushes.".to_string());
+        read.blocked =
+            Some("The branch no longer grows out of what the server has (its history was rewritten). The app never force-pushes.".to_string());
 
         return Ok(read);
     }

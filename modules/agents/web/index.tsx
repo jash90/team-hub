@@ -7,7 +7,7 @@ import { polish } from './pl.ts';
 import { AgentsSettings, ProjectTrust } from './settings.tsx';
 import './styles.css';
 
-export const agentsModule: WebModule = {
+const agentsModule: WebModule = {
   id: 'agents',
   globalNav: () => [{ id: 'agents', label: () => t('AI agents'), icon: 'bot', path: '/agents' }],
   routes: [{ pattern: '/agents', render: () => <AgentsPage /> }],
@@ -18,3 +18,5 @@ export const agentsModule: WebModule = {
   settings: [{ id: 'agents', label: () => t('AI agents'), render: () => <AgentsSettings /> }],
   polish,
 };
+
+export default agentsModule;

@@ -8,3 +8,6 @@ e2e/node_modules/
 e2e/.e2e/
 integrations/e2e-reporter/node_modules/
 integrations/e2e-reporter/dist/
+apps/desktop/ui/dist/
+apps/desktop/sidecar/.run/
+apps/desktop/src-tauri/gen/

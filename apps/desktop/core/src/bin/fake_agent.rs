@@ -45,7 +45,14 @@ fn tool(name: &str, detail: &str) {
 }
 
 fn result(ok: bool, summary: &str) {
-    emit(AgentEvent::Result { ok, summary: summary.to_string(), cost_usd: Some(0.0123), turns: Some(3), input_tokens: Some(1200), output_tokens: Some(340) });
+    emit(AgentEvent::Result {
+        ok,
+        summary: summary.to_string(),
+        cost_usd: Some(0.0123),
+        turns: Some(3),
+        input_tokens: Some(1200),
+        output_tokens: Some(340),
+    });
 }
 
 fn git(cwd: &str, arguments: &[&str]) -> bool {
@@ -139,7 +146,12 @@ fn work(agent: &mut Agent, start: &StartThread) -> Option<()> {
         say(&format!("Thanks. With \"{answer}\" I can finish."));
         write(cwd, &format!("agent-notes/{key}.md"), &format!("# {key}\n\nDecision: {answer}\n\nImplemented by the fake agent.\n"));
         commit(cwd, &format!("{key}: implement with the decided limit"));
-        agent.ask(protocol::PROPOSE_COMMENT, json!({ "body": format!("Implemented on a branch with the decision \"{answer}\"; a pull request follows.") }))?.ok();
+        agent
+            .ask(
+                protocol::PROPOSE_COMMENT,
+                json!({ "body": format!("Implemented on a branch with the decision \"{answer}\"; a pull request follows.") }),
+            )?
+            .ok();
         agent.ask(protocol::PROPOSE_PUSH, json!({ "note": "One commit." }))?.ok();
         agent.ask(protocol::PROPOSE_PULL_REQUEST, json!({ "title": format!("{key} implement"), "body": format!("Implements {key}.") }))?.ok();
         result(true, &format!("Implemented {key} in one commit; proposed a comment, the push and a pull request."));
@@ -202,7 +214,11 @@ fn work(agent: &mut Agent, start: &StartThread) -> Option<()> {
             let refused = agent.ask("read:add_comment", json!({ "key": key, "body": "Posted without asking" }))?;
             let unknown = agent.ask("delete_everything", json!({}))?;
 
-            say(&format!("add_comment: {}; delete_everything: {}", refused.err().unwrap_or_else(|| "ALLOWED".into()), unknown.err().unwrap_or_else(|| "ALLOWED".into())));
+            say(&format!(
+                "add_comment: {}; delete_everything: {}",
+                refused.err().unwrap_or_else(|| "ALLOWED".into()),
+                unknown.err().unwrap_or_else(|| "ALLOWED".into())
+            ));
             result(true, "Tried two things I am not allowed to do.");
         }
         "subtasks" => {
@@ -218,6 +234,21 @@ fn work(agent: &mut Agent, start: &StartThread) -> Option<()> {
             say(&format!("The first try was refused: {}", refused.err().unwrap_or_else(|| "it was not".into())));
             agent.ask(protocol::PROPOSE_STATUS, json!({ "status": "In Review" }))?.ok();
             result(true, "Proposed to move the issue to review.");
+        }
+        "no-shell" => {
+            // What a thread without a shell does: the file tools write, the app commits.
+            let _ = std::fs::write(Path::new(cwd).join("CHANGELOG.md"), format!("- {key}\n"));
+
+            tool("Write", "CHANGELOG.md");
+
+            let made = agent.ask(protocol::COMMIT_CHANGES, json!({ "message": format!("{key}: note the change"), "paths": ["CHANGELOG.md"] }))?;
+
+            say(&format!(
+                "commit_changes offered: {}; answer: {}",
+                start.commit_tool,
+                made.map(|text| text.as_str().unwrap_or_default().to_string()).unwrap_or_else(|error| error)
+            ));
+            result(true, "Committed through the app.");
         }
         "env" => {
             let seen: Vec<&str> = ["TEAM_HUB_TOKEN", "GH_TOKEN", "PATH"].into_iter().filter(|name| std::env::var_os(name).is_some()).collect();

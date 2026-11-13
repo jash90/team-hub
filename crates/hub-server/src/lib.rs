@@ -14,17 +14,29 @@ use tower_http::compression::CompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 
-/// Every module compiled into this build, in the order they are loaded.
+/// Every module compiled into this build, in the order they are loaded. Each is a Cargo
+/// feature of this crate, named by the module's id (see `Cargo.toml`).
+// A list literal cannot leave elements out by feature; pushes can.
+#[allow(unused_mut, clippy::vec_init_then_push)]
 pub fn modules() -> Vec<Arc<dyn Module>> {
-    vec![
-        Arc::new(hub_mod_github::GithubModule),
-        Arc::new(hub_mod_wiki::WikiModule),
-        Arc::new(hub_mod_confluence::ConfluenceModule),
-        Arc::new(hub_mod_jira::JiraModule),
-        Arc::new(hub_mod_reports::ReportsModule),
-        Arc::new(hub_mod_e2e::E2eModule),
-        Arc::new(hub_mod_agents::AgentsModule),
-    ]
+    let mut modules: Vec<Arc<dyn Module>> = Vec::new();
+
+    #[cfg(feature = "github")]
+    modules.push(Arc::new(hub_mod_github::GithubModule));
+    #[cfg(feature = "wiki")]
+    modules.push(Arc::new(hub_mod_wiki::WikiModule));
+    #[cfg(feature = "confluence")]
+    modules.push(Arc::new(hub_mod_confluence::ConfluenceModule));
+    #[cfg(feature = "jira")]
+    modules.push(Arc::new(hub_mod_jira::JiraModule));
+    #[cfg(feature = "reports")]
+    modules.push(Arc::new(hub_mod_reports::ReportsModule));
+    #[cfg(feature = "e2e")]
+    modules.push(Arc::new(hub_mod_e2e::E2eModule));
+    #[cfg(feature = "agents")]
+    modules.push(Arc::new(hub_mod_agents::AgentsModule));
+
+    modules
 }
 
 /// Wraps a module's routes so that they do not exist while the module is switched off.

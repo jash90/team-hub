@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Icon } from '@web/components/icon.tsx';
 import { Button, ConfirmDialog, ErrorNote, Spinner, Tabs, Tag, useBusy } from '@web/components/ui.tsx';
-import { formatDateTime, t, timeAgo } from '@web/i18n/index.ts';
+import { countOf, formatDateTime, t, timeAgo } from '@web/i18n/index.ts';
 import { core } from '../api.ts';
 import type { Thread } from '../bindings/Thread.ts';
 import type { ThreadDetail } from '../bindings/ThreadDetail.ts';
@@ -116,7 +116,7 @@ function Changes({ thread }: { thread: Thread }) {
   return (
     <div>
       <p className="desk-pad muted">
-        {t('Against {base}', { base: diff.data.base })} · {t('{count} commits', { count: diff.data.commits.length })}
+        {t('Against {base}', { base: diff.data.base })} · {countOf(diff.data.commits.length, 'commit', 'commits')}
         {diff.data.uncommitted > 0 && <> · {t('{count} files not committed', { count: diff.data.uncommitted })}</>}
       </p>
       <h3 className="desk-pad">{t('Commits')}</h3>

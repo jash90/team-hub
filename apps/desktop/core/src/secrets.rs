@@ -52,10 +52,7 @@ impl OsKeychain {
     /// gets a thread of its own instead of whichever one asked.
     fn on_thread<T: Send>(work: impl FnOnce() -> Result<T, keyring::Error> + Send) -> Result<T, keyring::Error> {
         std::thread::scope(|scope| {
-            scope
-                .spawn(work)
-                .join()
-                .unwrap_or_else(|_| Err(keyring::Error::PlatformFailure("the keychain call panicked".into())))
+            scope.spawn(work).join().unwrap_or_else(|_| Err(keyring::Error::PlatformFailure("the keychain call panicked".into())))
         })
     }
 }
@@ -170,17 +167,15 @@ impl CacheKey {
         }
 
         let bytes = random_bytes::<KEY_LENGTH>()?;
-        let persistent = keychain.set(CACHE_KEY_ENTRY, &Secret::new(to_hex(&bytes))).is_ok() && keychain.get(CACHE_KEY_ENTRY).ok().flatten().is_some();
+        let persistent =
+            keychain.set(CACHE_KEY_ENTRY, &Secret::new(to_hex(&bytes))).is_ok() && keychain.get(CACHE_KEY_ENTRY).ok().flatten().is_some();
 
         Ok(Self { cipher: ChaCha20Poly1305::new(Key::from_slice(&bytes)), persistent })
     }
 
     pub fn seal(&self, plain: &[u8]) -> CoreResult<Vec<u8>> {
         let nonce = random_bytes::<NONCE_LENGTH>()?;
-        let sealed = self
-            .cipher
-            .encrypt(Nonce::from_slice(&nonce), plain)
-            .map_err(|_| CoreError::not_possible("the cache could not be sealed"))?;
+        let sealed = self.cipher.encrypt(Nonce::from_slice(&nonce), plain).map_err(|_| CoreError::not_possible("the cache could not be sealed"))?;
 
         Ok([nonce.as_slice(), sealed.as_slice()].concat())
     }

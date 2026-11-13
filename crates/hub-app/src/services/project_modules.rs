@@ -18,6 +18,14 @@ pub fn disabled_modules(connection: &Connection, project_id: Id) -> ApiResult<Ve
     query_all(connection, "SELECT module_id FROM project_module_off WHERE project_id = ?1 ORDER BY module_id", [project_id], |row| row.get(0))
 }
 
+/// A condition that limits `column` (a project id) to the projects where the module is not
+/// switched off. For what a module gathers across projects, such as its section of "My work".
+pub fn on_in_project(module_id: &str, column: &str) -> String {
+    debug_assert!(module_id.chars().all(|character| character.is_ascii_alphanumeric() || character == '-' || character == '_'));
+
+    format!("{column} NOT IN (SELECT project_id FROM project_module_off WHERE module_id = '{module_id}')")
+}
+
 /// Switches a module on or off in one project. The caller has checked that the module exists.
 pub fn set_project_module(tx: &Tx, access: &ProjectAccess, module_id: &str, enabled: bool) -> ApiResult<()> {
     access.require_admin()?;

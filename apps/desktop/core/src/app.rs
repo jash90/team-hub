@@ -21,8 +21,8 @@ use crate::error::{CoreError, CoreResult};
 use crate::git;
 use crate::model::{
     AppEvent, CacheMode, ConnectionStatus, DashboardView, EventKind, IssueView, NewThread, Proposal, ProposalKind, ProposalState, PullRequestPreview,
-    PullRequestResult, PushPreview, PushResult, RepoCheck, RepoMapping, RepoStatus, RunnerStatus, SandboxState, SearchView, Settings, Thread, ThreadDetail,
-    ThreadDiff, ThreadKind, ThreadOrigin, ThreadState, WorkspaceView, WorktreeInfo,
+    PullRequestResult, PushPreview, PushResult, RepoCheck, RepoMapping, RepoStatus, RunnerStatus, SandboxState, SearchView, Settings, Thread,
+    ThreadDetail, ThreadDiff, ThreadKind, ThreadOrigin, ThreadState, WorkspaceView, WorktreeInfo,
 };
 use crate::policy;
 use crate::protocol::{self, HubTool};
@@ -54,7 +54,15 @@ pub struct OpenOptions {
 
 impl OpenOptions {
     pub fn new(paths: Paths, keychain: Arc<dyn Keychain>) -> Self {
-        Self { paths, keychain, helper: None, sidecar_script: None, stop_grace: Duration::from_secs(5), poll_every: Duration::from_secs(5), sandbox: None }
+        Self {
+            paths,
+            keychain,
+            helper: None,
+            sidecar_script: None,
+            stop_grace: Duration::from_secs(5),
+            poll_every: Duration::from_secs(5),
+            sandbox: None,
+        }
     }
 }
 
@@ -129,7 +137,10 @@ fn text_of<'a>(input: &'a Value, field: &str, max: usize) -> CoreResult<&'a str>
 
 /// Where the sidecar's script is: where the packaged app says, else in the source tree.
 fn default_helper(node: &str, packaged: Option<&Path>) -> (String, Vec<String>) {
-    let script = packaged.filter(|script| script.exists()).map(Path::to_path_buf).unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar/src/main.ts"));
+    let script = packaged
+        .filter(|script| script.exists())
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../sidecar/src/main.ts"));
 
     (node.to_string(), vec![frozen_copy(&script).to_string_lossy().into_owned()])
 }
@@ -352,7 +363,8 @@ impl Core {
                     let _ = self.store.cache_put(&self.cache_key, "bootstrap", boot);
                 }
 
-                let stored = boot.ok().or_else(|| self.store.cache_get::<Bootstrap>(&self.cache_key, "bootstrap").ok().flatten().map(|(boot, _)| boot));
+                let stored =
+                    boot.ok().or_else(|| self.store.cache_get::<Bootstrap>(&self.cache_key, "bootstrap").ok().flatten().map(|(boot, _)| boot));
 
                 self.adopt_session(client, None);
 
@@ -584,14 +596,19 @@ impl Core {
     pub fn repos(&self) -> CoreResult<Vec<RepoStatus>> {
         let mappings = self.store.repos()?;
         let threads = self.store.threads()?;
-        let thread_of = |path: &Path| threads.iter().find(|thread| thread.worktree.as_deref().is_some_and(|tree| Path::new(tree) == path)).map(|thread| thread.id);
+        let thread_of = |path: &Path| {
+            threads.iter().find(|thread| thread.worktree.as_deref().is_some_and(|tree| Path::new(tree) == path)).map(|thread| thread.id)
+        };
 
         Ok(mappings
             .into_par_iter()
             .map(|mapping| match git::inspect(Path::new(&mapping.path)) {
                 Ok(found) => RepoStatus {
                     exists: true,
-                    remote_matches: mapping.github_repo.as_deref().map(|repo| found.remote_url.as_deref().is_some_and(|url| git::remote_matches(url, repo))),
+                    remote_matches: mapping
+                        .github_repo
+                        .as_deref()
+                        .map(|repo| found.remote_url.as_deref().is_some_and(|url| git::remote_matches(url, repo))),
                     default_branch: found.default_branch,
                     current_branch: found.current_branch,
                     changed_files: found.changed_files,
@@ -599,7 +616,12 @@ impl Core {
                     worktrees: found
                         .worktrees
                         .into_iter()
-                        .map(|tree| WorktreeInfo { thread_id: thread_of(&tree.path), path: tree.path.to_string_lossy().into_owned(), branch: tree.branch, head: tree.head })
+                        .map(|tree| WorktreeInfo {
+                            thread_id: thread_of(&tree.path),
+                            path: tree.path.to_string_lossy().into_owned(),
+                            branch: tree.branch,
+                            head: tree.head,
+                        })
                         .collect(),
                     error: None,
                     mapping,
@@ -633,7 +655,9 @@ impl Core {
             (Some(repo), _) => Ok(repo.clone()),
             (None, _) if wanted.is_some() => Err(CoreError::not_possible(format!("That repository is not mapped to project {project_key}"))),
             (None, [only]) if github_repo.is_none() => Ok(only.clone()),
-            (None, []) => Err(CoreError::not_possible(format!("No local repository is mapped to project {project_key}. Map one under Repositories first"))),
+            (None, []) => {
+                Err(CoreError::not_possible(format!("No local repository is mapped to project {project_key}. Map one under Repositories first")))
+            }
             (None, _) => match github_repo {
                 Some(name) => Err(CoreError::not_possible(format!("{name} has no local clone mapped on this machine"))),
                 None => Err(CoreError::not_possible(format!("Project {project_key} has several repositories mapped; choose one"))),
@@ -663,7 +687,8 @@ impl Core {
     /// shows it too. Without a server (or without its runs API) the thread is local only.
     pub fn start_thread(&self, new: &NewThread) -> CoreResult<Thread> {
         let key = new.issue_key.trim().to_uppercase();
-        let (project_key, _) = hub_core::keys::parse_issue_key(&key).ok_or_else(|| CoreError::not_possible(format!("\"{key}\" is not an issue key")))?;
+        let (project_key, _) =
+            hub_core::keys::parse_issue_key(&key).ok_or_else(|| CoreError::not_possible(format!("\"{key}\" is not an issue key")))?;
         let repo = self.repo_for(&project_key, new.repo_id, None)?;
         let settings = self.settings();
         let model = new.model.clone().filter(|model| !model.trim().is_empty()).unwrap_or(settings.default_model);
@@ -697,7 +722,13 @@ impl Core {
                 self.claim_runs();
             }
             Err(error) => {
-                self.store.add_event(thread.id, EventKind::Status, &format!("This thread is not shown on the server: {error}"), &Value::Null, true)?;
+                self.store.add_event(
+                    thread.id,
+                    EventKind::Status,
+                    &format!("This thread is not shown on the server: {error}"),
+                    &Value::Null,
+                    true,
+                )?;
             }
         }
 
@@ -708,14 +739,21 @@ impl Core {
     /// server may carry out a `custom` run itself, and this one needs the code.
     fn repo_name(repo: &RepoMapping) -> String {
         let from_remote = || git::inspect(Path::new(&repo.path)).ok().and_then(|found| found.remote_url).and_then(|url| git::repo_of_remote(&url));
-        let from_folder = || format!("local/{}", Path::new(&repo.path).file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default());
+        let from_folder =
+            || format!("local/{}", Path::new(&repo.path).file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default());
 
         repo.github_repo.clone().or_else(from_remote).unwrap_or_else(from_folder)
     }
 
     fn create_run(&self, key: &str, kind: ThreadKind, instructions: &str, model: &str, repo: &str) -> CoreResult<AgentRun> {
         let client = self.client()?;
-        let new = NewRun { kind: RunKind::of_thread(kind), instructions: instructions.to_string(), model: Some(model.to_string()), repo: Some(repo.to_string()), shared: false };
+        let new = NewRun {
+            kind: RunKind::of_thread(kind),
+            instructions: instructions.to_string(),
+            model: Some(model.to_string()),
+            repo: Some(repo.to_string()),
+            shared: false,
+        };
         let run = self.seen(client.create_run(key, &new));
 
         if run.as_ref().is_err_and(CoreError::is_not_found) {
@@ -840,7 +878,28 @@ impl Core {
                 let branch = thread.branch.clone().ok_or_else(|| CoreError::not_possible("The thread has no branch to open a pull request from"))?;
                 let body = input["body"].as_str().unwrap_or_default().trim();
 
-                self.propose(thread, ProposalKind::PullRequest, json!({ "branch": branch, "title": text_of(input, "title", 200)?, "body": hub_core::text::truncate(body, 20_000) }))
+                self.propose(
+                    thread,
+                    ProposalKind::PullRequest,
+                    json!({ "branch": branch, "title": text_of(input, "title", 200)?, "body": hub_core::text::truncate(body, 20_000) }),
+                )
+            }
+            protocol::COMMIT_CHANGES => {
+                if !policy::writes_files(thread.kind) {
+                    return Err(CoreError::not_possible("This thread only reads; it has nothing to commit"));
+                }
+
+                let worktree = thread.worktree.clone().ok_or_else(|| CoreError::not_possible("The thread has no working tree"))?;
+                let paths: Vec<String> = input["paths"]
+                    .as_array()
+                    .map(|paths| paths.iter().filter_map(|path| path.as_str().map(String::from)).collect())
+                    .unwrap_or_default();
+                let made = git::commit(Path::new(&thread.repo_path), Path::new(&worktree), text_of(input, "message", 4000)?, &paths)?;
+                let event = self.store.add_event(thread.id, EventKind::Status, &format!("Committed {made}"), &Value::Null, false)?;
+
+                self.emit(AppEvent::ThreadEvent { thread_id: thread.id, event });
+
+                Ok(json!(format!("Committed {made}")))
             }
             other => Err(CoreError::not_possible(format!("There is no tool called {other}"))),
         }
@@ -849,7 +908,11 @@ impl Core {
     /// Records a proposal. Changes to the issue also become proposals of the run on the
     /// server, so they can be decided on the web; a push or a pull request is decided here.
     fn propose(&self, thread: &Thread, kind: ProposalKind, payload: Value) -> CoreResult<Value> {
-        let pending_same = self.store.proposals(thread.id)?.into_iter().find(|proposal| proposal.kind == kind && proposal.state == ProposalState::Pending && !kind.is_remote());
+        let pending_same = self
+            .store
+            .proposals(thread.id)?
+            .into_iter()
+            .find(|proposal| proposal.kind == kind && proposal.state == ProposalState::Pending && !kind.is_remote());
 
         if let Some(existing) = pending_same {
             // One pending push or pull request per thread: the newer wording replaces the older.
@@ -880,7 +943,13 @@ impl Core {
             ProposalKind::Push => "pushing the branch (decided in the desktop app)",
             ProposalKind::PullRequest => "opening a pull request (decided in the desktop app)",
         };
-        let event = self.store.add_event(thread.id, EventKind::Status, &format!("Proposed: {what}"), &json!({ "proposalId": proposal.id, "kind": kind }), false)?;
+        let event = self.store.add_event(
+            thread.id,
+            EventKind::Status,
+            &format!("Proposed: {what}"),
+            &json!({ "proposalId": proposal.id, "kind": kind }),
+            false,
+        )?;
 
         self.emit(AppEvent::ThreadEvent { thread_id: thread.id, event });
 
@@ -954,7 +1023,9 @@ impl Core {
 
                 Ok(json!({ "keys": keys }))
             }
-            ProposalKind::Push | ProposalKind::PullRequest => Err(CoreError::not_possible("A push or a pull request goes out through its own preview")),
+            ProposalKind::Push | ProposalKind::PullRequest => {
+                Err(CoreError::not_possible("A push or a pull request goes out through its own preview"))
+            }
         }
     }
 
@@ -984,7 +1055,9 @@ impl Core {
                     self.store.decide_proposal(id, ProposalState::Failed, Some(&error.to_string()), &Value::Null)?;
                 }
             },
-            (false, _, true) => return Err(CoreError::not_possible("Approve a push or a pull request from its preview, where what goes out is shown")),
+            (false, _, true) => {
+                return Err(CoreError::not_possible("Approve a push or a pull request from its preview, where what goes out is shown"))
+            }
             (_, _, false) => {
                 self.store.decide_proposal(id, ProposalState::Rejected, note, &Value::Null)?;
             }
@@ -1057,7 +1130,16 @@ impl Core {
 
         let result = PushResult { branch: branch.clone(), commit: read.commit.clone(), remote_url: read.remote_url };
         let short: String = read.commit.chars().take(8).collect();
-        let event = self.store.add_event(thread_id, EventKind::Status, &format!("Pushed {branch} at {short} ({} commits)", read.commits.len()), &json!({ "commit": read.commit }), false)?;
+        let event = self.store.add_event(
+            thread_id,
+            EventKind::Status,
+            &format!(
+                "Pushed {branch} at {short} ({})",
+                if read.commits.len() == 1 { "1 commit".to_string() } else { format!("{} commits", read.commits.len()) }
+            ),
+            &json!({ "commit": read.commit }),
+            false,
+        )?;
 
         self.emit(AppEvent::ThreadEvent { thread_id, event });
         self.settle_local(thread_id, ProposalKind::Push, ProposalState::Approved, &serde_json::to_value(&result)?)?;
@@ -1081,7 +1163,9 @@ impl Core {
         let issue = self.client().ok()?.issue(&thread.issue_key).ok()?;
         let prs = issue.panels.get("github")?.get("prs")?.as_array()?.clone();
 
-        prs.iter().find(|pr| pr["headRef"].as_str() == Some(branch) && pr["state"].as_str() == Some("open")).and_then(|pr| pr["url"].as_str().map(String::from))
+        prs.iter()
+            .find(|pr| pr["headRef"].as_str() == Some(branch) && pr["state"].as_str() == Some("open"))
+            .and_then(|pr| pr["url"].as_str().map(String::from))
     }
 
     pub fn pull_request_preview(&self, thread_id: i64) -> CoreResult<PullRequestPreview> {
@@ -1089,10 +1173,20 @@ impl Core {
         let branch = thread.branch.clone().ok_or_else(|| CoreError::not_possible("The thread has no branch yet"))?;
         let repo_path = Path::new(&thread.repo_path);
         let mapping = self.store.repo(thread.repo_id).ok();
-        let repo = mapping.and_then(|mapping| mapping.github_repo).or_else(|| git::inspect(repo_path).ok().and_then(|found| found.remote_url).and_then(|url| git::repo_of_remote(&url)));
+        let repo = mapping
+            .and_then(|mapping| mapping.github_repo)
+            .or_else(|| git::inspect(repo_path).ok().and_then(|found| found.remote_url).and_then(|url| git::repo_of_remote(&url)));
         let base = Self::default_branch_name(repo_path);
-        let proposed = self.store.proposals(thread_id)?.into_iter().rev().find(|proposal| proposal.kind == ProposalKind::PullRequest && proposal.state == ProposalState::Pending);
-        let title = proposed.as_ref().and_then(|proposal| proposal.payload["title"].as_str().map(String::from)).unwrap_or_else(|| format!("{} {}", thread.issue_key, thread.issue_summary));
+        let proposed = self
+            .store
+            .proposals(thread_id)?
+            .into_iter()
+            .rev()
+            .find(|proposal| proposal.kind == ProposalKind::PullRequest && proposal.state == ProposalState::Pending);
+        let title = proposed
+            .as_ref()
+            .and_then(|proposal| proposal.payload["title"].as_str().map(String::from))
+            .unwrap_or_else(|| format!("{} {}", thread.issue_key, thread.issue_summary));
         let body = proposed
             .as_ref()
             .and_then(|proposal| proposal.payload["body"].as_str().map(String::from))
@@ -1198,7 +1292,13 @@ impl Core {
         projects.sort();
         projects.dedup();
 
-        Ok(RunnerIdentity { id: settings.runner_id, name: settings.runner_name, kinds: RUNNER_KINDS.to_vec(), projects, version: env!("CARGO_PKG_VERSION").to_string() })
+        Ok(RunnerIdentity {
+            id: settings.runner_id,
+            name: settings.runner_name,
+            kinds: RUNNER_KINDS.to_vec(),
+            projects,
+            version: env!("CARGO_PKG_VERSION").to_string(),
+        })
     }
 
     fn runs_api(&self) -> bool {
@@ -1256,14 +1356,24 @@ impl Core {
                     taken += 1;
 
                     if let Err(error) = self.adopt(&client, &detail) {
-                        let patch = RunPatch { state: Some(RunState::Failed), summary: Some(format!("The desktop runner could not start this run: {error}")), ..Default::default() };
+                        let patch = RunPatch {
+                            state: Some(RunState::Failed),
+                            summary: Some(format!("The desktop runner could not start this run: {error}")),
+                            ..Default::default()
+                        };
                         let _ = client.patch_run(detail.run.id, &patch);
                     }
                 }
                 Ok(None) => {
                     // Whatever is still waiting was taken by another runner, or is gone.
                     for (_, thread_id) in lock(&self.runner).attach.drain() {
-                        let _ = self.store.add_event(thread_id, EventKind::Status, "The run made for this thread was taken elsewhere; the thread is not shown on the server.", &Value::Null, true);
+                        let _ = self.store.add_event(
+                            thread_id,
+                            EventKind::Status,
+                            "The run made for this thread was taken elsewhere; the thread is not shown on the server.",
+                            &Value::Null,
+                            true,
+                        );
                     }
 
                     break;
@@ -1332,7 +1442,12 @@ impl Core {
     /// writes, and the branch and the pull request are reported when they exist.
     fn patch_of(&self, thread: &Thread) -> RunPatch {
         let finished = matches!(thread.state, ThreadState::Done | ThreadState::Failed | ThreadState::Waiting | ThreadState::Stopped);
-        let decided_here = self.store.proposals(thread.id).unwrap_or_default().iter().any(|proposal| !proposal.kind.is_remote() && proposal.state == ProposalState::Pending);
+        let decided_here = self
+            .store
+            .proposals(thread.id)
+            .unwrap_or_default()
+            .iter()
+            .any(|proposal| !proposal.kind.is_remote() && proposal.state == ProposalState::Pending);
         let state = match thread.state {
             ThreadState::Done if decided_here => Some(RunState::Waiting),
             state => RunState::of_thread(state),
@@ -1361,7 +1476,9 @@ impl Core {
             // Answers on a run come from people through the web's own call; what the person
             // said to the thread here is told as a line of the runner.
             let (kind, text) = match event.kind {
-                EventKind::Answer => (RunEventKind::Status, format!("Said in the desktop app: {}", hub_core::text::truncate(&event.text.replace('\n', " "), 400))),
+                EventKind::Answer => {
+                    (RunEventKind::Status, format!("Said in the desktop app: {}", hub_core::text::truncate(&event.text.replace('\n', " "), 400)))
+                }
                 kind => (RunEventKind::of_thread(kind), event.text.clone()),
             };
 
@@ -1558,7 +1675,10 @@ impl Desktop {
         let cache_key = CacheKey::load_or_create(options.keychain.as_ref())?;
         let (events, _) = broadcast::channel(1024);
         let sandbox = options.sandbox.unwrap_or_else(policy::sandbox_state);
-        let from_env = std::env::var(config::SIDECAR_VARIABLE).ok().map(|line| line.split_whitespace().map(String::from).collect::<Vec<_>>()).filter(|parts| !parts.is_empty());
+        let from_env = std::env::var(config::SIDECAR_VARIABLE)
+            .ok()
+            .map(|line| line.split_whitespace().map(String::from).collect::<Vec<_>>())
+            .filter(|parts| !parts.is_empty());
         let (program, arguments) = match (options.helper, from_env) {
             (Some(helper), _) => helper,
             (None, Some(parts)) => (parts[0].clone(), parts[1..].to_vec()),

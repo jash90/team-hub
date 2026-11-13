@@ -1,38 +1,75 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { api, errorMessage } from './api.ts';
 import type { Bootstrap } from './bindings/Bootstrap.ts';
 import type { Notification } from './bindings/Notification.ts';
 import type { QuickHit } from './bindings/QuickHit.ts';
 import { Icon, type IconName } from './components/icon.tsx';
-import { Avatar, Button, Drawer, Empty, ErrorNote, Menu, Popover, Spinner, Toaster, attempt } from './components/ui.tsx';
+import { Avatar, Button, Drawer, Empty, ErrorNote, Menu, Popover, Spinner, Toaster, attempt, toast } from './components/ui.tsx';
 import { currentLanguage, setLanguage, t, timeAgo } from './i18n/index.ts';
-import { useModules, type NavEntry } from './modules.ts';
+import { whenIdle } from './lazy.tsx';
+import { loadModules, useModules, type NavEntry } from './modules.ts';
 import { Link, matchRoute, navigate, setParam, usePath, useSearchParams, type Params } from './router.tsx';
 import { ProjectProvider, SessionProvider, loadBootstrap, startLive, stopLive, useLive, useProjectData, useRemote, useSession, useStored } from './session.tsx';
 import { useClaimedProject } from './shell.ts';
 import { LoginView, SetupView } from './views/auth.tsx';
-import { BacklogView } from './views/backlog.tsx';
-import { BoardView } from './views/board.tsx';
-import { CreateIssueDialog } from './views/create-issue.tsx';
-import { DashboardView } from './views/dashboard.tsx';
-import { IssueView } from './views/issue.tsx';
-import { ProjectSettingsView } from './views/project-settings.tsx';
-import { ProjectsView } from './views/projects.tsx';
-import { ReleasesView } from './views/releases.tsx';
-import { SearchView } from './views/search.tsx';
-import { SettingsView } from './views/settings.tsx';
+import {
+  BacklogView,
+  BoardView,
+  CreateIssueDialog,
+  DashboardView,
+  IssueView,
+  ProjectSettingsView,
+  ProjectsView,
+  ReleasesView,
+  SearchView,
+  SettingsView,
+  preloadViews,
+} from './views/lazy.ts';
 
 export function App() {
   const [boot, setBoot] = useState<Bootstrap | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const latest = useRef(0);
   const refresh = useCallback(async () => {
-    setBoot(await loadBootstrap());
+    const mine = ++latest.current;
+    // The code of the page in the address is fetched next to the bootstrap, not after it.
+    const view = preloadCurrentView();
+    const next = await loadBootstrap();
+
+    if (next.user) {
+      // The shell is shown once what it paints first is here: the screens of the modules
+      // that are switched on (fetched side by side) and the page in the address. This is
+      // also how a module switched on later gets its screens without a reload.
+      const [failed] = await Promise.all([loadModules(next), view]);
+
+      if (failed.length > 0) {
+        toast(t('Some screens could not be loaded. Reload to try again.'), 'error');
+      }
+    }
+
+    // An older answer that arrives late does not replace a newer one.
+    if (mine === latest.current) {
+      setBoot(next);
+    }
   }, []);
 
   useEffect(() => {
     refresh().catch((caught) => setError(errorMessage(caught)));
   }, [refresh]);
+
+  // The bootstrap lists the projects and what is switched off in each. When somebody else
+  // changes a project, this browser asks again instead of waiting for its next reload.
+  const again = useRef<number | undefined>(undefined);
+
+  useLive((event) => {
+    if (event.kind.startsWith('project.') || event.kind === 'instance.modules') {
+      window.clearTimeout(again.current);
+      again.current = window.setTimeout(() => void refresh().catch(() => undefined), 300);
+    }
+  });
+
+  useEffect(() => () => window.clearTimeout(again.current), []);
 
   useEffect(() => {
     if (boot?.user) {
@@ -106,6 +143,34 @@ function ProjectScope({ projectKey, children }: { projectKey: string; children: 
   );
 }
 
+const inProject = (view: ReactNode) => (found: Params) => <ProjectScope projectKey={found.key.toUpperCase()}>{view}</ProjectScope>;
+
+/** The pages of the tracker itself, each with the view whose code it needs. */
+const CORE: (Route & { view: { preload: () => Promise<void> } })[] = [
+  { pattern: '/', view: DashboardView, render: () => <DashboardView /> },
+  { pattern: '/projects', view: ProjectsView, render: () => <ProjectsView /> },
+  { pattern: '/search', view: SearchView, render: () => <SearchView /> },
+  { pattern: '/issue/:key', view: IssueView, render: (found) => <IssueView issueKey={found.key.toUpperCase()} mode="page" /> },
+  { pattern: '/settings/:tab?', view: SettingsView, render: (found) => <SettingsView tab={found.tab} /> },
+  { pattern: '/p/:key/board', view: BoardView, render: inProject(<BoardView />) },
+  { pattern: '/p/:key/backlog', view: BacklogView, render: inProject(<BacklogView />) },
+  { pattern: '/p/:key/issues', view: SearchView, render: inProject(<SearchView scoped />) },
+  { pattern: '/p/:key/releases', view: ReleasesView, render: inProject(<ReleasesView />) },
+  { pattern: '/p/:key/settings/:tab?', view: ProjectSettingsView, render: (found) => <ProjectScope projectKey={found.key.toUpperCase()}><ProjectSettingsView tab={found.tab} /></ProjectScope> },
+];
+
+/** Fetches the code of the page in the address (and of the issue open over it), so the first paint has it. */
+function preloadCurrentView(): Promise<unknown> {
+  const wanted = [CORE.find((route) => matchRoute(route.pattern, window.location.pathname))?.view];
+
+  if (new URLSearchParams(window.location.search).has('issue')) {
+    wanted.push(IssueView);
+  }
+
+  // A view that cannot be fetched says so itself when it is shown.
+  return Promise.all(wanted.map((view) => view?.preload().catch(() => undefined)));
+}
+
 function projectKeyOf(path: string): string | null {
   const inProject = matchRoute('/p/:key/*', path) ?? matchRoute('/p/:key', path);
 
@@ -176,20 +241,10 @@ function Shell() {
     return () => window.removeEventListener('keydown', handle);
   }, []);
 
+  // The first page is on screen; the code of the others is fetched while nothing else happens.
+  useEffect(() => whenIdle(preloadViews), []);
+
   const routes = useMemo<Route[]>(() => {
-    const inProject = (view: ReactNode) => (found: Params) => <ProjectScope projectKey={found.key.toUpperCase()}>{view}</ProjectScope>;
-    const core: Route[] = [
-      { pattern: '/', render: () => <DashboardView /> },
-      { pattern: '/projects', render: () => <ProjectsView /> },
-      { pattern: '/search', render: () => <SearchView /> },
-      { pattern: '/issue/:key', render: (found) => <IssueView issueKey={found.key.toUpperCase()} mode="page" /> },
-      { pattern: '/settings/:tab?', render: (found) => <SettingsView tab={found.tab} /> },
-      { pattern: '/p/:key/board', render: inProject(<BoardView />) },
-      { pattern: '/p/:key/backlog', render: inProject(<BacklogView />) },
-      { pattern: '/p/:key/issues', render: inProject(<SearchView scoped />) },
-      { pattern: '/p/:key/releases', render: inProject(<ReleasesView />) },
-      { pattern: '/p/:key/settings/:tab?', render: (found) => <ProjectScope projectKey={found.key.toUpperCase()}><ProjectSettingsView tab={found.tab} /></ProjectScope> },
-    ];
     // A module switched off in a project has no pages there.
     const offIn = (key: string, id: string) => boot.projects.find((candidate) => candidate.key === key)?.disabledModules.includes(id) ?? false;
     const fromModules = modules.flatMap((module) =>
@@ -205,7 +260,7 @@ function Shell() {
       })),
     );
 
-    return [...core, ...fromModules];
+    return [...CORE, ...fromModules];
   }, [modules, boot.projects]);
 
   let view: ReactNode = null;

@@ -58,11 +58,13 @@ export function listen(handler: (event: AppEvent) => void): () => void {
   }
 
   const poll = async () => {
-    let after = 0;
+    // Without a position the server answers with where it is now: what happened before
+    // this page was opened is not news.
+    let after: number | undefined;
 
     while (!stopped) {
       try {
-        const response = await fetch(`${DEV_SERVER}/events?after=${after}`);
+        const response = await fetch(after === undefined ? `${DEV_SERVER}/events` : `${DEV_SERVER}/events?after=${after}`);
         const batch = (await response.json()) as { last: number; events: AppEvent[] };
 
         after = batch.last;

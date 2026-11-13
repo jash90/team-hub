@@ -1,0 +1,15 @@
+{
+  "name": "team-hub-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The team-hub desktop app. The Tauri command line is run from this folder.",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icons": "python3 scripts/make-icons.py src-tauri/icons"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

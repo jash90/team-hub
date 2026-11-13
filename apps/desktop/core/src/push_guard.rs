@@ -25,7 +25,8 @@ static SECRET_TEXT: LazyLock<Regex> = LazyLock::new(|| {
     .expect("valid regex")
 });
 static SECRET_FILE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(^|/)(\.env(\.[^/]*)?|id_rsa|id_ed25519|[^/]*\.(pem|p12|pfx|jks|keystore)|\.npmrc|\.netrc|\.pypirc|credentials(\.json)?)$").expect("valid regex")
+    Regex::new(r"(^|/)(\.env(\.[^/]*)?|id_rsa|id_ed25519|[^/]*\.(pem|p12|pfx|jks|keystore)|\.npmrc|\.netrc|\.pypirc|credentials(\.json)?)$")
+        .expect("valid regex")
 });
 /// Files whose change runs code on CI runners, in every build or on every commit.
 static RUNS_IN_CI: LazyLock<Regex> = LazyLock::new(|| {
@@ -162,14 +163,24 @@ mod tests {
 
     #[test]
     fn ordinary_code_goes_without_remarks() {
-        let patch = "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-const token = read();\n+const token = readToken();\n";
+        let patch =
+            "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-const token = read();\n+const token = readToken();\n";
 
         assert!(review(&[reading(raw(&[("100644", "100644", "M", "src/a.ts")]), patch)]).is_empty());
     }
 
     #[test]
     fn ci_and_build_files_wait_for_a_confirmation() {
-        for path in [".github/workflows/ci.yml", "package.json", "web/package.json", "Dockerfile", "build.rs", "Makefile", "android/app/build.gradle", ".gitlab-ci.yml"] {
+        for path in [
+            ".github/workflows/ci.yml",
+            "package.json",
+            "web/package.json",
+            "Dockerfile",
+            "build.rs",
+            "Makefile",
+            "android/app/build.gradle",
+            ".gitlab-ci.yml",
+        ] {
             let findings = review(&[reading(raw(&[("100644", "100644", "M", path)]), "")]);
 
             assert_eq!(kinds(&findings), vec!["ci"], "{path}");
@@ -199,7 +210,10 @@ mod tests {
         let adds = "diff --git a/k b/k\n--- /dev/null\n+++ b/k\n@@ -0,0 +1 @@\n+AKIAABCDEFGHIJKLMNOP\n";
 
         assert!(review(&[reading(raw(&[("100644", "000000", "D", "k")]), removes)]).is_empty());
-        assert_eq!(kinds(&review(&[reading(raw(&[("000000", "100644", "A", "k")]), adds), reading(raw(&[("100644", "000000", "D", "k")]), removes)])), vec!["secret"]);
+        assert_eq!(
+            kinds(&review(&[reading(raw(&[("000000", "100644", "A", "k")]), adds), reading(raw(&[("100644", "000000", "D", "k")]), removes)])),
+            vec!["secret"]
+        );
     }
 
     #[test]

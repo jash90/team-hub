@@ -21,12 +21,33 @@ Each layer is cut by what it is about, one file per thing, behind a stable entry
 - `web/src/components/ui/` and `components/issue-bits/`: one file per component or tight
   family. `ui.tsx` and `issue-bits.tsx` re-export them, and that is what views and modules
   import.
+- `hub-app/src/services/issues/`: one file per thing that happens to an issue (`create`,
+  `update`, `moving`, `comments`, `links`, `worklogs`, `attachments`, `import`, …);
+  `issues/mod.rs` re-exports what is public, so callers write `services::issues::create_issue`.
 - `web/src/views/<feature>/` for the large views (the issue page, search, project settings):
   the frame, and a file per part or tab. `views/<feature>.tsx` re-exports the view.
 
 Dependencies point one way: `hub-core` ← `hub-app` ← modules ← `hub-server`, and in the
 interface `web/src` ← module screens, with `web/src/modules.ts` the only place that names a
 module. Tests and a build step enforce this (see "Boundaries" in [modules.md](modules.md)).
+
+## What is built, what is fetched
+
+- **The server.** Each module is a Cargo feature of `hub-server`, all on by default.
+  `cargo build -p hub-server --no-default-features` is the tracker alone;
+  `--no-default-features --features github,wiki` picks modules. A module that is left out
+  has no tables, no routes and no entry in Settings.
+- **The interface** is built once, with every module, and split into chunks:
+  - the shell (`index`): React, the building blocks, sign-in, navigation;
+  - one chunk per core view (`board`, `backlog`, `issue`, `search`, …; `views/lazy.ts`);
+  - one chunk per module (`module-<id>`), holding its screens, Polish and styles;
+  - the Markdown renderer, shared by the views and modules that show formatted text.
+
+  At the start the browser fetches the shell, then, side by side, the bootstrap and the view
+  in the address, then the chunks of the modules that are switched on; it shows the shell
+  when those are here, so the first paint is complete. The remaining core views are fetched
+  when the browser is idle, so moving between pages does not wait. A module that is off, or
+  not in the build, is never fetched; one switched on in Settings is fetched at that moment.
 
 ## One core, shared
 

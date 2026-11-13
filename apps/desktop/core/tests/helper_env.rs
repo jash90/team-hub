@@ -17,7 +17,14 @@ async fn the_agent_never_inherits_the_apps_token_or_the_persons_other_tokens() {
     bench.connect(&hub).await;
     bench.map(&repo).await;
 
-    let new = NewThread { issue_key: "WEB-1".into(), kind: ThreadKind::Custom, instructions: "[fake:env]".into(), model: None, repo_id: None, branch: None };
+    let new = NewThread {
+        issue_key: "WEB-1".into(),
+        kind: ThreadKind::Custom,
+        instructions: "[fake:env]".into(),
+        model: None,
+        repo_id: None,
+        branch: None,
+    };
     let id = bench.desktop.run(move |core| core.start_thread(&new)).await.unwrap().id;
 
     bench.until_state(id, ThreadState::Done).await;

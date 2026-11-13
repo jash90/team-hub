@@ -20,7 +20,7 @@ function modeOf(text: string | undefined): PageMode {
   return text === 'edit' || text === 'history' ? text : 'view';
 }
 
-export const wikiModule: WebModule = {
+const wikiModule: WebModule = {
   id: 'wiki',
   globalNav: () => [{ id: 'wiki', label: () => t('Knowledge base'), icon: 'book', path: '/wiki' }],
   // The navigation cannot wait for the list of spaces: once it has been loaded the entry
@@ -39,3 +39,5 @@ export const wikiModule: WebModule = {
   issuePanel: IssuePanel,
   polish,
 };
+
+export default wikiModule;

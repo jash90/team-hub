@@ -101,7 +101,6 @@ export const polish: Record<string, string> = {
   Send: 'Wyślij',
   'The thread has no working tree (not started yet, or removed).': 'Wątek nie ma drzewa roboczego (jeszcze nie wystartował albo zostało usunięte).',
   'Against {base}': 'Względem {base}',
-  '{count} commits': 'commity: {count}',
   '{count} files not committed': 'niezacommitowane pliki: {count}',
   Commits: 'Commity',
   'No commits yet.': 'Nie ma jeszcze commitów.',
@@ -122,7 +121,6 @@ export const polish: Record<string, string> = {
   Approve: 'Zatwierdź',
   Reject: 'Odrzuć',
   Push: 'Wypchnij',
-  'Push {count} commits': 'Wypchnij commity: {count}',
   Pushed: 'Wypchnięto',
   'Reading what would be pushed…': 'Czytam, co zostałoby wypchnięte…',
   'Exactly this commit is pushed: {commit}. Anything the thread commits after you looked stays here.':
@@ -139,6 +137,8 @@ export const polish: Record<string, string> = {
   'The gh command is not installed, so the pull request is finished on GitHub in your browser. Paste its address here afterwards and the thread and its run will show it.':
     'Polecenie gh nie jest zainstalowane, więc pull request dokańczasz na GitHubie w przeglądarce. Wklej potem tutaj jego adres, a wątek i jego zlecenie go pokażą.',
   'Save the address': 'Zapisz adres',
+  'Opened it somewhere else already? Paste its address and the thread and its run will show it.': 'Pull request jest już otwarty gdzie indziej? Wklej jego adres, a wątek i jego zlecenie go pokażą.',
+  'Address of the pull request': 'Adres pull requesta',
 
   // a new thread
   'New thread': 'Nowy wątek',

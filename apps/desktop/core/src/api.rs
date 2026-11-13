@@ -122,7 +122,11 @@ impl HubClient {
 
         let text = if text.trim().is_empty() { "null" } else { text.as_str() };
 
-        serde_json::from_str(text).map_err(|error| CoreError::Api { status, code: "unreadable".into(), message: format!("The server's answer could not be read: {error}") })
+        serde_json::from_str(text).map_err(|error| CoreError::Api {
+            status,
+            code: "unreadable".into(),
+            message: format!("The server's answer could not be read: {error}"),
+        })
     }
 
     pub fn get<T: DeserializeOwned>(&self, path: &str) -> CoreResult<T> {
@@ -206,7 +210,8 @@ impl HubClient {
     // ---------- agent runs: docs/agent-runs.md ----------
 
     pub fn heartbeat(&self, runner: &RunnerIdentity) -> CoreResult<()> {
-        let body = json!({ "runnerId": runner.id, "name": runner.name, "kinds": runner.kinds, "projects": runner.projects, "version": runner.version });
+        let body =
+            json!({ "runnerId": runner.id, "name": runner.name, "kinds": runner.kinds, "projects": runner.projects, "version": runner.version });
 
         self.post::<Value>(&format!("{AGENTS}/runners/heartbeat"), &body).map(|_| ())
     }

@@ -18,11 +18,10 @@ import type { Project } from '@/bindings/Project.ts';
 import type { ReviewState } from '@/bindings/ReviewState.ts';
 import { Icon, type IconName } from '@/components/icon.tsx';
 import { IssueKey, IssueLine, canEdit } from '@/components/issue-bits.tsx';
-import { Button, Dialog, Empty, ErrorNote, Field, Picker, Spinner, Tabs, Tag, attempt, copyText, toast, useBusy } from '@/components/ui.tsx';
+import { Button, Dialog, Empty, ErrorNote, Field, Picker, SettingsCard, Spinner, Tabs, Tag, attempt, copyText, toast, useBusy } from '@/components/ui.tsx';
 import { countOf, formatDateTime, t, timeAgo } from '@/i18n/index.ts';
 import type { WebModule } from '@/modules.ts';
 import { useProject, useRemote, useSession, useStored } from '@/session.tsx';
-import { SettingsCard } from '@/views/settings.tsx';
 
 import { polish } from './pl.ts';
 
@@ -645,7 +644,7 @@ function DashboardPart({ data }: { data: unknown }) {
   );
 }
 
-export const githubModule: WebModule = {
+const githubModule: WebModule = {
   id: 'github',
   projectNav: (projectKey) => [{ id: 'code', label: () => t('Code'), icon: 'branch', path: `/p/${projectKey}/code` }],
   routes: [{ pattern: '/p/:key/code', render: () => <CodeView /> }],
@@ -656,3 +655,5 @@ export const githubModule: WebModule = {
   settings: [{ id: 'github', label: () => 'GitHub', adminOnly: true, render: () => <AdminSettings /> }],
   polish,
 };
+
+export default githubModule;

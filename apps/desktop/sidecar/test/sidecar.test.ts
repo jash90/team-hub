@@ -28,6 +28,7 @@ const start = (over: Partial<Start> = {}): Start => ({
   denied_tools: ['Agent', 'Task', 'Bash(git push:*)'],
   sandbox: { writable: ['/repos/web/.git/objects'], protected: ['/repos/web/.git/hooks'], unreadable: ['/home/me/.ssh'] },
   hub_tools: [{ name: 'get_issue', description: 'One issue', input_schema: { type: 'object', properties: { key: { type: 'string' } }, required: ['key'] } }],
+  commit_tool: false,
   env: { EXTRA: '1' },
   ...over,
 });
@@ -70,6 +71,13 @@ test('without a shell on the allow list the shell is not even offered', () => {
   const options = optionsFor(start({ allowed_tools: ['Read', 'Glob', 'Grep'], sandbox: null }));
 
   assert.deepEqual(options.tools, ['Read', 'Glob', 'Grep']);
+});
+
+test('a thread without a shell is offered the tool that commits through the app', () => {
+  const without = optionsFor(start({ allowed_tools: ['Read', 'Edit(//w/**)'], sandbox: null, commit_tool: true }));
+
+  assert.ok(without.allowedTools?.includes('mcp__team-hub__commit_changes'));
+  assert.ok(!optionsFor(start()).allowedTools?.includes('mcp__team-hub__commit_changes'));
 });
 
 test('tool names are those the agent sees, reads first', () => {

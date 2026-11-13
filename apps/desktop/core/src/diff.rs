@@ -149,7 +149,8 @@ fn parse_file(chunk: &str) -> PatchFile {
 
 /// Every file of a patch. Files are independent, so they are read in parallel.
 pub fn parse_patch(patch: &str) -> Vec<PatchFile> {
-    let mut starts: Vec<usize> = patch.match_indices(FILE_HEADER).map(|(index, _)| index).filter(|&index| index == 0 || patch.as_bytes()[index - 1] == b'\n').collect();
+    let mut starts: Vec<usize> =
+        patch.match_indices(FILE_HEADER).map(|(index, _)| index).filter(|&index| index == 0 || patch.as_bytes()[index - 1] == b'\n').collect();
 
     starts.push(patch.len());
 
@@ -267,7 +268,9 @@ index 6666666..0000000
 
     #[test]
     fn many_files_keep_their_order() {
-        let many: String = (0..200).map(|index| format!("diff --git a/f{index}.txt b/f{index}.txt\n--- a/f{index}.txt\n+++ b/f{index}.txt\n@@ -1 +1 @@\n-a\n+b\n")).collect();
+        let many: String = (0..200)
+            .map(|index| format!("diff --git a/f{index}.txt b/f{index}.txt\n--- a/f{index}.txt\n+++ b/f{index}.txt\n@@ -1 +1 @@\n-a\n+b\n"))
+            .collect();
         let files = parse_patch(&many);
 
         assert_eq!(files.len(), 200);

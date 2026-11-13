@@ -25,7 +25,8 @@ the knowledge base instead of bolted onto them.
   permissions of the person whose token it uses.
 
 Everything beyond the tracker is a module that can be switched off, for the whole instance
-or for one project, and new ones plug in the same way: see [docs/modules.md](docs/modules.md).
+or for one project, or left out of the build, and new ones plug in the same way: see
+[docs/modules.md](docs/modules.md).
 
 ## Running it
 
@@ -45,6 +46,11 @@ cargo build --release
 
 Open <http://localhost:8080>. The first visit creates the administrator account, optionally
 with example projects, a team and a few weeks of history to look around in.
+
+Every module is in that build. To leave some out, name the ones to keep:
+`cargo build --release -p hub-server --no-default-features --features github,wiki`
+(the interface is built the same way either way; it fetches the screens of the modules the
+server has).
 
 | Variable | Default | Meaning |
 |---|---|---|

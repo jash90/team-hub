@@ -68,6 +68,28 @@ async fn a_module_switched_off_in_a_project_leaves_that_project_only() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_module_switched_off_in_a_project_leaves_that_project_out_of_my_work() {
+    let mut client = demo().await;
+    let repos = |section: &Value| -> Vec<String> {
+        section["pulls"]
+            .as_array()
+            .map(|pulls| pulls.iter().map(|pull| pull["repo"].as_str().unwrap_or("").to_string()).collect())
+            .unwrap_or_default()
+    };
+
+    let before = client.get("/api/dashboard").await["ext"]["github"].clone();
+    assert!(repos(&before).iter().any(|repo| repo == "acme/sklep-web"), "the demo has my pull requests in WEB: {before}");
+
+    client.put("/api/projects/WEB/modules/github", json!({ "enabled": false })).await;
+    let after = client.get("/api/dashboard").await["ext"]["github"].clone();
+    assert!(!repos(&after).iter().any(|repo| repo == "acme/sklep-web"), "WEB is out of the section: {after}");
+    assert!(!after["drift"].to_string().contains("\"WEB-"), "and so are its issues: {after}");
+
+    client.put("/api/projects/WEB/modules/github", json!({ "enabled": true })).await;
+    assert_eq!(client.get("/api/dashboard").await["ext"]["github"], before);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn only_a_project_administrator_switches_modules() {
     let mut client = demo().await;
     let (mut member, _) = client.member("Ola Nowak", "ola@example.com").await;

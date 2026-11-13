@@ -29,6 +29,11 @@ denied_tools: Array<string>,
  */
 sandbox: SandboxPolicy | null, hub_tools: Array<HubTool>, 
 /**
+ * Offer the `commit_changes` tool: the thread writes files but has no shell to run git in,
+ * so the app commits for it.
+ */
+commit_tool: boolean, 
+/**
  * Added to the environment of the thread's commands.
  */
 env: { [key in string]: string }, };

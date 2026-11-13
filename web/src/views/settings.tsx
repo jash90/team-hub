@@ -1,28 +1,14 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent } from 'react';
 
 import { api } from '../api.ts';
 import type { ApiToken } from '../bindings/ApiToken.ts';
 import type { ModuleInfo } from '../bindings/ModuleInfo.ts';
 import type { User } from '../bindings/User.ts';
-import { Avatar, Button, Dialog, Field, Picker, Tabs, Tag, attempt, copyText, toast, useBusy } from '../components/ui.tsx';
+import { Avatar, Button, Dialog, Field, Picker, SettingsCard, Tabs, Tag, attempt, copyText, toast, useBusy } from '../components/ui.tsx';
 import { currentLanguage, formatDate, setLanguage, t, timeAgo } from '../i18n/index.ts';
 import { useModules } from '../modules.ts';
 import { navigate } from '../router.tsx';
 import { useRemote, useSession } from '../session.tsx';
-
-export function SettingsCard({ title, lead, children, action }: { title: string; lead?: string; children: ReactNode; action?: ReactNode }) {
-  return (
-    <section className="panel settings-card">
-      <header className="panel-head">
-        <h2>{title}</h2>
-        <span className="filter-spacer" />
-        {action}
-      </header>
-      {lead && <p className="muted settings-lead">{lead}</p>}
-      {children}
-    </section>
-  );
-}
 
 export function SettingsView({ tab }: { tab?: string }) {
   const { user } = useSession();

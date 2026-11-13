@@ -79,6 +79,20 @@ fn a_branch_checked_out_elsewhere_and_a_made_up_name_are_refused() {
 }
 
 #[test]
+fn a_tree_whose_folder_was_deleted_by_hand_does_not_block_the_next_one() {
+    let repo = repo("worktree-pruned");
+    let tree = repo.root.path().join("trees/a");
+
+    git::create_worktree(&repo.clone, &tree, "feature/WEB-1").unwrap();
+    std::fs::remove_dir_all(&tree).unwrap();
+
+    let again = git::create_worktree(&repo.clone, &tree, "feature/WEB-1").unwrap();
+
+    assert!(again.continued);
+    assert_eq!(run(&tree, &["rev-parse", "--abbrev-ref", "HEAD"]), "feature/WEB-1");
+}
+
+#[test]
 fn a_tree_with_changes_is_not_removed_and_a_clean_one_is_while_the_branch_stays() {
     let repo = repo("worktree-remove");
     let tree = repo.root.path().join("trees/a");
@@ -145,20 +159,80 @@ fn the_sandbox_opens_only_what_a_commit_needs_in_the_clones_git_folder() {
     let repo = repo("worktree-access");
     let tree = repo.root.path().join("trees/a");
 
+    run(&repo.clone, &["branch", "feature/WEB-9-somebody-elses"]);
     git::create_worktree(&repo.clone, &tree, "feature/WEB-1").unwrap();
 
     let access = git::write_access(&repo.clone, &tree, "feature/WEB-1").unwrap();
     let dot_git = repo.clone.join(".git");
     let text = |path: std::path::PathBuf| path.to_string_lossy().into_owned();
 
+    // The folders of the branch's ref and reflog, not the files: git writes `<ref>.lock` beside the ref.
     assert_eq!(
         access.writable,
-        vec![text(dot_git.join("objects")), text(dot_git.join("refs/heads/feature/WEB-1")), text(dot_git.join("logs/refs/heads/feature/WEB-1")), text(dot_git.join("worktrees/a"))]
+        vec![
+            text(dot_git.join("objects")),
+            text(dot_git.join("refs/heads/feature")),
+            text(dot_git.join("logs/refs/heads/feature")),
+            text(dot_git.join("worktrees/a"))
+        ]
     );
 
-    for closed in ["hooks", "config", "info", "modules", "worktrees/a/gitdir", "worktrees/a/commondir"] {
+    for closed in ["hooks", "config", "info", "modules", "worktrees/a/gitdir", "worktrees/a/commondir", "refs/heads/feature/WEB-9-somebody-elses"] {
         assert!(access.protected.contains(&text(dot_git.join(closed))), "{closed}");
     }
+
+    assert!(!access.protected.contains(&text(dot_git.join("refs/heads/feature/WEB-1"))));
+
+    // A branch without a folder of its own opens refs/heads, with every other branch closed by name.
+    let flat = repo.root.path().join("trees/b");
+
+    git::create_worktree(&repo.clone, &flat, "hotfix").unwrap();
+
+    let access = git::write_access(&repo.clone, &flat, "hotfix").unwrap();
+
+    assert!(access.writable.contains(&text(dot_git.join("refs/heads"))));
+    assert!(access.protected.contains(&text(dot_git.join("refs/heads/main"))));
+    assert!(access.protected.contains(&text(dot_git.join("refs/heads/feature"))));
+    assert!(!access.protected.contains(&text(dot_git.join("refs/heads/hotfix"))));
+}
+
+#[test]
+fn the_app_commits_for_a_thread_without_a_shell_and_runs_no_hook_doing_it() {
+    let repo = repo("commit-tool");
+    let tree = repo.root.path().join("trees/a");
+    let made = git::create_worktree(&repo.clone, &tree, "feature/WEB-1").unwrap();
+
+    write(&repo.clone, ".git/hooks/pre-commit", "#!/bin/sh\necho ran > \"$(git rev-parse --show-toplevel)/hook-ran\"\nexit 1\n");
+    run(&repo.clone, &["config", "user.name", "Ada"]);
+    run(&repo.clone, &["config", "user.email", "ada@example.invalid"]);
+    run(&repo.clone, &["config", "commit.gpgsign", "false"]);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        std::fs::set_permissions(repo.clone.join(".git/hooks/pre-commit"), std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    write(&tree, "src/login.ts", "export const limit = 10;\n");
+    write(&tree, "notes.md", "left out of the first commit\n");
+
+    let first = git::commit(&repo.clone, &tree, "WEB-1: raise the limit", &["src/login.ts".to_string()]).unwrap();
+
+    assert!(first.ends_with("WEB-1: raise the limit"), "{first}");
+    assert_eq!(run(&tree, &["status", "--porcelain"]), "?? notes.md");
+    assert!(!tree.join("hook-ran").exists());
+
+    git::commit(&repo.clone, &tree, "WEB-1: notes", &[]).unwrap();
+
+    let (_, commits, uncommitted) = git::thread_changes(&repo.clone, &tree, &made.base_commit).unwrap();
+
+    assert_eq!((commits.len(), uncommitted), (2, 0));
+    assert!(git::commit(&repo.clone, &tree, "WEB-1: nothing", &[]).is_err());
+    assert!(git::commit(&repo.clone, &tree, "x", &["../web/README.md".to_string()]).is_err());
+    assert!(git::commit(&repo.clone, &tree, "x", &["--amend".to_string()]).is_err());
+    assert!(git::commit(&repo.clone, &tree, "  ", &[]).is_err());
+    assert_eq!(run(&repo.clone, &["rev-parse", "--abbrev-ref", "HEAD"]), "main");
 }
 
 #[test]

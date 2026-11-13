@@ -1,4 +1,4 @@
-// Polish for the desktop app. English is written in place (`t('…')`), exactly as in the web
+// Polish for the desktop app. English is written in place, as the argument of `t`, exactly as in the web
 // interface, whose own dictionary answers first: words the two share are translated once,
 // there. The modules' dictionaries cover what their panels say.
 import { addTranslations } from '@web/i18n/index.ts';

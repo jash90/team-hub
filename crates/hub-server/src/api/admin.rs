@@ -20,7 +20,13 @@ struct ModuleRequest {
 
 async fn set_module(State(app): State<App>, user: AuthUser, Path(id): Path<String>, Json(request): Json<ModuleRequest>) -> Reply<Value> {
     user.require_admin()?;
-    app.run(move |app| app.set_module_enabled(&id, request.enabled)).await?;
+    app.run(move |app| {
+        app.set_module_enabled(&id, request.enabled)?;
+
+        // Tells every open browser to load or drop the module's screens.
+        app.write(user.actor(), |tx| tx.emit("instance.modules", None, None, json!({ "module": id, "enabled": request.enabled })))
+    })
+    .await?;
 
     Ok(Json(json!({ "modules": app.module_infos() })))
 }

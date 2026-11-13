@@ -109,8 +109,10 @@ impl Module for AgentsModule {
     fn dashboard(&self, connection: &Connection, viewer: &AuthUser) -> ApiResult<Option<Value>> {
         let (visible, mut params) = visible_projects(viewer, "r.project_id");
         params.push(SqlValue::Integer(viewer.id));
+        // Projects that have this module switched off stay out of the section.
+        let on = hub_app::services::project_modules::on_in_project("agents", "r.project_id");
         let tail = format!(
-            "WHERE {visible} AND r.requested_by = ? AND r.state != 'cancelled'
+            "WHERE {visible} AND {on} AND r.requested_by = ? AND r.state != 'cancelled'
                AND (r.question_pending = 1 OR EXISTS (SELECT 1 FROM agent_proposal a WHERE a.run_id = r.id AND a.state = 'pending'))
              ORDER BY r.id DESC LIMIT 20"
         );

@@ -236,7 +236,9 @@ pub fn dashboard(connection: &Connection, viewer: &AuthUser) -> ApiResult<Option
     let (visible, mut params) = visible_projects(viewer, "i.project_id");
     params.insert(0, SqlValue::Integer(viewer.id));
 
-    let failing = tests_of_issues(connection, viewer, &format!("i.assignee_id = ? AND t.last_status = 'failed' AND {visible}"), params)?;
+    // Projects that have this module switched off stay out of the section.
+    let on = hub_app::services::project_modules::on_in_project("e2e", "i.project_id");
+    let failing = tests_of_issues(connection, viewer, &format!("i.assignee_id = ? AND t.last_status = 'failed' AND {visible} AND {on}"), params)?;
 
     if failing.is_empty() {
         return Ok(None);

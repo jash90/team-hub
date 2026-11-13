@@ -92,9 +92,8 @@ pub fn repository_instructions(worktree: &Path) -> Option<String> {
 
 /// Whether this system can confine a thread's shell commands.
 pub fn sandbox_state() -> SandboxState {
-    let on_path = |program: &str| {
-        std::env::var_os("PATH").is_some_and(|paths| std::env::split_paths(&paths).any(|folder| folder.join(program).is_file()))
-    };
+    let on_path =
+        |program: &str| std::env::var_os("PATH").is_some_and(|paths| std::env::split_paths(&paths).any(|folder| folder.join(program).is_file()));
     let available = if cfg!(target_os = "macos") {
         Path::new("/usr/bin/sandbox-exec").exists()
     } else if cfg!(target_os = "linux") {
@@ -133,7 +132,7 @@ pub fn read_denials(folders: &[String]) -> Vec<String> {
 pub fn allowed_tools(kind: ThreadKind, worktree: &str, shell: bool) -> Vec<String> {
     let mut tools: Vec<String> = READ_TOOLS.iter().map(|tool| (*tool).to_string()).collect();
 
-    if matches!(kind, ThreadKind::Implement | ThreadKind::Custom) {
+    if writes_files(kind) {
         tools.extend(["Edit", "Write"].map(|tool| format!("{tool}({}/**)", rule_path(worktree))));
     }
 
@@ -170,9 +169,46 @@ fn kind_rules(kind: ThreadKind) -> &'static str {
     }
 }
 
+const WITH_SHELL: &str = "Your shell runs in a sandbox: no network, and it can write only inside the working tree. Commit with git as usual, staging the files you changed by name. The sandbox may show placeholder dotfiles in the working tree (.bashrc, .gitconfig and the like); they are not yours, leave them alone.";
+const WITHOUT_SHELL: &str = "You have no shell on this machine, so you cannot run commands, tests or git. Read and edit files with the file tools, and commit with the commit_changes tool (a message, and optionally the paths to commit). Say in your summary that nothing could be run.";
+
 /// The rules added to the agent's instructions.
-pub fn rules(kind: ThreadKind) -> String {
-    COMMON_RULES.iter().copied().chain([kind_rules(kind)]).collect::<Vec<_>>().join("\n\n")
+pub fn rules(kind: ThreadKind, shell: bool) -> String {
+    let how = if shell { WITH_SHELL } else { WITHOUT_SHELL };
+
+    COMMON_RULES.iter().copied().chain([how, kind_rules(kind)]).collect::<Vec<_>>().join("\n\n")
+}
+
+/// Whether threads of this kind change files at all.
+pub fn writes_files(kind: ThreadKind) -> bool {
+    matches!(kind, ThreadKind::Implement | ThreadKind::Custom)
+}
+
+/// Names the Linux sandbox shows in a working tree while a command runs: placeholders that
+/// keep these files from being created. Git must not take them for the thread's work.
+const SANDBOX_PLACEHOLDERS: [&str; 12] = [
+    ".bash_profile",
+    ".bashrc",
+    ".profile",
+    ".zprofile",
+    ".zshrc",
+    ".gitconfig",
+    ".gitmodules",
+    ".ripgreprc",
+    ".mcp.json",
+    ".idea",
+    ".vscode",
+    ".claude/",
+];
+
+/// An excludes file for the thread's own git: the person's global one, plus the sandbox's
+/// placeholders. Returns its path, or none when it could not be written.
+pub fn sandbox_excludes(worktrees_root: &Path, global: Option<&str>) -> Option<PathBuf> {
+    let file = worktrees_root.join(".sandbox-excludes");
+    let own = SANDBOX_PLACEHOLDERS.iter().map(|name| format!("/{name}")).collect::<Vec<_>>().join("\n");
+    let content = format!("{}\n# Placeholders of the shell sandbox (written by team-hub desktop).\n{own}\n", global.unwrap_or_default().trim_end());
+
+    std::fs::write(&file, content).ok().map(|()| file)
 }
 
 /// Text from the tracker inside a fence the text itself cannot close.
@@ -191,7 +227,8 @@ pub fn first_prompt(kind: ThreadKind, issue: Option<(&Issue, Option<&Project>)>,
     let mut parts = vec![format!("Issue {key}: {summary}")];
 
     if let Some((issue, project)) = issue {
-        let status = project.and_then(|project| project.statuses.iter().find(|status| status.id == issue.row.status_id)).map(|status| status.name.as_str());
+        let status =
+            project.and_then(|project| project.statuses.iter().find(|status| status.id == issue.row.status_id)).map(|status| status.name.as_str());
         let type_name = project.and_then(|project| project.types.iter().find(|kind| kind.id == issue.row.type_id)).map(|kind| kind.name.as_str());
         let facts = [
             type_name.map(|name| format!("Type: {name}")),
@@ -275,8 +312,25 @@ mod tests {
 
         assert!(prompt.starts_with("Issue WEB-12: Login fails"));
         assert!(prompt.contains("Focus on the session cookie."));
-        assert!(rules(ThreadKind::Analyse).contains("Do not edit files"));
-        assert!(rules(ThreadKind::Implement).contains("propose_push"));
+        assert!(rules(ThreadKind::Analyse, true).contains("Do not edit files"));
+        assert!(rules(ThreadKind::Implement, true).contains("propose_push"));
+        assert!(rules(ThreadKind::Implement, true).contains("staging the files you changed by name"));
+        assert!(rules(ThreadKind::Implement, false).contains("commit_changes"));
+    }
+
+    #[test]
+    fn the_threads_git_ignores_the_sandboxs_placeholders_and_keeps_the_persons_own_ignores() {
+        let folder = std::env::temp_dir().join(format!("hub-desktop-excludes-{}", std::process::id()));
+
+        std::fs::create_dir_all(&folder).unwrap();
+
+        let file = sandbox_excludes(&folder, Some("*.swp\n")).unwrap();
+        let content = std::fs::read_to_string(file).unwrap();
+
+        assert!(content.starts_with("*.swp\n"));
+        assert!(content.contains("\n/.bashrc\n") && content.contains("\n/.claude/\n"));
+
+        let _ = std::fs::remove_dir_all(folder);
     }
 
     #[test]

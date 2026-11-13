@@ -14,6 +14,7 @@ export { Menu, type MenuItem } from './ui/menu.tsx';
 export { Picker, type Option } from './ui/picker.tsx';
 export { Popover } from './ui/popover.tsx';
 export { ProgressBar } from './ui/progress.tsx';
+export { SettingsCard } from './ui/settings-card.tsx';
 export { Tabs, type TabItem } from './ui/tabs.tsx';
 export { Tag } from './ui/tag.tsx';
 export { Toaster, attempt, toast, useBusy } from './ui/toast.tsx';

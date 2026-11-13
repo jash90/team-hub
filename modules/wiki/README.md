@@ -119,7 +119,7 @@ and the FTS5 table `wiki_fts(title, body)` with rowid = page id, holding text fo
 
 ## Web (`web/`)
 
-`index.tsx` exports `wikiModule`; texts are English in place with Polish in `pl.ts`, styles in
+The default export of `index.tsx` is `wikiModule`; texts are English in place with Polish in `pl.ts`, styles in
 `styles.css` (classes prefixed `wiki-`).
 
 | Address | Screen |

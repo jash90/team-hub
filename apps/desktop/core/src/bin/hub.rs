@@ -123,11 +123,18 @@ enum ThreadCommand {
     },
     List,
     /// What a thread said and did, and its proposals.
-    Show { id: i64 },
+    Show {
+        id: i64,
+    },
     /// The thread's changes against the point it started from.
-    Diff { id: i64 },
+    Diff {
+        id: i64,
+    },
     /// Answer a thread's question or tell it more, and follow it.
-    Say { id: i64, text: String },
+    Say {
+        id: i64,
+        text: String,
+    },
     /// Note the pull request opened for the thread's branch, so the thread and its run show it.
     Pr {
         id: i64,
@@ -135,7 +142,9 @@ enum ThreadCommand {
         url: String,
     },
     /// Remove the thread's working tree (the branch stays).
-    Remove { id: i64 },
+    Remove {
+        id: i64,
+    },
 }
 
 fn print_json<T: Serialize>(value: &T) {
@@ -163,7 +172,15 @@ fn line_of_thread(thread: &Thread) -> String {
     };
     let run = thread.run_id.map_or("local".to_string(), |id| format!("run {id}"));
 
-    format!("#{:<3} {:<8} {:<10} {:<9} {:<8} {}{needs}", thread.id, thread.state.as_str(), thread.issue_key, thread.kind.as_str(), run, thread.branch.as_deref().unwrap_or("-"))
+    format!(
+        "#{:<3} {:<8} {:<10} {:<9} {:<8} {}{needs}",
+        thread.id,
+        thread.state.as_str(),
+        thread.issue_key,
+        thread.kind.as_str(),
+        run,
+        thread.branch.as_deref().unwrap_or("-")
+    )
 }
 
 /// Follows one thread: prints what it says, keeps the runner's rounds going, and returns when
@@ -258,7 +275,11 @@ async fn status(desktop: &Desktop, json: bool) -> CoreResult<()> {
     match dashboard {
         Ok(view) => {
             let status_of = |row: &hub_core::IssueRow| {
-                view.projects.iter().flat_map(|project| &project.statuses).find(|status| status.id == row.status_id).map_or("?", |status| status.name.as_str())
+                view.projects
+                    .iter()
+                    .flat_map(|project| &project.statuses)
+                    .find(|status| status.id == row.status_id)
+                    .map_or("?", |status| status.name.as_str())
             };
 
             println!("\nMy work ({} as of {})", view.dashboard.assigned.len(), view.fetched_at);
@@ -315,23 +336,41 @@ async fn run(cli: Cli, desktop: &Desktop) -> CoreResult<ExitCode> {
 
             let issue = &view.issue;
             let project = view.project.as_ref();
-            let status = project.and_then(|project| project.statuses.iter().find(|status| status.id == issue.row.status_id)).map_or("?", |status| status.name.as_str());
+            let status = project
+                .and_then(|project| project.statuses.iter().find(|status| status.id == issue.row.status_id))
+                .map_or("?", |status| status.name.as_str());
 
             println!("{} {}{}", issue.row.key, issue.row.summary, if view.offline { "  (stored copy)" } else { "" });
-            println!("{status} · {} · {} comments · spent {}", priority_name(issue.row.priority), issue.comments.len(), hub_core::text::format_duration(issue.spent_minutes));
+            println!(
+                "{status} · {} · {} comments · spent {}",
+                priority_name(issue.row.priority),
+                issue.comments.len(),
+                hub_core::text::format_duration(issue.spent_minutes)
+            );
 
             if !issue.description.trim().is_empty() {
                 println!("\n{}", issue.description.trim());
             }
 
             for comment in &issue.comments {
-                println!("\n— {} ({})\n{}", comment.author_label.clone().unwrap_or_else(|| format!("user {}", comment.author_id.unwrap_or_default())), comment.created_at, comment.body);
+                println!(
+                    "\n— {} ({})\n{}",
+                    comment.author_label.clone().unwrap_or_else(|| format!("user {}", comment.author_id.unwrap_or_default())),
+                    comment.created_at,
+                    comment.body
+                );
             }
 
             for (module, panel) in &issue.panels {
                 if let Some(prs) = panel.get("prs").and_then(|prs| prs.as_array()) {
                     for pr in prs {
-                        println!("\n[{module}] {} #{} {} ({})", pr["repo"].as_str().unwrap_or_default(), pr["number"], pr["title"].as_str().unwrap_or_default(), pr["state"].as_str().unwrap_or_default());
+                        println!(
+                            "\n[{module}] {} #{} {} ({})",
+                            pr["repo"].as_str().unwrap_or_default(),
+                            pr["number"],
+                            pr["title"].as_str().unwrap_or_default(),
+                            pr["state"].as_str().unwrap_or_default()
+                        );
                     }
                 }
             }
@@ -353,11 +392,22 @@ async fn run(cli: Cli, desktop: &Desktop) -> CoreResult<ExitCode> {
                         (None, changed) => format!("{changed} changed"),
                     };
 
-                    println!("#{} {} {} → {}", repo.mapping.id, repo.mapping.project_key, repo.mapping.github_repo.as_deref().unwrap_or("-"), repo.mapping.path);
+                    println!(
+                        "#{} {} {} → {}",
+                        repo.mapping.id,
+                        repo.mapping.project_key,
+                        repo.mapping.github_repo.as_deref().unwrap_or("-"),
+                        repo.mapping.path
+                    );
                     println!("    default {} · {state} · {} working trees", repo.default_branch.as_deref().unwrap_or("?"), repo.worktrees.len());
 
                     for tree in repo.worktrees {
-                        println!("    {} {}{}", tree.head, tree.branch.as_deref().unwrap_or("(detached)"), tree.thread_id.map(|id| format!("  thread #{id}")).unwrap_or_default());
+                        println!(
+                            "    {} {}{}",
+                            tree.head,
+                            tree.branch.as_deref().unwrap_or("(detached)"),
+                            tree.thread_id.map(|id| format!("  thread #{id}")).unwrap_or_default()
+                        );
                     }
                 }
             }
@@ -404,7 +454,12 @@ async fn run(cli: Cli, desktop: &Desktop) -> CoreResult<ExitCode> {
                     return Ok(ExitCode::SUCCESS);
                 }
 
-                println!("{}\n{} · {}", line_of_thread(&detail.thread), detail.thread.issue_summary, detail.thread.worktree.as_deref().unwrap_or("no working tree"));
+                println!(
+                    "{}\n{} · {}",
+                    line_of_thread(&detail.thread),
+                    detail.thread.issue_summary,
+                    detail.thread.worktree.as_deref().unwrap_or("no working tree")
+                );
                 detail.events.iter().for_each(|event| println!("{}", line_of(event)));
 
                 for proposal in detail.proposals {
@@ -466,7 +521,15 @@ async fn run(cli: Cli, desktop: &Desktop) -> CoreResult<ExitCode> {
                 for run in runs {
                     let runner = run.runner_name.as_deref().unwrap_or("-");
 
-                    println!("{:<5} {:<10} {:<9} {:<10} {:<24} {}", run.id, run.state.as_str(), run.kind.as_str(), run.issue_key, runner, run.branch.as_deref().unwrap_or(""));
+                    println!(
+                        "{:<5} {:<10} {:<9} {:<10} {:<24} {}",
+                        run.id,
+                        run.state.as_str(),
+                        run.kind.as_str(),
+                        run.issue_key,
+                        runner,
+                        run.branch.as_deref().unwrap_or("")
+                    );
                 }
             }
         }
@@ -510,7 +573,14 @@ async fn run(cli: Cli, desktop: &Desktop) -> CoreResult<ExitCode> {
                 print_json(&pending);
             } else {
                 for proposal in pending {
-                    println!("#{:<3} thread #{:<3} {:<10} {:<16} {}", proposal.id, proposal.thread_id, proposal.issue_key, proposal.kind.as_str(), proposal.payload);
+                    println!(
+                        "#{:<3} thread #{:<3} {:<10} {:<16} {}",
+                        proposal.id,
+                        proposal.thread_id,
+                        proposal.issue_key,
+                        proposal.kind.as_str(),
+                        proposal.payload
+                    );
                 }
             }
         }

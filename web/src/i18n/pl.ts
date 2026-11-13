@@ -17,6 +17,8 @@ export const pl: Record<string, string> = {
   'Profile and tokens': 'Profil i tokeny',
   'Sign out': 'Wyloguj',
   'Page not found': 'Nie ma takiej strony',
+  'This page could not be loaded. Reload to try again.': 'Nie udało się wczytać tej strony. Odśwież, aby spróbować ponownie.',
+  'Some screens could not be loaded. Reload to try again.': 'Nie udało się wczytać części ekranów. Odśwież, aby spróbować ponownie.',
   'Switch theme': 'Przełącz motyw',
   'Search issues, pages… ( / )': 'Szukaj zadań, stron… ( / )',
   'Search all issues for “{text}”': 'Szukaj „{text}” we wszystkich zadaniach',

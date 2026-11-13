@@ -299,7 +299,8 @@ mod tests {
     #[test]
     fn a_patch_sends_only_what_changed() {
         let sent = RunPatch { state: Some(RunState::Running), branch: Some("feature/WEB-1".into()), ..Default::default() };
-        let now = RunPatch { state: Some(RunState::Succeeded), branch: Some("feature/WEB-1".into()), summary: Some("Done".into()), ..Default::default() };
+        let now =
+            RunPatch { state: Some(RunState::Succeeded), branch: Some("feature/WEB-1".into()), summary: Some("Done".into()), ..Default::default() };
         let patch = now.changed_since(&sent);
 
         assert_eq!(serde_json::to_value(&patch).unwrap(), serde_json::json!({ "state": "succeeded", "summary": "Done" }));

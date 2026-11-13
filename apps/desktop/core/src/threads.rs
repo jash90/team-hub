@@ -112,7 +112,12 @@ impl Inner {
     }
 
     fn notify(&self, thread: &Thread, title: String, body: &str) {
-        self.emit(AppEvent::Notify { title, body: hub_core::text::truncate(body, 200), thread_id: Some(thread.id), issue_key: Some(thread.issue_key.clone()) });
+        self.emit(AppEvent::Notify {
+            title,
+            body: hub_core::text::truncate(body, 200),
+            thread_id: Some(thread.id),
+            issue_key: Some(thread.issue_key.clone()),
+        });
     }
 
     fn running(&self) -> std::sync::MutexGuard<'_, HashMap<i64, Running>> {
@@ -143,21 +148,32 @@ impl Inner {
                 let suggested = || hub_core::keys::suggest_branch_name(&thread.issue_key, &thread.issue_summary, &private.issue_type);
                 let branch = thread.branch.clone().or(private.wanted_branch.clone()).unwrap_or_else(suggested);
                 let holder = self.store.threads()?.into_iter().find(|other| {
-                    other.id != thread.id && other.repo_path == thread.repo_path && other.branch.as_deref() == Some(branch.as_str()) && other.worktree.as_deref().is_some_and(|tree| Path::new(tree).exists())
+                    other.id != thread.id
+                        && other.repo_path == thread.repo_path
+                        && other.branch.as_deref() == Some(branch.as_str())
+                        && other.worktree.as_deref().is_some_and(|tree| Path::new(tree).exists())
                 });
 
                 match holder {
                     // One branch has one working tree. An earlier thread that is at rest hands
                     // its tree over; one that is working keeps it.
                     Some(other) if other.state.is_active() => {
-                        return Err(CoreError::not_possible(format!("Thread #{} is already working on branch {branch}; stop it or wait for it", other.id)));
+                        return Err(CoreError::not_possible(format!(
+                            "Thread #{} is already working on branch {branch}; stop it or wait for it",
+                            other.id
+                        )));
                     }
                     Some(other) => {
                         let place = other.worktree.clone().unwrap_or_default();
 
                         self.store.set_worktree(other.id, None, None, None, None)?;
                         self.store.set_worktree(thread.id, Some(&place), Some(&branch), other.base.as_deref(), other.base_commit.as_deref())?;
-                        self.say(other.id, EventKind::Status, &format!("Thread #{} continues in this thread's working tree.", thread.id), Value::Null);
+                        self.say(
+                            other.id,
+                            EventKind::Status,
+                            &format!("Thread #{} continues in this thread's working tree.", thread.id),
+                            Value::Null,
+                        );
                         self.changed(other.id);
                         self.say(
                             thread.id,
@@ -169,7 +185,11 @@ impl Inner {
                         (PathBuf::from(place), branch)
                     }
                     None => {
-                        let folder = self.config.worktrees_root.join(repo_folder_name(&repo)).join(format!("{}-t{}", thread.issue_key.to_lowercase(), thread.id));
+                        let folder = self.config.worktrees_root.join(repo_folder_name(&repo)).join(format!(
+                            "{}-t{}",
+                            thread.issue_key.to_lowercase(),
+                            thread.id
+                        ));
                         let made = git::create_worktree(&repo, &folder, &branch)?;
                         let place = made.path.to_string_lossy().into_owned();
                         let how = if made.continued { "continuing branch" } else { "new branch" };
@@ -214,9 +234,18 @@ impl Inner {
             (None, None) => private.first_prompt,
         };
         let rules = match policy::repository_instructions(&worktree) {
-            Some(own) => format!("{}\n\n# The repository's own instructions (CLAUDE.md)\n\n{own}", policy::rules(thread.kind)),
-            None => policy::rules(thread.kind),
+            Some(own) => format!("{}\n\n# The repository's own instructions (CLAUDE.md)\n\n{own}", policy::rules(thread.kind, shell)),
+            None => policy::rules(thread.kind, shell),
         };
+        let mut env = BTreeMap::new();
+
+        // The thread's git must not take the sandbox's placeholder files for its own work.
+        if let Some(excludes) = sandboxed.then(|| policy::sandbox_excludes(&self.config.worktrees_root, git::global_excludes().as_deref())).flatten()
+        {
+            env.insert("GIT_CONFIG_COUNT".to_string(), "1".to_string());
+            env.insert("GIT_CONFIG_KEY_0".to_string(), "core.excludesFile".to_string());
+            env.insert("GIT_CONFIG_VALUE_0".to_string(), excludes.to_string_lossy().into_owned());
+        }
 
         Ok(StartThread {
             thread: thread.id,
@@ -230,7 +259,8 @@ impl Inner {
             denied_tools: denied,
             sandbox: sandboxed.then(|| SandboxPolicy { writable: access.writable, protected: access.protected, unreadable }),
             hub_tools: self.host.hub_tools(&thread),
-            env: BTreeMap::new(),
+            commit_tool: !shell && policy::writes_files(thread.kind),
+            env,
         })
     }
 
@@ -239,7 +269,13 @@ impl Inner {
         let start = tokio::task::spawn_blocking(move || inner.prepare(thread_id)).await??;
         let mut command = Command::new(&self.config.program);
 
-        command.args(&self.config.arguments).envs(&self.config.env).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
+        command
+            .args(&self.config.arguments)
+            .envs(&self.config.env)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
 
         // The agent and its shell inherit the helper's environment: the app's own token and
         // the usual tokens of code hosts and clouds are not part of it.
@@ -556,7 +592,10 @@ impl Runtime {
     /// period, together with everything it started.
     pub async fn stop(&self, thread_id: i64) -> CoreResult<Thread> {
         let inner = &self.inner;
-        let handle = inner.running().get(&thread_id).map(|running| (running.to_helper.clone(), running.pid, Arc::clone(&running.stopping), running.exited.clone()));
+        let handle = inner
+            .running()
+            .get(&thread_id)
+            .map(|running| (running.to_helper.clone(), running.pid, Arc::clone(&running.stopping), running.exited.clone()));
 
         match handle {
             Some((to_helper, pid, stopping, mut exited)) => {
@@ -626,7 +665,10 @@ impl Runtime {
         if let Some(worktree) = thread.worktree.clone() {
             let repo = PathBuf::from(&thread.repo_path);
 
-            tokio::task::spawn_blocking(move || if Path::new(&worktree).exists() { git::remove_worktree(&repo, Path::new(&worktree)) } else { Ok(()) }).await??;
+            tokio::task::spawn_blocking(
+                move || if Path::new(&worktree).exists() { git::remove_worktree(&repo, Path::new(&worktree)) } else { Ok(()) },
+            )
+            .await??;
             self.inner.store.set_worktree(thread_id, None, None, None, None)?;
             self.inner.say(thread_id, EventKind::Status, "Working tree removed; the branch is kept.", Value::Null);
             self.inner.changed(thread_id);

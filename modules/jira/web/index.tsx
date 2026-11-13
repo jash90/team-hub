@@ -21,12 +21,11 @@ import type { StatusCategory } from '@/bindings/StatusCategory.ts';
 import type { TypeLevel } from '@/bindings/TypeLevel.ts';
 import { Icon } from '@/components/icon.tsx';
 import { PRIORITIES } from '@/components/issue-bits.tsx';
-import { Button, ErrorNote, Field, Picker, Spinner, Tag, toast, useBusy } from '@/components/ui.tsx';
+import { Button, ErrorNote, Field, Picker, SettingsCard, Spinner, Tag, toast, useBusy } from '@/components/ui.tsx';
 import { countOf, formatDateTime, t, timeAgo } from '@/i18n/index.ts';
 import type { WebModule } from '@/modules.ts';
 import { Link } from '@/router.tsx';
 import { useLive, useRemote, useSession } from '@/session.tsx';
-import { SettingsCard } from '@/views/settings.tsx';
 
 import { polish } from './pl.ts';
 import './styles.css';
@@ -977,9 +976,11 @@ function AdminSettings() {
   );
 }
 
-export const jiraModule: WebModule = {
+const jiraModule: WebModule = {
   id: 'jira',
   issuePanel: IssuePanel,
   settings: [{ id: 'jira', label: () => t('Jira import'), adminOnly: true, render: () => <AdminSettings /> }],
   polish,
 };
+
+export default jiraModule;

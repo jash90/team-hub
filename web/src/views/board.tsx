@@ -12,7 +12,8 @@ import { Avatar, Button, Dialog, Empty, ErrorNote, Field, Picker, ProgressBar, S
 import { countOf, formatDate, t } from '../i18n/index.ts';
 import { Link } from '../router.tsx';
 import { changesIssues, useProject, useRemote, useSession, useStored } from '../session.tsx';
-import { CreateIssueDialog, type CreateDefaults } from './create-issue.tsx';
+import type { CreateDefaults } from './create-issue.tsx';
+import { CreateIssueDialog } from './lazy.ts';
 
 type Grouping = 'none' | 'epic' | 'assignee';
 type Lane = { id: string; title: string; assigneeId?: number | null; matches: (issue: IssueRow) => boolean };

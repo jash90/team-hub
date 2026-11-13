@@ -7,12 +7,11 @@ import type { ConfluenceRemoteSpace } from '@/bindings/ConfluenceRemoteSpace.ts'
 import type { ConfluenceSettings } from '@/bindings/ConfluenceSettings.ts';
 import type { ConfluenceTestResult } from '@/bindings/ConfluenceTestResult.ts';
 import { Icon } from '@/components/icon.tsx';
-import { Button, ErrorNote, Field, Picker, Spinner, Tag, attempt, toast, useBusy } from '@/components/ui.tsx';
+import { Button, ErrorNote, Field, Picker, SettingsCard, Spinner, Tag, attempt, toast, useBusy } from '@/components/ui.tsx';
 import { formatDateTime, t, timeAgo } from '@/i18n/index.ts';
 import type { WebModule } from '@/modules.ts';
 import { Link } from '@/router.tsx';
 import { useRemote } from '@/session.tsx';
-import { SettingsCard } from '@/views/settings.tsx';
 
 import { polish } from './pl.ts';
 import './styles.css';
@@ -313,8 +312,10 @@ function AdminSettings() {
   );
 }
 
-export const confluenceModule: WebModule = {
+const confluenceModule: WebModule = {
   id: 'confluence',
   settings: [{ id: 'confluence', label: () => 'Confluence', adminOnly: true, render: () => <AdminSettings /> }],
   polish,
 };
+
+export default confluenceModule;

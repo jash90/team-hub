@@ -59,6 +59,9 @@ pub struct StartThread {
     /// person chose otherwise in the settings.
     pub sandbox: Option<SandboxPolicy>,
     pub hub_tools: Vec<HubTool>,
+    /// Offer the `commit_changes` tool: the thread writes files but has no shell to run git in,
+    /// so the app commits for it.
+    pub commit_tool: bool,
     /// Added to the environment of the thread's commands.
     pub env: BTreeMap<String, String>,
 }
@@ -71,7 +74,11 @@ pub enum ToSidecar {
     /// Stop working now. The helper ends its process; a helper that does not is killed.
     Stop,
     /// The answer to a `request`.
-    Reply { request: u64, ok: bool, result: Value },
+    Reply {
+        request: u64,
+        ok: bool,
+        result: Value,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -79,11 +86,18 @@ pub enum ToSidecar {
 #[ts(export, export_to = "../../../apps/desktop/ui/src/bindings/")]
 pub enum AgentEvent {
     /// The session id to resume this conversation with.
-    Session { session_id: String },
+    Session {
+        session_id: String,
+    },
     /// Something the agent said.
-    Assistant { text: String },
+    Assistant {
+        text: String,
+    },
     /// A tool the agent called, with its input cut to a readable length.
-    Tool { name: String, detail: String },
+    Tool {
+        name: String,
+        detail: String,
+    },
     /// The turn is over.
     Result {
         ok: bool,
@@ -93,18 +107,28 @@ pub enum AgentEvent {
         input_tokens: Option<i64>,
         output_tokens: Option<i64>,
     },
-    Error { message: String },
+    Error {
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[ts(export, export_to = "../../../apps/desktop/ui/src/bindings/")]
 pub enum FromSidecar {
-    Ready { protocol: u32 },
-    Event { event: AgentEvent },
+    Ready {
+        protocol: u32,
+    },
+    Event {
+        event: AgentEvent,
+    },
     /// A tool call of the agent that the core answers with a `reply`: `read:<name>` for a
-    /// tool of the server, or one of the `propose_*` tools, or `ask_question`.
-    Request { request: u64, tool: String, input: Value },
+    /// tool of the server, or one of the `propose_*` tools, `ask_question` or `commit_changes`.
+    Request {
+        request: u64,
+        tool: String,
+        input: Value,
+    },
 }
 
 /// Prefix of a request for one of the server's read-only tools.
@@ -115,6 +139,7 @@ pub const PROPOSE_STATUS: &str = "propose_status_change";
 pub const PROPOSE_SUBTASKS: &str = "propose_subtasks";
 pub const PROPOSE_PUSH: &str = "propose_push";
 pub const PROPOSE_PULL_REQUEST: &str = "propose_pull_request";
+pub const COMMIT_CHANGES: &str = "commit_changes";
 
 #[cfg(test)]
 mod tests {
@@ -129,7 +154,8 @@ mod tests {
         assert_eq!(serde_json::to_value(&reply).unwrap(), json!({ "type": "reply", "request": 3, "ok": true, "result": "recorded" }));
         assert_eq!(serde_json::to_value(&ToSidecar::Stop).unwrap(), json!({ "type": "stop" }));
 
-        let event: FromSidecar = serde_json::from_value(json!({ "type": "event", "event": { "kind": "tool", "name": "Bash", "detail": "cargo test" } })).unwrap();
+        let event: FromSidecar =
+            serde_json::from_value(json!({ "type": "event", "event": { "kind": "tool", "name": "Bash", "detail": "cargo test" } })).unwrap();
 
         assert_eq!(event, FromSidecar::Event { event: AgentEvent::Tool { name: "Bash".into(), detail: "cargo test".into() } });
     }
@@ -148,6 +174,7 @@ mod tests {
             denied_tools: vec![],
             sandbox: None,
             hub_tools: vec![],
+            commit_tool: false,
             env: BTreeMap::new(),
         }));
         let value = serde_json::to_value(&start).unwrap();

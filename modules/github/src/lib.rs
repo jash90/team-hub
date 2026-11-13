@@ -201,15 +201,22 @@ impl Module for GithubModule {
 
     /// My open pull requests, and my issues whose status disagrees with their code.
     fn dashboard(&self, connection: &Connection, viewer: &AuthUser) -> ApiResult<Option<Value>> {
+        // Projects that have this module switched off stay out of the section.
+        let on = |column: &str| hub_app::services::project_modules::on_in_project("github", column);
         let login: Option<String> = connection.query_row("SELECT github_login FROM user WHERE id = ?1", [viewer.id], |row| row.get(0))?;
         let pulls = match login.filter(|login| login.chars().all(|character| character.is_ascii_alphanumeric() || character == '-')) {
-            Some(login) => pulls_where(connection, &format!("p.state = 'open' AND p.author = '{login}' COLLATE NOCASE"), 20)?,
+            Some(login) => {
+                pulls_where(connection, &format!("p.state = 'open' AND p.author = '{login}' COLLATE NOCASE AND {}", on("r.project_id")), 20)?
+            }
             None => Vec::new(),
         };
         let drifting = query_all(
             connection,
-            "SELECT i.key, i.summary, group_concat(d.kind) FROM gh_drift d JOIN issue i ON i.id = d.issue_id
-             WHERE i.assignee_id = ?1 GROUP BY i.id ORDER BY i.updated_at DESC LIMIT 20",
+            &format!(
+                "SELECT i.key, i.summary, group_concat(d.kind) FROM gh_drift d JOIN issue i ON i.id = d.issue_id
+                 WHERE i.assignee_id = ?1 AND {} GROUP BY i.id ORDER BY i.updated_at DESC LIMIT 20",
+                on("i.project_id")
+            ),
             [viewer.id],
             |row| {
                 let kinds: String = row.get(2)?;

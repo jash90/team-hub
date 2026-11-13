@@ -427,11 +427,26 @@ shared!(
 #[ts(export, export_to = "../../../apps/desktop/ui/src/bindings/")]
 pub enum AppEvent {
     /// A thread's state, summary or counters changed.
-    ThreadChanged { thread_id: i64 },
-    ThreadEvent { thread_id: i64, event: ThreadEvent },
+    ThreadChanged {
+        thread_id: i64,
+    },
+    ThreadEvent {
+        thread_id: i64,
+        event: ThreadEvent,
+    },
     /// Something on the server changed: `scope` is "dashboard", "issue" or "runs".
-    DataChanged { scope: String, issue_key: Option<String> },
-    Connection { online: bool },
+    DataChanged {
+        scope: String,
+        issue_key: Option<String>,
+    },
+    Connection {
+        online: bool,
+    },
     /// Something needs the person: shown as a system notification.
-    Notify { title: String, body: String, thread_id: Option<i64>, issue_key: Option<String> },
+    Notify {
+        title: String,
+        body: String,
+        thread_id: Option<i64>,
+        issue_key: Option<String>,
+    },
 }

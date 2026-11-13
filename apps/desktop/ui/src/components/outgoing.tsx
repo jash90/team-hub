@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { Button, Dialog, ErrorNote, Field, Spinner, toast, useBusy } from '@web/components/ui.tsx';
 import { Icon } from '@web/components/icon.tsx';
-import { t } from '@web/i18n/index.ts';
+import { countOf, t } from '@web/i18n/index.ts';
 import { core } from '../api.ts';
 import type { PullRequestPreview } from '../bindings/PullRequestPreview.ts';
 import { openExternal } from '../bridge.ts';
@@ -40,7 +40,7 @@ export function PushDialog({ threadId, onClose }: { threadId: number; onClose: (
         <>
           <Button onClick={onClose}>{t('Cancel')}</Button>
           <Button variant="primary" icon="upload" disabled={!canPush || busy} onClick={push}>
-            {data ? t('Push {count} commits', { count: data.commits.length }) : t('Push')}
+            {data ? `${t('Push')} ${countOf(data.commits.length, 'commit', 'commits')}` : t('Push')}
           </Button>
         </>
       }
@@ -134,15 +134,17 @@ function PullRequestForm({ preview, onClose }: { preview: PullRequestPreview; on
           {preview.canCreate ? t('Open the pull request') : t('Continue in the browser')}
         </Button>
       </div>
-      {!preview.canCreate && <p className="muted">{t('The gh command is not installed, so the pull request is finished on GitHub in your browser. Paste its address here afterwards and the thread and its run will show it.')}</p>}
-      {(browserUrl || !preview.canCreate) && (
-        <div className="inline-form">
-          <input className="input" placeholder="https://github.com/…/pull/12" value={url} onChange={(event) => setUrl(event.target.value)} />
-          <Button disabled={busy || !url.trim()} onClick={record}>
-            {t('Save the address')}
-          </Button>
-        </div>
-      )}
+      <p className="muted">
+        {preview.canCreate && !browserUrl
+          ? t('Opened it somewhere else already? Paste its address and the thread and its run will show it.')
+          : t('The gh command is not installed, so the pull request is finished on GitHub in your browser. Paste its address here afterwards and the thread and its run will show it.')}
+      </p>
+      <div className="inline-form desk-inline-wide">
+        <input className="input" placeholder="https://github.com/…/pull/12" value={url} onChange={(event) => setUrl(event.target.value)} aria-label={t('Address of the pull request')} />
+        <Button disabled={busy || !url.trim()} onClick={record}>
+          {t('Save the address')}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -3,7 +3,8 @@
 //! commands go through `commands::invoke`, the very function the Tauri crate forwards to.
 //!
 //! `POST /invoke` `{ command, args }` → `{ ok, value }` or `{ ok: false, error }`
-//! `GET /events?after=N` → `{ last, events }`, waiting up to 20 s for something new
+//! `GET /events?after=N` → `{ last, events }`, waiting up to 20 s for something new;
+//! without `after`, only where the journal is now
 //!
 //! For development only: it listens on 127.0.0.1 and has no authentication of its own.
 
@@ -60,8 +61,8 @@ struct Invoke {
 
 #[derive(Deserialize)]
 struct After {
-    #[serde(default)]
-    after: u64,
+    /// The number of the last event the page has; none on its first request.
+    after: Option<u64>,
 }
 
 /// Only pages served from this machine may call.
@@ -90,9 +91,14 @@ async fn invoke(State(served): State<Served>, headers: HeaderMap, Json(request):
 }
 
 async fn events(State(served): State<Served>, headers: HeaderMap, Query(query): Query<After>) -> Response {
+    let Some(after) = query.after else {
+        let last = served.journal.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).last;
+
+        return cors(&headers, Json(json!({ "last": last, "events": [] })).into_response());
+    };
     let read = |served: &Served| {
         let journal = served.journal.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        let newer: Vec<&AppEvent> = journal.events.iter().filter(|(number, _)| *number > query.after).map(|(_, event)| event).collect();
+        let newer: Vec<&AppEvent> = journal.events.iter().filter(|(number, _)| *number > after).map(|(_, event)| event).collect();
 
         (journal.last, serde_json::to_value(newer).unwrap_or_default())
     };
@@ -153,7 +159,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("The desktop core is served on http://127.0.0.1:{} — for development only.", arguments.port);
 
-    axum::serve(listener, app).with_graceful_shutdown(async { let _ = tokio::signal::ctrl_c().await; }).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async {
+            let _ = tokio::signal::ctrl_c().await;
+        })
+        .await?;
     desktop.shutdown().await;
 
     Ok(())

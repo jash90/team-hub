@@ -20,12 +20,11 @@ import type { IssueRow } from '@/bindings/IssueRow.ts';
 import type { Project } from '@/bindings/Project.ts';
 import { Icon, type IconName } from '@/components/icon.tsx';
 import { IssueKey, openIssue } from '@/components/issue-bits.tsx';
-import { Button, ConfirmDialog, Dialog, Empty, ErrorNote, Field, Menu, Spinner, Tabs, Tag, attempt, copyText, toast, useBusy, type MenuItem } from '@/components/ui.tsx';
+import { Button, ConfirmDialog, Dialog, Empty, ErrorNote, Field, Menu, type MenuItem, SettingsCard, Spinner, Tabs, Tag, attempt, copyText, toast, useBusy } from '@/components/ui.tsx';
 import { formatDateTime, t, timeAgo } from '@/i18n/index.ts';
 import type { WebModule } from '@/modules.ts';
 import { Link, setParam, useSearchParams } from '@/router.tsx';
 import { useProject, useRemote, useStored, type LiveEvent } from '@/session.tsx';
-import { SettingsCard } from '@/views/settings.tsx';
 
 import { polish } from './pl.ts';
 import './styles.css';
@@ -972,7 +971,7 @@ function DashboardPart({ data }: { data: unknown }) {
   );
 }
 
-export const e2eModule: WebModule = {
+const e2eModule: WebModule = {
   id: 'e2e',
   projectNav: (projectKey) => [{ id: 'tests', label: () => t('Tests'), icon: 'check', path: `/p/${projectKey}/tests` }],
   routes: [{ pattern: '/p/:key/tests', render: () => <TestsView /> }],
@@ -982,3 +981,5 @@ export const e2eModule: WebModule = {
   projectSettings: [{ id: 'e2e', label: () => t('Tests'), render: (project) => <ProjectSettings project={project} /> }],
   polish,
 };
+
+export default e2eModule;

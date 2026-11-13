@@ -1,0 +1,659 @@
+/* What the desktop app adds to the web interface's stylesheet (web/src/styles.css): the
+   three-column shell, threads, diffs. Colours, radii and type come from that file's tokens. */
+
+:root {
+  --desk-left: 320px;
+  --desk-right: 360px;
+  --desk-gap: 14px;
+}
+
+.desk-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.desk-topbar {
+  flex: none;
+  padding: 8px 14px;
+}
+
+.desk-brand {
+  border: 0;
+  background: none;
+  padding: 0 8px 0 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.desk-search {
+  width: min(420px, 36vw);
+}
+
+.desk-grow {
+  flex: 1;
+}
+
+.desk-columns {
+  display: grid;
+  grid-template-columns: var(--desk-left) minmax(0, 1fr) var(--desk-right);
+  gap: var(--desk-gap);
+  flex: 1;
+  min-height: 0;
+  padding: var(--desk-gap);
+}
+
+.desk-column,
+.desk-center {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.desk-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--desk-gap);
+}
+
+/* Panels in a scrolling column keep their height; without this they shrink into each other. */
+.desk-column > * {
+  flex-shrink: 0;
+}
+
+.desk-center {
+  padding-right: 2px;
+}
+
+.desk-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--desk-gap);
+  max-width: 980px;
+  margin: 0 auto;
+  padding-bottom: 24px;
+}
+
+.desk-pad {
+  padding: 12px 14px;
+}
+
+h3.desk-pad {
+  padding-bottom: 4px;
+}
+
+.desk-fold {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 2px;
+  margin-left: -4px;
+  cursor: pointer;
+}
+
+.desk-section > .panel-head {
+  padding: 8px 12px;
+}
+
+.desk-section > .panel-head:last-child {
+  border-bottom: 0;
+}
+
+.desk-foot {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.desk-filter {
+  padding: 8px 12px 4px;
+}
+
+/* rows that open something */
+.desk-row {
+  cursor: pointer;
+}
+
+.desk-row:hover {
+  background: var(--sunk);
+}
+
+.desk-row-selected {
+  background: var(--accent-soft);
+}
+
+.desk-right .issue-line,
+.desk-right .pr-row {
+  padding-left: 12px;
+  padding-right: 8px;
+  gap: 7px;
+}
+
+.desk-right .issue-line-summary {
+  flex: 1 1 0;
+  min-width: 60px;
+}
+
+.desk-right .drift-kinds {
+  padding: 0 12px 8px;
+}
+
+/* the left column's items */
+.desk-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.desk-item:last-child {
+  border-bottom: 0;
+}
+
+.desk-item:hover {
+  background: var(--sunk);
+}
+
+.desk-item-selected,
+.desk-item-selected:hover {
+  background: var(--accent-soft);
+}
+
+.desk-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.desk-thread-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desk-item-text,
+.desk-item-said {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.desk-item-said {
+  color: var(--ink);
+  border-left: 2px solid var(--line-strong);
+  padding-left: 8px;
+}
+
+.desk-item-need {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* my work */
+.desk-queue-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 0;
+}
+
+.desk-queue-search {
+  width: 100%;
+}
+
+.desk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.desk-chip {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.desk-chip.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* an issue and a thread in the middle */
+.desk-issue-head,
+.desk-thread-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.desk-issue-facts,
+.desk-issue-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.desk-issue-actions {
+  gap: 8px;
+}
+
+.desk-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.desk-pad > .desk-composer {
+  padding: 12px 0 0;
+  margin-top: 14px;
+}
+
+.desk-composer .row-end {
+  margin: 0;
+}
+
+.desk-events {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.desk-event-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.desk-event-message,
+.desk-event-question,
+.desk-event-answer,
+.desk-event-error {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--sunk);
+}
+
+.desk-event-question {
+  background: var(--amber-soft);
+}
+
+.desk-event-answer {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--accent-soft);
+}
+
+.desk-event-error {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.desk-error-text {
+  margin: 0;
+  font: 12.5px/1.5 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.desk-event-tool {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-left: 12px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.desk-event-tool code {
+  flex: none;
+}
+
+.desk-inline-wide {
+  margin-top: 0;
+}
+
+.desk-inline-wide .input {
+  max-width: none;
+}
+
+.desk-event-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-event-status {
+  padding-left: 12px;
+  font-size: 12.5px;
+}
+
+/* decisions */
+.desk-decisions {
+  border-color: var(--amber);
+}
+
+.desk-decisions > .panel-head {
+  flex-wrap: wrap;
+}
+
+.desk-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.desk-proposal:last-child {
+  border-bottom: 0;
+}
+
+.desk-proposal > header,
+.desk-proposal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.desk-proposal-text {
+  padding: 8px 12px;
+  border-left: 3px solid var(--line-strong);
+  background: var(--sunk);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.desk-subtasks {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.desk-findings {
+  padding: 10px 12px;
+  border: 1px solid var(--red);
+  border-radius: var(--radius-sm);
+  background: var(--red-soft);
+}
+
+.desk-findings ul {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+}
+
+/* diffs */
+.desk-file {
+  border-top: 1px solid var(--line);
+}
+
+.desk-file-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 14px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.desk-file-head:hover {
+  background: var(--sunk);
+}
+
+.desk-file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.desk-plus {
+  color: var(--green);
+}
+
+.desk-minus {
+  color: var(--red);
+}
+
+.desk-patch {
+  overflow-x: auto;
+  border-top: 1px solid var(--line);
+  background: var(--sunk);
+}
+
+.desk-patch-empty {
+  padding: 8px 14px;
+}
+
+.desk-hunk {
+  width: 100%;
+  border-collapse: collapse;
+  font: 12.5px/1.5 var(--mono);
+}
+
+.desk-hunk-head td {
+  padding: 2px 10px;
+  color: var(--muted);
+  background: var(--blue-soft);
+}
+
+.desk-line-no {
+  width: 1%;
+  min-width: 38px;
+  padding: 0 6px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.desk-line-text {
+  padding: 0 10px;
+  white-space: pre;
+}
+
+.desk-line-add {
+  background: var(--green-soft);
+}
+
+.desk-line-del {
+  background: var(--red-soft);
+}
+
+.desk-commit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+}
+
+.desk-commit-subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* a new thread */
+.desk-kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.desk-kind,
+.desk-step {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.desk-kind:hover,
+.desk-step:hover {
+  background: var(--sunk);
+}
+
+.desk-kind.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.desk-kind .muted,
+.desk-step .muted {
+  font-size: 12.5px;
+}
+
+.desk-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.desk-home {
+  padding-top: 24px;
+}
+
+/* repositories */
+.desk-clone {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.desk-clone-head,
+.desk-clone-facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 7px 12px;
+}
+
+.desk-clone-facts {
+  padding-top: 0;
+  font-size: 12.5px;
+}
+
+.desk-clone-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.desk-clone .pr-row {
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+.desk-check-ok {
+  background: var(--green-soft);
+  color: var(--ink);
+}
+
+.settings-card .list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.settings-card > .check,
+.settings-card > p {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+/* Narrower windows: my work moves under the middle and the page scrolls as one; the left
+   column stays in view. Narrower still, everything stacks. */
+@media (max-width: 1280px) {
+  .desk-columns {
+    grid-template-columns: var(--desk-left) minmax(0, 1fr);
+    grid-auto-rows: max-content;
+    align-items: start;
+    overflow-y: auto;
+  }
+
+  .desk-left {
+    grid-row: 1 / span 2;
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 78px);
+  }
+
+  .desk-center,
+  .desk-right {
+    grid-column: 2;
+    min-height: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 860px) {
+  .desk-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desk-left,
+  .desk-center,
+  .desk-right {
+    grid-column: 1;
+    grid-row: auto;
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .desk-search {
+    width: 100%;
+  }
+
+  .desk-topbar {
+    flex-wrap: wrap;
+  }
+}

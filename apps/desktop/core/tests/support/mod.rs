@@ -17,8 +17,8 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use hub_core::{
-    BoardMode, Bootstrap, Comment, Dashboard, Issue, IssueRow, IssueType, Notification, Project, ProjectSummary, Role, SearchResult, Status, StatusCategory,
-    SubtaskTally, TypeLevel, User,
+    BoardMode, Bootstrap, Comment, Dashboard, Issue, IssueRow, IssueType, Notification, Project, ProjectSummary, Role, SearchResult, Status,
+    StatusCategory, SubtaskTally, TypeLevel, User,
 };
 use hub_desktop_core::config::Paths;
 use hub_desktop_core::model::{AppEvent, SandboxState, Thread, ThreadState};
@@ -137,11 +137,20 @@ pub struct FakeHub {
 type Shared = State<Arc<Mutex<HubState>>>;
 
 fn user() -> User {
-    User { id: 1, name: "Ada Nowak".into(), email: "ada@example.com".into(), role: Role::Admin, active: true, color: "#4f46e5".into(), github_login: None }
+    User {
+        id: 1,
+        name: "Ada Nowak".into(),
+        email: "ada@example.com".into(),
+        role: Role::Admin,
+        active: true,
+        color: "#4f46e5".into(),
+        github_login: None,
+    }
 }
 
 fn project() -> Project {
-    let status = |id, name: &str, category, position| Status { id, project_id: 1, name: name.into(), category, position, on_board: true, wip_limit: None };
+    let status =
+        |id, name: &str, category, position| Status { id, project_id: 1, name: name.into(), category, position, on_board: true, wip_limit: None };
     let kind = |id, name: &str, level, position| IssueType { id, project_id: 1, name: name.into(), level, icon: name.to_lowercase(), position };
 
     Project {
@@ -254,7 +263,9 @@ impl HubState {
     }
 
     fn announce(&self, kind: &str, payload: Value) {
-        let _ = self.live.send(json!({ "id": 1, "at": NOW, "actorId": 1, "kind": kind, "projectId": 1, "issueId": null, "payload": payload }).to_string());
+        let _ = self
+            .live
+            .send(json!({ "id": 1, "at": NOW, "actorId": 1, "kind": kind, "projectId": 1, "issueId": null, "payload": payload }).to_string());
     }
 
     fn run_index(&self, id: i64) -> Option<usize> {
@@ -280,7 +291,15 @@ impl HubState {
     fn add_comment(&mut self, key: &str, body: &str) -> Option<Comment> {
         let id = self.id();
         let issue = self.issues.get_mut(key)?;
-        let comment = Comment { id, issue_id: issue.row.id, author_id: Some(1), author_label: None, body: body.to_string(), created_at: NOW.into(), updated_at: NOW.into() };
+        let comment = Comment {
+            id,
+            issue_id: issue.row.id,
+            author_id: Some(1),
+            author_label: None,
+            body: body.to_string(),
+            created_at: NOW.into(),
+            updated_at: NOW.into(),
+        };
 
         issue.comments.push(comment.clone());
         issue.row.comment_count += 1;
@@ -306,7 +325,10 @@ impl HubState {
     /// What an approved proposal does to the tracker.
     fn apply(&mut self, proposal: &Value, key: &str) -> Result<Value, String> {
         match proposal["kind"].as_str().unwrap_or_default() {
-            "comment" => self.add_comment(key, proposal["payload"]["body"].as_str().unwrap_or_default()).map(|comment| json!({ "commentId": comment.id })).ok_or_else(|| "no such issue".to_string()),
+            "comment" => self
+                .add_comment(key, proposal["payload"]["body"].as_str().unwrap_or_default())
+                .map(|comment| json!({ "commentId": comment.id }))
+                .ok_or_else(|| "no such issue".to_string()),
             "transition" => {
                 let wanted = proposal["payload"]["status"].as_str().unwrap_or_default();
                 let status = self.project.statuses.iter().find(|status| status.name == wanted).ok_or(format!("Unknown status \"{wanted}\""))?.id;
@@ -438,7 +460,12 @@ async fn create_issue(State(state): Shared, headers: HeaderMap, Json(body): Json
     state.writes.push(("POST".into(), "/api/issues".into(), body.clone()));
 
     let number = state.issues.len() as i64 + 1;
-    let mut new = issue(number, body["summary"].as_str().unwrap_or_default(), body["typeId"].as_i64().unwrap_or(1), body["description"].as_str().unwrap_or_default());
+    let mut new = issue(
+        number,
+        body["summary"].as_str().unwrap_or_default(),
+        body["typeId"].as_i64().unwrap_or(1),
+        body["description"].as_str().unwrap_or_default(),
+    );
 
     new.row.parent_key = body["parentKey"].as_str().map(String::from);
     state.issues.insert(new.row.key.clone(), new.clone());
@@ -477,7 +504,8 @@ async fn add_worklog(State(state): Shared, headers: HeaderMap, UrlPath(key): Url
 async fn search(State(state): Shared, headers: HeaderMap, Query(query): Query<BTreeMap<String, String>>) -> Response {
     let state = guard!(state, headers);
     let wanted = query.get("q").cloned().unwrap_or_default().to_lowercase();
-    let issues: Vec<IssueRow> = state.issues.values().filter(|issue| issue.row.summary.to_lowercase().contains(&wanted)).map(|issue| issue.row.clone()).collect();
+    let issues: Vec<IssueRow> =
+        state.issues.values().filter(|issue| issue.row.summary.to_lowercase().contains(&wanted)).map(|issue| issue.row.clone()).collect();
 
     Json(SearchResult { total: issues.len() as i64, issues, error: None }).into_response()
 }
@@ -494,18 +522,19 @@ async fn stream(State(state): Shared, headers: HeaderMap) -> Response {
 
         state.live.subscribe()
     };
-    let events = BroadcastStream::new(receiver).filter_map(|event| event.ok()).map(|data| Ok::<_, Infallible>(SseEvent::default().event("change").data(data)));
+    let events =
+        BroadcastStream::new(receiver).filter_map(|event| event.ok()).map(|data| Ok::<_, Infallible>(SseEvent::default().event("change").data(data)));
 
     Sse::new(events).keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_millis(200))).into_response()
 }
 
 async fn mcp(State(state): Shared, headers: HeaderMap, Json(body): Json<Value>) -> Response {
     let mut state = guard!(state, headers);
-    let tool = |name: &str, read_only: bool| {
-        json!({ "name": name, "description": format!("{name} of the fake hub"), "inputSchema": { "type": "object", "properties": { "key": { "type": "string" } } }, "annotations": { "readOnlyHint": read_only } })
-    };
+    let tool = |name: &str, read_only: bool| json!({ "name": name, "description": format!("{name} of the fake hub"), "inputSchema": { "type": "object", "properties": { "key": { "type": "string" } } }, "annotations": { "readOnlyHint": read_only } });
     let result = match body["method"].as_str().unwrap_or_default() {
-        "tools/list" => json!({ "tools": [tool("get_issue", true), tool("search_issues", true), tool("add_comment", false), tool("transition_issue", false)] }),
+        "tools/list" => {
+            json!({ "tools": [tool("get_issue", true), tool("search_issues", true), tool("add_comment", false), tool("transition_issue", false)] })
+        }
         "tools/call" => {
             let name = body["params"]["name"].as_str().unwrap_or_default().to_string();
             let key = body["params"]["arguments"]["key"].as_str().unwrap_or_default().to_string();
@@ -711,7 +740,9 @@ async fn answer_run(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPa
 
 async fn decide(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i64>, Json(body): Json<Value>) -> Response {
     let mut state = guard!(runs state, headers);
-    let Some(index) = state.proposals.iter().position(|proposal| proposal["id"] == id) else { return error(StatusCode::NOT_FOUND, "No such proposal") };
+    let Some(index) = state.proposals.iter().position(|proposal| proposal["id"] == id) else {
+        return error(StatusCode::NOT_FOUND, "No such proposal");
+    };
 
     if state.proposals[index]["state"] != "pending" {
         return error(StatusCode::CONFLICT, "Already decided");

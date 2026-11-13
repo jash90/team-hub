@@ -63,7 +63,7 @@ export const optionsFor = (start: Start): Options => ({
   // Nobody is there to approve anything: what is not on the allow list is refused.
   permissionMode: 'dontAsk',
   tools: builtInTools(start.allowed_tools),
-  allowedTools: [...start.allowed_tools, ...hubToolNames(start.hub_tools)],
+  allowedTools: [...start.allowed_tools, ...hubToolNames(start.hub_tools, start.commit_tool)],
   disallowedTools: start.denied_tools,
   canUseTool: async (toolName) => ({
     behavior: 'deny',
@@ -86,7 +86,7 @@ export const optionsFor = (start: Start): Options => ({
   // repository's settings can bring hooks of its own; a thread gets none of them.
   settingSources: [],
   strictMcpConfig: true,
-  mcpServers: { [HUB_SERVER]: hubServer(start.hub_tools, callCore) },
+  mcpServers: { [HUB_SERVER]: hubServer(start.hub_tools, callCore, start.commit_tool) },
 });
 
 const run = async (start: Start) => {

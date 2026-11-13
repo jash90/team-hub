@@ -11,7 +11,7 @@ import { t, timeAgo } from '../../i18n/index.ts';
 import { useModules } from '../../modules.ts';
 import { Link, navigate, setParam } from '../../router.tsx';
 import { useProjectData, useRemote, useSession, type Remote } from '../../session.tsx';
-import { CreateIssueDialog } from '../create-issue.tsx';
+import { CreateIssueDialog } from '../lazy.ts';
 import { Activity } from './activity.tsx';
 import { LinkDialog, WorkDialog } from './dialogs.tsx';
 import type { Patch } from './patch.ts';

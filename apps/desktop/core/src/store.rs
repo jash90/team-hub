@@ -84,7 +84,8 @@ CREATE TABLE IF NOT EXISTS cache (
 );
 ";
 
-const THREAD_COLUMNS: &str = "t.id, t.issue_key, t.issue_summary, t.project_key, t.kind, t.instructions, t.model, t.repo_id, t.repo_path, t.worktree, \
+const THREAD_COLUMNS: &str =
+    "t.id, t.issue_key, t.issue_summary, t.project_key, t.kind, t.instructions, t.model, t.repo_id, t.repo_path, t.worktree, \
      t.branch, t.base, t.base_commit, t.state, t.origin, t.session_id, t.run_id, t.summary, t.pull_request_url, t.input_tokens, t.output_tokens, \
      t.cost_usd, t.turns, t.created_at, t.started_at, t.finished_at, \
      (SELECT COUNT(*) FROM proposal p WHERE p.thread_id = t.id AND p.state = 'pending'), \
@@ -239,7 +240,8 @@ impl Store {
     pub fn repos(&self) -> CoreResult<Vec<RepoMapping>> {
         let db = self.db();
         let mut statement = db.prepare("SELECT id, project_key, github_repo, path FROM repo ORDER BY project_key, path")?;
-        let rows = statement.query_map([], |row| Ok(RepoMapping { id: row.get(0)?, project_key: row.get(1)?, github_repo: row.get(2)?, path: row.get(3)? }))?;
+        let rows = statement
+            .query_map([], |row| Ok(RepoMapping { id: row.get(0)?, project_key: row.get(1)?, github_repo: row.get(2)?, path: row.get(3)? }))?;
 
         Ok(rows.collect::<Result<_, _>>()?)
     }
@@ -346,16 +348,20 @@ impl Store {
     }
 
     pub fn thread_private(&self, id: i64) -> CoreResult<ThreadPrivate> {
-        Ok(self.db().query_row("SELECT issue_type, wanted_branch, first_prompt, next_prompt, run_sent, answers_seen FROM thread WHERE id = ?1", [id], |row| {
-            Ok(ThreadPrivate {
-                issue_type: row.get(0)?,
-                wanted_branch: row.get(1)?,
-                first_prompt: row.get(2)?,
-                next_prompt: row.get(3)?,
-                run_sent: json_column(row.get(4)?),
-                answers_seen: row.get(5)?,
-            })
-        })?)
+        Ok(self.db().query_row(
+            "SELECT issue_type, wanted_branch, first_prompt, next_prompt, run_sent, answers_seen FROM thread WHERE id = ?1",
+            [id],
+            |row| {
+                Ok(ThreadPrivate {
+                    issue_type: row.get(0)?,
+                    wanted_branch: row.get(1)?,
+                    first_prompt: row.get(2)?,
+                    next_prompt: row.get(3)?,
+                    run_sent: json_column(row.get(4)?),
+                    answers_seen: row.get(5)?,
+                })
+            },
+        )?)
     }
 
     fn update(&self, sql: &str, parameters: impl rusqlite::Params) -> CoreResult<()> {
@@ -382,7 +388,14 @@ impl Store {
         Ok(changed > 0)
     }
 
-    pub fn set_worktree(&self, id: i64, worktree: Option<&str>, branch: Option<&str>, base: Option<&str>, base_commit: Option<&str>) -> CoreResult<()> {
+    pub fn set_worktree(
+        &self,
+        id: i64,
+        worktree: Option<&str>,
+        branch: Option<&str>,
+        base: Option<&str>,
+        base_commit: Option<&str>,
+    ) -> CoreResult<()> {
         self.update(
             "UPDATE thread SET worktree = ?2, branch = COALESCE(?3, branch), base = COALESCE(?4, base), base_commit = COALESCE(?5, base_commit) WHERE id = ?1",
             params![id, worktree, branch, base, base_commit],

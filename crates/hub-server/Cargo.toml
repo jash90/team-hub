@@ -8,16 +8,29 @@ publish.workspace = true
 name = "team-hub"
 path = "src/main.rs"
 
+# One feature per module, named by the module's id. A feature switches on the module's crate
+# and the features of the modules it depends on. `cargo build --no-default-features` builds
+# the tracker alone; `--no-default-features --features github,wiki` picks modules.
+[features]
+default = ["github", "wiki", "confluence", "jira", "reports", "e2e", "agents"]
+github = ["dep:hub-mod-github"]
+wiki = ["dep:hub-mod-wiki"]
+confluence = ["dep:hub-mod-confluence", "wiki"]
+jira = ["dep:hub-mod-jira"]
+reports = ["dep:hub-mod-reports"]
+e2e = ["dep:hub-mod-e2e"]
+agents = ["dep:hub-mod-agents"]
+
 [dependencies]
 hub-core.workspace = true
 hub-app.workspace = true
-hub-mod-github = { path = "../../modules/github" }
-hub-mod-wiki = { path = "../../modules/wiki" }
-hub-mod-confluence = { path = "../../modules/confluence" }
-hub-mod-jira = { path = "../../modules/jira" }
-hub-mod-reports = { path = "../../modules/reports" }
-hub-mod-e2e = { path = "../../modules/e2e" }
-hub-mod-agents = { path = "../../modules/agents" }
+hub-mod-github = { path = "../../modules/github", optional = true }
+hub-mod-wiki = { path = "../../modules/wiki", optional = true }
+hub-mod-confluence = { path = "../../modules/confluence", optional = true }
+hub-mod-jira = { path = "../../modules/jira", optional = true }
+hub-mod-reports = { path = "../../modules/reports", optional = true }
+hub-mod-e2e = { path = "../../modules/e2e", optional = true }
+hub-mod-agents = { path = "../../modules/agents", optional = true }
 axum.workspace = true
 chrono.workspace = true
 rayon.workspace = true
@@ -29,6 +42,19 @@ tracing-subscriber = "0.3"
 tower-http = { version = "0.6", features = ["fs", "trace", "compression-gzip", "set-header"] }
 futures-util = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }
+
+# Tests that need particular modules run only in builds that have them.
+[[test]]
+name = "github"
+required-features = ["github"]
+
+[[test]]
+name = "project_modules"
+required-features = ["github", "wiki"]
+
+[[test]]
+name = "all_modules"
+required-features = ["github", "wiki", "confluence", "reports", "agents"]
 
 [dev-dependencies]
 hmac.workspace = true

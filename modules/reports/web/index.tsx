@@ -50,9 +50,11 @@ function ReportsView() {
   );
 }
 
-export const reportsModule: WebModule = {
+const reportsModule: WebModule = {
   id: 'reports',
   projectNav: (projectKey) => [{ id: 'reports', label: () => t('Reports'), icon: 'chart', path: `/p/${projectKey}/reports` }],
   routes: [{ pattern: '/p/:key/reports', render: (params) => <ReportsView key={params.key} /> }],
   polish,
 };
+
+export default reportsModule;

@@ -10,11 +10,10 @@ import type { AgentToolInfo } from '@/bindings/AgentToolInfo.ts';
 import type { AgentTrust } from '@/bindings/AgentTrust.ts';
 import type { Project } from '@/bindings/Project.ts';
 import type { JsonValue } from '@/bindings/serde_json/JsonValue.ts';
-import { Button, ErrorNote, Field, Picker, Spinner, Tag, attempt, copyText, useBusy } from '@/components/ui.tsx';
+import { Button, ErrorNote, Field, Picker, SettingsCard, Spinner, Tag, attempt, copyText, useBusy } from '@/components/ui.tsx';
 import { t } from '@/i18n/index.ts';
 import { Link } from '@/router.tsx';
 import { useRemote, useSession } from '@/session.tsx';
-import { SettingsCard } from '@/views/settings.tsx';
 
 import { BASE, RunnerLine, kindLabel, proposalLabel, useAgentSettings } from './runs.tsx';
 

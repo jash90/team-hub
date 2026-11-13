@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Creates the skeleton of a module in modules/<id>/: a crate that compiles, with one route
 # and a test for it, and a web folder with one page in the project navigation. Then prints
-# the three lines that register it. See docs/modules.md.
+# how to register it: one entry in crates/hub-server, one line in web/src/modules.ts. Until
+# it is registered, `cargo test -p hub-server` and `npm run build` say what is missing.
+# See docs/modules.md.
 #
 #   scripts/new-module.sh <id> "<Name>"
 #   scripts/new-module.sh notes "Release notes"
@@ -266,12 +268,14 @@ function ${pascal}View() {
   );
 }
 
-export const ${id}Module: WebModule = {
+const ${id}Module: WebModule = {
   id: '$id',
   projectNav: (projectKey) => [{ id: '$id', label: () => t('$name'), icon: 'puzzle', path: \`/p/\${projectKey}/$id\` }],
   routes: [{ pattern: '/p/:key/$id', render: () => <${pascal}View /> }],
   polish,
 };
+
+export default ${id}Module;
 EOF
 
 cat > "$dir/web/pl.ts" <<EOF
@@ -316,27 +320,34 @@ issues are open.
 
 ## Screens
 
-\`web/index.tsx\` exports \`${id}Module\`: one entry in the project navigation and the page
-behind it (\`/p/:key/$id\`). Polish in \`web/pl.ts\`, styles in \`web/styles.css\`.
+The default export of \`web/index.tsx\`: one entry in the project navigation and the page
+behind it (\`/p/:key/$id\`). Polish in \`web/pl.ts\`, styles in \`web/styles.css\`. The browser
+fetches them as one chunk, and only while the module is switched on.
 EOF
 
 # How long a line gets depends on the id; let rustfmt have the last word where it is installed.
 (cd "$root" && cargo fmt -p "hub-mod-$id" > /dev/null 2>&1) || true
 
 cat <<EOF
-Created modules/$id (crate hub-mod-$id, web module ${id}Module).
+Created modules/$id (crate hub-mod-$id, screens in modules/$id/web).
 
-Register it in three places:
+Register it, once on each side.
 
-  crates/hub-server/Cargo.toml, under [dependencies]:
-      hub-mod-$id = { path = "../../modules/$id" }
+  The server, crates/hub-server: a feature, the crate behind it, and its line in modules().
 
-  crates/hub-server/src/lib.rs, in modules():
-      Arc::new(hub_mod_$id::${pascal}Module),
+    Cargo.toml, under [features] (and "$id" in the \`default\` list, to have it in the usual build):
+        $id = ["dep:hub-mod-$id"]
 
-  web/src/modules.ts, next to the other modules:
-      import { ${id}Module } from '../../modules/$id/web/index.tsx';
-      (and add ${id}Module to the list)
+    Cargo.toml, under [dependencies]:
+        hub-mod-$id = { path = "../../modules/$id", optional = true }
+
+    src/lib.rs, in modules():
+        #[cfg(feature = "$id")]
+        modules.push(Arc::new(hub_mod_$id::${pascal}Module));
+
+  The interface, web/src/modules.ts: one line in SCREENS.
+
+        $id: () => import('../../modules/$id/web/index.tsx'),
 
 Then:
 

@@ -3,7 +3,9 @@
 //  - a module's screens (`modules/<id>/web/`) import only `react`, the application through
 //    `@/…`, and their own files; never another module, never a package of their own;
 //  - the application (`web/src/`) reaches into a module's folder only from `src/modules.ts`,
-//    the one place where modules are listed.
+//    the one place where modules are listed;
+//  - `src/modules.ts` lists every module that has screens, and fetches each with `import()`,
+//    so that a module's screens stay a chunk of their own.
 //
 // Run by `npm run build`; on its own with `npm run check:boundaries`.
 
@@ -52,13 +54,13 @@ function imports(path) {
   const found = [];
 
   for (const entry of parsed.module.staticImports) {
-    found.push({ specifier: entry.moduleRequest.value, line: line(entry.start) });
+    found.push({ specifier: entry.moduleRequest.value, line: line(entry.start), fixed: true });
   }
 
   for (const statement of parsed.module.staticExports) {
     for (const entry of statement.entries) {
       if (entry.moduleRequest) {
-        found.push({ specifier: entry.moduleRequest.value, line: line(statement.start) });
+        found.push({ specifier: entry.moduleRequest.value, line: line(statement.start), fixed: true });
       }
     }
   }
@@ -131,6 +133,28 @@ for (const path of sources(src)) {
     if (to && inside(to, modules)) {
       report(path, line, `"${specifier}" names a module's folder; only src/modules.ts lists modules, everything else goes through useModules()`);
     }
+  }
+}
+
+const listed = [];
+
+for (const { specifier, line, fixed } of imports(registry)) {
+  const to = specifier === null ? null : target(specifier, registry);
+
+  if (to && inside(to, modules)) {
+    listed.push(to);
+
+    if (fixed) {
+      report(registry, line, `"${specifier}" is imported with the shell; list the module as \`id: () => import('…')\` so its screens are fetched only when it is switched on`);
+    }
+  }
+}
+
+for (const id of readdirSync(modules)) {
+  const screens = join(modules, id, 'web', 'index.tsx');
+
+  if (statSync(screens, { throwIfNoEntry: false })?.isFile() && !listed.includes(screens)) {
+    report(screens, 1, `the module has screens that src/modules.ts does not list; add \`${id}: () => import('../../modules/${id}/web/index.tsx'),\` there`);
   }
 }
 

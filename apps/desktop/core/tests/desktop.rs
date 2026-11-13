@@ -192,7 +192,13 @@ async fn a_repository_is_mapped_only_when_its_origin_is_the_named_one() {
 
         bench
             .desktop
-            .run(move |core| Ok((core.map_repo("WEB", Some("acme/api"), &path).unwrap_err(), core.map_repo("WEB", None, &outside).unwrap_err(), core.map_repo("web", Some("Acme/Web"), &format!("{path}/src"))?)))
+            .run(move |core| {
+                Ok((
+                    core.map_repo("WEB", Some("acme/api"), &path).unwrap_err(),
+                    core.map_repo("WEB", None, &outside).unwrap_err(),
+                    core.map_repo("web", Some("Acme/Web"), &format!("{path}/src"))?,
+                ))
+            })
             .await
             .unwrap()
     };
@@ -242,7 +248,8 @@ async fn a_thread_works_in_its_own_tree_and_shows_up_on_the_server_as_a_run() {
 
     let detail = bench.desktop.run(move |core| core.thread(id)).await.unwrap();
     let said: Vec<&str> = detail.events.iter().filter(|event| event.kind == EventKind::Message).map(|event| event.text.as_str()).collect();
-    let tools: Vec<&str> = detail.events.iter().filter(|event| event.kind == EventKind::Tool).map(|event| event.data["name"].as_str().unwrap()).collect();
+    let tools: Vec<&str> =
+        detail.events.iter().filter(|event| event.kind == EventKind::Tool).map(|event| event.data["name"].as_str().unwrap()).collect();
     let kinds: Vec<ProposalKind> = detail.proposals.iter().map(|proposal| proposal.kind).collect();
 
     assert_eq!(said, vec!["Reading WEB-1 before touching the code.", "The change is committed locally."]);
@@ -519,6 +526,40 @@ async fn the_agent_reads_through_the_servers_read_only_tools_and_cannot_call_the
     assert!(!hub.state().writes.iter().any(|(_, path, _)| path.contains("comments")));
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn a_thread_without_a_shell_commits_through_the_app_and_a_reading_thread_cannot() {
+    let (bench, _hub, repo) = ready("no-shell").await;
+
+    git(&repo.clone, &["config", "commit.gpgsign", "false"]);
+    git(&repo.clone, &["config", "user.name", "Ada"]);
+    git(&repo.clone, &["config", "user.email", "ada@example.invalid"]);
+
+    let id = start(&bench, "WEB-1", ThreadKind::Implement, "[fake:no-shell]").await;
+    let done = bench.until_state(id, ThreadState::Done).await;
+    let detail = bench.desktop.run(move |core| core.thread(id)).await.unwrap();
+    let said = detail.events.iter().rev().find(|event| event.kind == EventKind::Message).unwrap();
+    let short = git(&repo.clone, &["rev-parse", "--short", done.branch.as_deref().unwrap()]);
+
+    assert_eq!(said.text, format!("commit_changes offered: true; answer: Committed {short} WEB-1: note the change"));
+    assert_eq!(git(&repo.clone, &["log", "-1", "--format=%s", done.branch.as_deref().unwrap()]), "WEB-1: note the change");
+    assert!(detail.events.iter().any(|event| event.text.contains("works without a shell")));
+
+    let reading = {
+        let mut new = new_thread("WEB-2", ThreadKind::Review, "[fake:no-shell]");
+
+        new.branch = Some("feature/WEB-2-review".to_string());
+        bench.desktop.run(move |core| core.start_thread(&new)).await.unwrap().id
+    };
+
+    bench.until_state(reading, ThreadState::Done).await;
+
+    let refused = bench.desktop.run(move |core| core.thread(reading)).await.unwrap();
+    let said = refused.events.iter().rev().find(|event| event.kind == EventKind::Message).unwrap();
+
+    assert_eq!(said.text, "commit_changes offered: false; answer: This thread only reads; it has nothing to commit");
+    assert_eq!(git(&repo.clone, &["rev-list", "--count", "origin/main..feature/WEB-2-review"]), "0");
+}
+
 // ---------- nothing leaves without a click ----------
 
 #[tokio::test(flavor = "multi_thread")]
@@ -602,7 +643,13 @@ async fn a_push_goes_out_only_after_the_click_and_only_the_commit_that_was_shown
     assert_eq!((pull_request.base.as_str(), pull_request.head.as_str()), ("main", branch.as_str()));
     assert_eq!(pull_request.title, "WEB-1 Login form validation");
     assert!(!pull_request.pushed);
-    assert!(bench.desktop.run(move |core| core.open_pull_request(id, "WEB-1 Login", "")).await.unwrap_err().to_string().contains("Push the branch first"));
+    assert!(bench
+        .desktop
+        .run(move |core| core.open_pull_request(id, "WEB-1 Login", ""))
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("Push the branch first"));
 
     // While the pull request is undecided the run waits; once it is there, the run ends with it.
     let run_id = thread.run_id.unwrap();
@@ -800,10 +847,23 @@ fn a_helper_whose_parent_is_gone_ends_and_takes_its_children_along() {
         .spawn()
         .unwrap();
     let pid = child.id();
-    let start = json!({
-        "type": "start", "thread": 1, "prompt": "Issue WEB-1: x\n\n[fake:slow]", "cwd": folder.path(), "model": "m", "resume": null, "max_turns": 5,
-        "rules": "", "allowed_tools": [], "denied_tools": [], "sandbox": null, "hub_tools": [], "env": {},
-    });
+    // Built from the core's own types, so the test cannot drift from the protocol.
+    let start = serde_json::to_string(&hub_desktop_core::protocol::ToSidecar::Start(Box::new(hub_desktop_core::protocol::StartThread {
+        thread: 1,
+        prompt: "Issue WEB-1: x\n\n[fake:slow]".to_string(),
+        cwd: folder.path().to_string_lossy().into_owned(),
+        model: "m".to_string(),
+        resume: None,
+        max_turns: 5,
+        rules: String::new(),
+        allowed_tools: Vec::new(),
+        denied_tools: Vec::new(),
+        sandbox: None,
+        hub_tools: Vec::new(),
+        commit_tool: false,
+        env: Default::default(),
+    })))
+    .unwrap();
     let mut stdin = child.stdin.take().unwrap();
     let mut lines = std::io::BufReader::new(child.stdout.take().unwrap()).lines();
 
@@ -834,7 +894,8 @@ async fn the_windows_commands_reach_the_same_core() {
     let dashboard = commands::invoke(desktop, "dashboard", Value::Null).await.unwrap();
     let issue = commands::invoke(desktop, "issue", json!({ "key": "WEB-1" })).await.unwrap();
     let check = commands::invoke(desktop, "check_repo", json!({ "path": repo.clone, "githubRepo": "acme/web" })).await.unwrap();
-    let thread = commands::invoke(desktop, "start_thread", json!({ "issueKey": "WEB-1", "kind": "analyse", "instructions": "[fake:analyse]" })).await.unwrap();
+    let thread =
+        commands::invoke(desktop, "start_thread", json!({ "issueKey": "WEB-1", "kind": "analyse", "instructions": "[fake:analyse]" })).await.unwrap();
     let id = thread["id"].as_i64().unwrap();
 
     bench.until_state(id, ThreadState::Done).await;

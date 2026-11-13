@@ -9,12 +9,51 @@ A module can be switched off at runtime (Settings → Modules); while off, its r
 `scripts/new-module.sh <id> "<Name>"` creates the skeleton described here (a crate with one
 tested route, a `web/` folder with one page) and prints the lines that register it.
 
+## Registering a module
+
+A module is named in two places, once for each half; nothing else in the workspace knows it.
+
+- **The server**, `crates/hub-server`: a Cargo feature named by the module's id, the
+  optional dependency behind it, and its line in `modules()`.
+
+  ```toml
+  [features]
+  default = ["github", "wiki", …, "notes"]        # to have it in the usual build
+  notes = ["dep:hub-mod-notes"]                    # plus the ids it depends on: ["dep:…", "wiki"]
+
+  [dependencies]
+  hub-mod-notes = { path = "../../modules/notes", optional = true }
+  ```
+
+  ```rust
+  #[cfg(feature = "notes")]
+  modules.push(Arc::new(hub_mod_notes::NotesModule));
+  ```
+
+- **The interface**, `web/src/modules.ts`: one line in `SCREENS`.
+
+  ```ts
+  notes: () => import('../../modules/notes/web/index.tsx'),
+  ```
+
+A module folder that is not registered fails `cargo test -p hub-server` and `npm run build`,
+each with the line to add.
+
+**Choosing modules at build time.** `cargo build -p hub-server` has every module of `default`;
+`--no-default-features` builds the tracker alone, `--no-default-features --features github,wiki`
+picks. A build tells the interface which modules it has (the bootstrap lists them), and the
+interface fetches the screens of those only, so one built `web/dist` serves any selection.
+
 ## The crate
 
 - Package name `hub-mod-<id>`; depends on `hub-core` and `hub-app` (workspace dependencies).
 - `src/lib.rs` exports one unit struct, e.g. `pub struct WikiModule;`, implementing
   `hub_app::Module` (`crates/hub-app/src/module.rs` documents every hook).
-- `hub-server/src/lib.rs::modules()` lists the modules compiled into the build.
+- `hub-server/src/lib.rs::modules()` lists the modules compiled into the build, each under
+  its Cargo feature (see "Registering a module").
+- `ModuleMeta::depends_on` names the modules this one needs, written as a plain list
+  (`depends_on: &["wiki"]`): the boundary test reads it from the source, so that it can check
+  a module the build leaves out.
 
 ## What the host gives a module
 
@@ -44,10 +83,18 @@ it in `disabledModules`. The module is not asked and does not have to know:
 - the interface leaves the module out of that project: its project navigation, its pages
   under `/p/:key/…`, its tab in the project's settings, its panel and its badges.
 
-Everything else stays per instance: the module's own routes, its events, its section of
-"My work", its tools, and its query-language fields, which still match that project's issues.
-A module that wants to respect the switch there reads
-`hub_app::services::project_modules::disabled_modules(connection, project_id)`.
+What a module gathers across projects is the module's to limit, because the host cannot see
+into it. Its section of "My work" leaves out the projects where it is off by adding
+`hub_app::services::project_modules::on_in_project("<id>", "i.project_id")` to its query: a
+condition on a project-id column. The three modules that have a section do.
+
+Everything else stays per instance: the module's own routes, its events, its tools, and its
+query-language fields, which still match that project's issues. A module that wants to
+respect the switch there uses the same condition, or reads
+`project_modules::disabled_modules(connection, project_id)`.
+
+Every open browser learns of a switch at once: it is announced as `project.updated`, and the
+interface then asks for the list of projects again.
 
 ## Rules
 
@@ -76,11 +123,19 @@ A module that wants to respect the switch there reads
 
 ## The web half
 
-`modules/<id>/web/index.tsx` exports one `WebModule` (the type, with a comment on every
-field, is in `web/src/modules.ts`, where the module is also listed). It only shows up where
-it has something: project navigation, full pages, badges on issue cards, a panel on the issue
-page, a section of "My work", tabs in project and instance settings.
+The default export of `modules/<id>/web/index.tsx` is one `WebModule` (the type, with a
+comment on every field, is in `web/src/modules.ts`, where the module is also listed). It only
+shows up where it has something: project navigation, full pages, badges on issue cards, a
+panel on the issue page, a section of "My work", tabs in project and instance settings.
 `modules/github/web/index.tsx` uses every one of these and is the reference.
+
+A module's screens, its Polish and its styles are a chunk of their own
+(`assets/module-<id>-….js` and `.css`). The browser fetches the chunks of the modules that
+are switched on, side by side, right after the bootstrap and before it shows anything; a
+module that is off, or not in the build, costs the browser nothing, and one switched on later
+is fetched then, without a reload. What `index.tsx` imports at the top is therefore what
+every page waits for: keep a heavy part that only one page needs behind `lazyView` from
+`@/lazy.tsx`.
 
 - **Imports**: `react`, and the application through the `@/` alias (`web/src`). Nothing else
   resolves from a module folder, so no extra packages: charts are hand-drawn SVG.
@@ -93,12 +148,13 @@ page, a section of "My work", tabs in project and instance settings.
     project's navigation instead of the last one used.
   - `@/components/ui.tsx`: `Button`, `Dialog`, `ConfirmDialog`, `Picker`, `Menu`, `Popover`,
     `Tabs`, `Tag`, `Field`, `Empty`, `Spinner`, `ErrorNote`, `ProgressBar`, `Avatar`,
-    `InlineEdit`, `attempt()`, `useBusy()`, `toast()`, `copyText()`. Each lives in its own
-    file under `components/ui/`; import them from `ui.tsx`, which is what stays stable.
+    `InlineEdit`, `SettingsCard`, `attempt()`, `useBusy()`, `toast()`, `copyText()`. Each lives
+    in its own file under `components/ui/`; import them from `ui.tsx`, which is what stays
+    stable.
   - `@/components/icon.tsx` (`Icon`, the names are the keys of its table),
     `@/components/issue-bits.tsx` (`IssueLine`, `IssueKey`, pickers for issue fields),
     `@/components/markdown.tsx` (`Markdown`, `MarkdownEditor`), `@/router.tsx` (`Link`,
-    `navigate`, `useSearchParams`, `setParam`), `@/views/settings.tsx` (`SettingsCard`).
+    `navigate`, `useSearchParams`, `setParam`).
   - `@/modules.ts`: the `WebModule` type, and `useModules(project?)` for the rare module that
     renders what other modules contribute.
   - `@/bindings/*`: the types generated from Rust. Never write those shapes by hand.
@@ -121,13 +177,16 @@ page, a section of "My work", tabs in project and instance settings.
 
 The rules about who may depend on whom are checked, not just written down:
 
-- `cargo test -p hub-server --test boundaries` reads the manifests. A module may depend on
+- `cargo test -p hub-server --test boundaries` reads the manifests and the sources of every
+  folder under `modules/`, whether or not the build has that module. A module may depend on
   another module's crate only when its `ModuleMeta::depends_on` names it; no module depends
-  on `hub-server`; `hub-app` depends on no module; `hub-core` depends on nothing that touches
-  the network, the disk or a runtime.
+  on `hub-server`; every module is a feature of `hub-server` that switches on its crate and
+  the features of what it depends on; `hub-app` depends on no module; `hub-core` depends on
+  nothing that touches the network, the disk or a runtime.
 - `npm run check:boundaries` (part of `npm run build`) reads the imports. A file under
   `modules/<id>/web/` imports `react`, `@/…` and its own files, never another module's folder
-  and never a package of its own; under `web/src/` only `modules.ts` names a module's folder.
+  and never a package of its own; under `web/src/` only `modules.ts` names a module's folder,
+  it lists every module that has screens, and it fetches each with `import()`.
 
 A module that needs something from another one declares it in `depends_on` and uses its
 crate on the server; in the interface it goes through what the host offers (`useModules()`,
