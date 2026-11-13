@@ -5,7 +5,7 @@ import { t } from '@web/i18n/index.ts';
 import { core } from '../api.ts';
 import type { ConnectionStatus } from '../bindings/ConnectionStatus.ts';
 import type { PairingView } from '../bindings/PairingView.ts';
-import { inApp, openExternal, web } from '../bridge.ts';
+import { inApp, openExternal, signIn, web } from '../bridge.ts';
 import { useWebSlot } from '../shell/web-slot.ts';
 
 function messageOf(reason: unknown): string {
@@ -51,9 +51,11 @@ function Pairing({ pairing, onCancel }: { pairing: PairingView; onCancel: () => 
   );
 }
 
-/** The first screen: the server's address, and signing in to it in the window. */
+/** The first screen: the server's address, and the e-mail address and password of an account there. */
 export function ConnectView({ status, onConnected }: { status: ConnectionStatus; onConnected: (status: ConnectionStatus) => void }) {
   const [url, setUrl] = useState(status.serverUrl ?? '');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [pairing, setPairing] = useState<PairingView | undefined>();
@@ -71,8 +73,24 @@ export function ConnectView({ status, onConnected }: { status: ConnectionStatus;
     [],
   );
 
-  async function signIn(event: FormEvent): Promise<void> {
+  async function withPassword(event: FormEvent): Promise<void> {
     event.preventDefault();
+    setBusy(true);
+    setError(undefined);
+
+    try {
+      const connected = await signIn<ConnectionStatus>(url, email, password);
+
+      setPassword('');
+      onConnected(connected);
+    } catch (reason) {
+      setError(messageOf(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function atTracker(): Promise<void> {
     setBusy(true);
     setError(undefined);
 
@@ -144,26 +162,42 @@ export function ConnectView({ status, onConnected }: { status: ConnectionStatus;
           team-hub
         </div>
         <h1>{t('Connect to your team-hub')}</h1>
-        <p className="muted">{t('Sign in to your server here, in the window, with the account you use in the browser. The app gets a token of its own and keeps it in the keychain of this computer.')}</p>
-        <form className="form" onSubmit={signIn}>
+        <p className="muted">{t('Sign in with the account you use in the browser. The password goes to your server and is kept nowhere; the app gets a token of its own, in the keychain of this computer.')}</p>
+        <form className="form" onSubmit={withPassword}>
           <Field label={t('Server address')}>
-            <input className="input" placeholder="https://hub.example.com" value={url} onChange={(event) => setUrl(event.target.value)} autoFocus required />
+            <input className="input" placeholder="https://hub.example.com" value={url} onChange={(event) => setUrl(event.target.value)} autoFocus={!url} required />
+          </Field>
+          <Field label={t('E-mail')}>
+            <input className="input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" autoFocus={Boolean(url)} required />
+          </Field>
+          <Field label={t('Password')}>
+            <input className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
           </Field>
           {error && <ErrorNote message={error} />}
           <Button variant="primary" type="submit" disabled={busy}>
-            {busy ? t('Connecting…') : t('Sign in in the window')}
+            {busy ? t('Connecting…') : t('Sign in')}
           </Button>
         </form>
         <details className="desk-advanced">
-          <summary>{t('Advanced: connect with an API token')}</summary>
+          <summary>{t('Other ways to connect')}</summary>
+          <div className="form">
+            <p className="muted">{t('Sign in at the tracker instead: the app shows a code, you sign in on the server’s own page and confirm it there, and the app never sees your password.')}</p>
+            <div>
+              <Button disabled={busy || !url.trim()} onClick={() => void atTracker()}>
+                {t('Sign in at the tracker')}
+              </Button>
+            </div>
+          </div>
           <form className="form" onSubmit={withToken}>
-            <p className="muted">{t('For a computer where signing in is not possible. Create a token in team-hub under Settings → API tokens; it is kept in the keychain of this computer and nowhere else.')}</p>
+            <p className="muted">{t('Or paste an API token, for a computer where nobody can sign in. Create one in team-hub under Settings → API tokens; it is kept in the keychain of this computer and nowhere else.')}</p>
             <Field label={t('API token')}>
               <input className="input input-mono" type="password" placeholder="th_…" value={token} onChange={(event) => setToken(event.target.value)} autoComplete="off" required />
             </Field>
-            <Button type="submit" disabled={busy || !url.trim()}>
-              {t('Connect')}
-            </Button>
+            <div>
+              <Button type="submit" disabled={busy || !url.trim()}>
+                {t('Connect')}
+              </Button>
+            </div>
           </form>
         </details>
       </div>

@@ -145,6 +145,9 @@ pub struct HubState {
     pub no_pairing: bool,
     /// The ids of the tokens that were removed through the API.
     pub revoked_tokens: Vec<i64>,
+    /// The names of the tokens made in a browser session, and how many sessions are open.
+    pub made_tokens: Vec<String>,
+    pub sessions: i64,
     pub(crate) next_id: i64,
     pub(crate) live: broadcast::Sender<String>,
 }
@@ -492,6 +495,69 @@ async fn claim_pairing(State(state): Shared, UrlPath(id): UrlPath<String>, Json(
             Json(json!({ "status": "approved", "token": token, "tokenId": PAIRED_TOKEN_ID })).into_response()
         }
     }
+}
+
+/// What the fake server takes as the one account's sign-in.
+pub const EMAIL: &str = "ada@example.com";
+pub const PASSWORD: &str = "correct horse";
+const SESSION: &str = "session-of-ada";
+const CSRF: &str = "csrf-of-ada";
+
+fn in_session(headers: &HeaderMap, needs_csrf: bool) -> bool {
+    let cookie = headers.get("cookie").and_then(|value| value.to_str().ok()).unwrap_or_default();
+    let csrf = headers.get("x-csrf-token").and_then(|value| value.to_str().ok());
+
+    cookie == format!("th_session={SESSION}") && (!needs_csrf || csrf == Some(CSRF))
+}
+
+async fn login(State(state): Shared, Json(body): Json<Value>) -> Response {
+    let mut state = lock(&state);
+
+    if body["email"] != EMAIL || body["password"] != PASSWORD {
+        return error(StatusCode::UNAUTHORIZED, "Wrong e-mail or password");
+    }
+
+    state.sessions += 1;
+
+    ([("set-cookie", format!("th_session={SESSION}; HttpOnly; SameSite=Lax; Path=/"))], Json(json!({ "user": user(), "csrf": CSRF }))).into_response()
+}
+
+async fn logout(State(state): Shared, headers: HeaderMap) -> Response {
+    if in_session(&headers, true) {
+        lock(&state).sessions -= 1;
+    }
+
+    Json(Value::Null).into_response()
+}
+
+async fn create_token(State(state): Shared, headers: HeaderMap, Json(body): Json<Value>) -> Response {
+    if !in_session(&headers, true) {
+        return error(StatusCode::FORBIDDEN, "Missing or stale CSRF token; reload the page");
+    }
+
+    let mut state = lock(&state);
+    let token = state.token.clone();
+
+    state.made_tokens.push(body["name"].as_str().unwrap_or_default().to_string());
+
+    Json(json!({ "token": token })).into_response()
+}
+
+async fn list_tokens(State(state): Shared, headers: HeaderMap) -> Response {
+    if !in_session(&headers, false) {
+        return error(StatusCode::UNAUTHORIZED, "Sign in first");
+    }
+
+    let state = lock(&state);
+    let hint = format!("…{}", &state.token[state.token.len() - 4..]);
+    // An older token of another name sits beside the one just made.
+    let mut tokens = vec![json!({ "id": 3, "name": "script", "hint": hint })];
+
+    if let Some(name) = state.made_tokens.last() {
+        tokens.insert(0, json!({ "id": PAIRED_TOKEN_ID, "name": name, "hint": hint }));
+    }
+
+    Json(tokens).into_response()
 }
 
 async fn revoke_token(State(state): Shared, headers: HeaderMap, UrlPath(id): UrlPath<i64>) -> Response {
@@ -1021,6 +1087,8 @@ impl FakeHub {
             pairings: BTreeMap::new(),
             no_pairing: false,
             revoked_tokens: Vec::new(),
+            made_tokens: Vec::new(),
+            sessions: 0,
             next_id: 100,
             live,
         }));
@@ -1044,6 +1112,9 @@ impl FakeHub {
             .route("/desktop/pairings", post(start_pairing))
             .route("/desktop/pairings/{id}/token", post(claim_pairing))
             .route("/me/tokens/{id}", axum::routing::delete(revoke_token))
+            .route("/login", post(login))
+            .route("/logout", post(logout))
+            .route("/me/tokens", get(list_tokens).post(create_token))
             .route("/dashboard", get(dashboard))
             .route("/projects/{key}", get(get_project))
             .route("/issues", post(create_issue))

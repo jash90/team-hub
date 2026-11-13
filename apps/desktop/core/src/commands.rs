@@ -20,6 +20,14 @@ struct Connect {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct SignIn {
+    url: String,
+    email: String,
+    password: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ServerUrl {
     url: String,
 }
@@ -157,9 +165,10 @@ fn answer<T: Serialize>(value: CoreResult<T>) -> CoreResult<Value> {
 }
 
 /// Every command the interface may call.
-pub const COMMANDS: [&str; 40] = [
+pub const COMMANDS: [&str; 41] = [
     "status",
     "connect",
+    "sign_in",
     "disconnect",
     "pair_start",
     "pair_wait",
@@ -214,7 +223,21 @@ async fn dispatch(desktop: &Desktop, command: &str, args: Value) -> CoreResult<V
             desktop.run(move |core| answer(core.connect(&url, &token))).await
         }
         "disconnect" => desktop.run(|core| answer(core.disconnect())).await,
-        // Signing in from the window: docs/desktop-pairing.md.
+        // Here nobody shows the tracker, so the session that made the token is ended. The
+        // window has a command of its own, which hands the session to the tracker instead.
+        "sign_in" => {
+            let SignIn { url, email, password } = arguments(command, args)?;
+
+            desktop
+                .run(move |core| {
+                    let (status, session) = core.sign_in(&url, &email, &password)?;
+
+                    session.end();
+                    answer(Ok(status))
+                })
+                .await
+        }
+        // Signing in at the tracker instead, where the app never sees the password: docs/desktop-pairing.md.
         "pair_start" => {
             let ServerUrl { url } = arguments(command, args)?;
 

@@ -146,6 +146,17 @@ export const web = {
   forget: () => shell<null>('web_forget'),
 };
 
+/**
+ * Signs in with the e-mail address and password of an account. Inside the app the window
+ * does it, so that the tracker it shows is signed in by the same sign-in; in a browser
+ * the core does, and the tracker is a tab that signs in for itself.
+ */
+export async function signIn<T>(url: string, email: string, password: string): Promise<T> {
+  const args = { url, email, password };
+
+  return IN_APP ? ((await shell<T>('sign_in', args)) as T) : call<T>('sign_in', args);
+}
+
 /** Lets the person pick a folder. In a browser there is no folder dialog, so it asks for the path. */
 export async function pickFolder(title: string): Promise<string | null> {
   if (IN_APP) {

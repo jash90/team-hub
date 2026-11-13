@@ -116,6 +116,58 @@ pub struct PairingGrant {
     pub token_id: i64,
 }
 
+/// The name of the server's session cookie, with the `=` that follows it.
+const SESSION_COOKIE_PREFIX: &str = "th_session=";
+/// The name alone, for whoever hands the session to a browser.
+pub const SESSION_COOKIE: &str = "th_session";
+
+/// A browser session on the server, made by signing in with a password. The app uses it to
+/// make itself a token; the window hands it to the tracker it shows, so that the person
+/// signs in once. It is kept nowhere.
+#[derive(Debug, Clone)]
+pub struct WebSession {
+    base: String,
+    /// The value of the session cookie.
+    pub cookie: Secret,
+    csrf: String,
+}
+
+impl WebSession {
+    fn call<T: DeserializeOwned>(&self, method: &str, path: &str, body: Option<&Value>) -> CoreResult<T> {
+        let agent = agent_for(&self.base, Some(TIMEOUT));
+        let url = format!("{}{path}", self.base);
+        let cookie = format!("{SESSION_COOKIE_PREFIX}{}", self.cookie.expose());
+
+        HubClient::finish(match (method, body) {
+            ("GET", _) => agent.get(url).header("Cookie", cookie).call(),
+            (_, body) => agent.post(url).header("Cookie", cookie).header("x-csrf-token", &self.csrf).send_json(body.unwrap_or(&Value::Null)),
+        })
+    }
+
+    /// Makes an API token of the signed-in person, named `name`; the token and its id.
+    pub fn create_token(&self, name: &str) -> CoreResult<PairingGrant> {
+        let made: Value = self.call("POST", "/api/me/tokens", Some(&json!({ "name": name })))?;
+        let token = made["token"].as_str().unwrap_or_default().to_string();
+        // The server lists tokens newest first, each with the last characters of its text.
+        let listed: Vec<Value> = self.call("GET", "/api/me/tokens", None)?;
+        let tail: String = token.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
+        let token_id = listed
+            .iter()
+            .find(|entry| entry["name"] == name && entry["hint"].as_str().is_some_and(|hint| hint.ends_with(&tail)))
+            .and_then(|entry| entry["id"].as_i64());
+
+        match (token.is_empty(), token_id) {
+            (false, Some(token_id)) => Ok(PairingGrant { token: Secret::new(token), token_id }),
+            _ => Err(CoreError::Api { status: 200, code: "unreadable".into(), message: "The server did not hand over a token".into() }),
+        }
+    }
+
+    /// Ends the session on the server: for when no browser is going to use it.
+    pub fn end(&self) {
+        let _ = self.call::<Value>("POST", "/api/logout", None);
+    }
+}
+
 #[derive(Clone)]
 pub struct HubClient {
     base: String,
@@ -249,6 +301,36 @@ impl HubClient {
             Ok(Some(serde_json::from_value(answer)?))
         } else {
             Ok(None)
+        }
+    }
+
+    // ---------- signing in with e-mail and password, as the web interface does ----------
+
+    /// Signs in as a browser would. The answer is the session: its cookie and CSRF token.
+    pub fn sign_in(base: &str, email: &str, password: &str) -> CoreResult<WebSession> {
+        let request = agent_for(base, Some(TIMEOUT)).post(format!("{base}/api/login"));
+        let mut response = request.send_json(json!({ "email": email, "password": password })).map_err(offline)?;
+        let cookie = response
+            .headers()
+            .get_all("set-cookie")
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .filter_map(|value| value.split(';').next())
+            .find_map(|pair| pair.trim().strip_prefix(SESSION_COOKIE_PREFIX))
+            .map(Secret::new);
+        let status = response.status().as_u16();
+        let text = response.body_mut().read_to_string().map_err(offline)?;
+        let body: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
+
+        if !(200..300).contains(&status) {
+            let message = body["error"]["message"].as_str().map(String::from).unwrap_or_else(|| format!("The server answered {status}"));
+
+            return Err(CoreError::Api { status, code: body["error"]["code"].as_str().unwrap_or_default().to_string(), message });
+        }
+
+        match (cookie, body["csrf"].as_str()) {
+            (Some(cookie), Some(csrf)) => Ok(WebSession { base: base.to_string(), cookie, csrf: csrf.to_string() }),
+            _ => Err(CoreError::Api { status, code: "unreadable".into(), message: "The server signed in without saying which session this is".into() }),
         }
     }
 

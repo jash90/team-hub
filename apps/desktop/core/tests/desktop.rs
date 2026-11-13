@@ -88,6 +88,57 @@ async fn the_token_lives_in_the_keychain_and_in_no_file() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn signing_in_with_a_password_makes_the_app_a_token_and_keeps_the_password_nowhere() {
+    use hub_desktop_core::secrets::Keychain;
+
+    let hub = FakeHub::start().await;
+    let bench = open("password");
+
+    // A wrong password is the server's refusal, and connects nothing.
+    let url = hub.url.clone();
+    let refused = bench.desktop.run(move |core| core.sign_in(&url, support::EMAIL, "not it")).await.unwrap_err();
+    assert!(refused.to_string().contains("Wrong e-mail or password"), "{refused}");
+    assert!(bench.desktop.run(|core| core.sign_in("http://127.0.0.1:1", " ", "")).await.is_err());
+    assert_eq!((bench.keychain.get("api-token").unwrap(), hub.state().made_tokens.len()), (None, 0));
+
+    // The right one: a token named after this app, connected like a pasted one.
+    let url = hub.url.clone();
+    let (status, session) = bench.desktop.run(move |core| core.sign_in(&url, &format!(" {} ", support::EMAIL), support::PASSWORD)).await.unwrap();
+
+    assert!(status.online && status.has_token);
+    assert_eq!(status.user.unwrap().name, "Ada Nowak");
+    assert!(hub.state().made_tokens[0].starts_with("Desktop"));
+    assert_eq!(bench.keychain.get("api-token").unwrap().unwrap().expose(), TOKEN);
+    assert_eq!(bench.keychain.get("api-token-id").unwrap().unwrap().expose(), support::PAIRED_TOKEN_ID.to_string(), "the token made now, not the older one");
+
+    // The session is the caller's: the window gives it to the tracker, anyone else ends it.
+    assert_eq!((session.cookie.expose(), hub.state().sessions), ("session-of-ada", 1));
+    assert!(!format!("{session:?}").contains("session-of-ada"));
+    session.end();
+    assert_eq!(hub.state().sessions, 0);
+
+    // Neither the password nor the session is in a file.
+    for file in files_under(bench.data.path()) {
+        let bytes = std::fs::read(&file).unwrap();
+
+        for secret in [support::PASSWORD, "session-of-ada", TOKEN] {
+            assert!(!bytes.windows(secret.len()).any(|window| window == secret.as_bytes()), "{secret} is in {}", file.display());
+        }
+    }
+
+    // Disconnecting takes the token back on the server.
+    bench.desktop.run(|core| core.disconnect()).await.unwrap();
+    assert_eq!(hub.state().revoked_tokens, [support::PAIRED_TOKEN_ID]);
+
+    // Through the commands (a browser, the command line) nobody shows the tracker: the
+    // session is ended there, and the answer is the status alone.
+    let args = json!({ "url": hub.url, "email": support::EMAIL, "password": support::PASSWORD });
+    let answer = commands::invoke(&bench.desktop, "sign_in", args).await.unwrap();
+    assert_eq!((&answer["hasToken"], hub.state().sessions), (&json!(true), 0));
+    assert!(!answer.to_string().contains("session-of-ada") && !answer.to_string().contains(support::PASSWORD));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn signing_in_from_the_window_gets_the_token_once_a_person_has_said_yes() {
     use hub_desktop_core::secrets::Keychain;
 
